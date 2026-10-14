@@ -1,26 +1,15 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+html, body { margin: 0; background: #030305; color: #f2f2f4; font-family: Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+* { box-sizing: border-box; }
+a { color: #f2f2f4; }
+a:hover { color: #e8793c; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+input { font: inherit; color: inherit; }
+input::placeholder { color: rgba(242, 242, 244, .45); }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* Pressed states (the design's style-active) */
+.ds-press:active { transform: scale(.98); }
+.ds-press-hero:active { transform: scale(.985); }
+.ds-press-tile:active { transform: scale(.97); }
+.ds-press-bg:active { background: rgba(255, 255, 255, .06) !important; }
