@@ -90,7 +90,7 @@ function Badge({ children, bg, color, size = 10, pad = '4px 7px', radius = 6 }) 
 
 export default class DarkskyMenu extends React.Component {
   // items: menu from the database (falls back to the bundled menu); table: { number, token } from the QR link, or null.
-  static defaultProps = { smokeIntensity: 0.4, skipIntro: false, items: D.ITEMS, table: null };
+  static defaultProps = { smokeIntensity: 0.4, skipIntro: false, items: D.ITEMS, table: null, logoUrl: '/darksky-logo.jpg' };
   state = { gi: 0, gOn: true, ready: false, phase: 'intro', view: 'home', sec: null, contentOn: true, lang: 'es', cat: 'hookah', q: '', searchOpen: false, sheetId: null, vi: 0, qty: 1, cartOpen: false, langOpen: false, cart: [], cash: false, sent: false, sending: false, sendErr: '', orderId: null, orderStatus: null, toast: '', toastOn: false };
   canvasRef = React.createRef();
   introRef = React.createRef();
@@ -108,7 +108,7 @@ export default class DarkskyMenu extends React.Component {
     try {
       const S = await import('@/lib/smoke-scene');
       if (!this.canvasRef.current) return;
-      this.scene = await S.createSmoke(this.canvasRef.current, { logoUrl: '/darksky-logo.jpg', onSlow: () => this.setState({ no3d: true }) });
+      this.scene = await S.createSmoke(this.canvasRef.current, { logoUrl: this.props.logoUrl, onSlow: () => this.setState({ no3d: true }) });
       if (this.scene.fallback) this.setState({ no3d: true }); else setTimeout(() => this.setState({ sceneOn: true }), 2200);
       if (this.state.phase !== 'intro') { this.scene.enter(true); this.scene.setDim(this.dimVal()); }
       this.layoutIntro();
@@ -278,7 +278,7 @@ export default class DarkskyMenu extends React.Component {
       <div style={css(`position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;opacity:${s.phase === 'intro' ? 1 : 0};pointer-events:${s.phase === 'intro' ? 'auto' : 'none'};transition:opacity .7s ease`)}>
         {s.no3d && (
           <div style={css(`position:absolute;left:0;right:0;top:0;height:${s.logoFree || '55%'};display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none`)}>
-            <img src="/darksky-logo.jpg" alt="DARKSKY Hookah Lounge" style={css('max-width:min(78vw,380px);max-height:100%;object-fit:contain;mix-blend-mode:screen')} /> {/* eslint-disable-line @next/next/no-img-element */}
+            <img src={this.props.logoUrl} alt="DARKSKY Hookah Lounge" style={css('max-width:min(78vw,380px);max-height:100%;object-fit:contain;mix-blend-mode:screen')} /> {/* eslint-disable-line @next/next/no-img-element */}
           </div>
         )}
         <div ref={this.introRef} style={css('width:100%;height:min(64vh,640px);display:flex;justify-content:center')}>
