@@ -1,29 +1,69 @@
-# DARKSKY Hookah Lounge — digital menu
+# DARKSKY Hookah Lounge — меню с заказом к столу
 
-Mobile-first menu for the lounge, ported to Next.js from the `DarkSky_Menu.html` design export.
+Гость сканирует QR-код на столе → открывается меню, уже привязанное к его столу → он собирает заказ и жмёт «Отправить официанту» → в Telegram-группу официантов приходит сообщение с кнопкой «Принял». Кто нажал — тот взял заказ; после подачи он жмёт «Подано». Гость видит статус у себя в телефоне.
 
-- 10 languages (auto-detected, remembered per device), RTL for Arabic
-- Hookah lines with strength scale and taste tags, kitchen, cocktails, tea, bar, soft drinks
-- Search, item sheets with variants and pairings, order cart with table number and −15% cash/crypto discount
-- Promotions (Business Hookah −20% 14:00–17:00 shows live) and house rules
-- Three.js smoke intro with the logo and 3D section tiles; falls back to a static logo on weak GPUs
+- **Меню для гостя** — `/` (только просмотр) и `/t/<код стола>` (с заказом). 10 языков, поиск, корзина, скидка −15% за наличные/крипто.
+- **Админка** — `/admin` (вход по паролю):
+  - **Меню**: добавить / изменить / удалить блюдо, фото, цены и варианты, описания на ES / EN / RU, вкус, крепость, «хит», «новинка», порядок в категории;
+  - **Стоп-лист**: переключатель «В наличии» — блюдо сразу пропадает из меню гостей;
+  - **Столы и QR**: добавить столы, выключить стол, выпустить новую ссылку, распечатать все QR-коды на листах A4;
+  - **Заказы**: история заказов со статусами;
+  - **Telegram**: проверка и подключение бота.
 
-## Where things live
+## Запуск (один раз, ~20 минут)
 
-| What | File |
-| --- | --- |
-| Menu content: items, prices, translations, promos, rules | `src/lib/darksky-data.js` |
-| Product photos / videos / 3D models (`id → path in public/`) | `MEDIA` in `src/lib/darksky-data.js` |
-| UI and logic | `src/components/DarkskyMenu.jsx` |
-| Smoke intro / section tiles (three.js) | `src/lib/smoke-scene.js`, `src/lib/tiles-scene.js` |
-| Fonts (Manrope, Michroma), logo | `public/fonts`, `public/darksky-logo.jpg` |
+Нужны три бесплатных аккаунта: **Supabase** (база данных), **Vercel** (хостинг сайта), **Telegram-бот**.
 
-## Run
+### 1. База данных — Supabase
+1. Зарегистрируйтесь на [supabase.com](https://supabase.com) → **New project** (регион: South America (São Paulo)). Придумайте и сохраните пароль базы.
+2. В проекте нажмите **Connect** → вкладка **Connection string** → **Transaction pooler**. Скопируйте строку и подставьте в неё пароль вместо `[YOUR-PASSWORD]`. Это `DATABASE_URL`.
+
+### 2. Бот — Telegram
+1. Напишите [@BotFather](https://t.me/BotFather) → `/newbot` → придумайте имя → получите **токен**. Это `TELEGRAM_BOT_TOKEN`.
+2. Создайте группу для официантов и добавьте туда бота.
+
+### 3. Сайт — Vercel
+1. Зарегистрируйтесь на [vercel.com](https://vercel.com) через GitHub → **Add New → Project** → выберите репозиторий `dark-sky-`.
+2. В **Environment Variables** добавьте:
+   | Переменная | Значение |
+   | --- | --- |
+   | `DATABASE_URL` | строка из Supabase |
+   | `ADMIN_PASSWORD` | пароль для входа в админку |
+   | `TELEGRAM_BOT_TOKEN` | токен от BotFather |
+3. Нажмите **Deploy**. При первой сборке база заполнится сама: всё текущее меню и 20 столов.
+
+### 4. Подключить бота
+1. Откройте `https://<ваш-сайт>.vercel.app/admin` → войдите → вкладка **Telegram** → **Подключить бота**.
+2. В группе официантов напишите `/id` — бот ответит номером группы (вида `-100…`).
+3. В Vercel добавьте переменную `TELEGRAM_CHAT_ID` с этим номером → **Redeploy**.
+4. В админке → **Telegram** → **Отправить тест в группу**. Сообщение пришло — всё готово.
+
+### 5. QR-коды
+Админка → **Столы и QR** → добавьте недостающие столы → **Распечатать QR-коды**. Если подключите свой домен, сначала укажите его в переменной `SITE_URL`, а потом печатайте — QR ведут на адрес сайта.
+
+## Полезно знать
+- Цены в заказе всегда пересчитываются на сервере по базе — подделать цену с телефона нельзя.
+- Ссылка стола содержит секретный код: номер стола в адресе подменить нельзя. Если QR-код украли или испортили — «Новая ссылка» в админке, старый перестанет работать.
+- С одного стола — не больше 5 заказов за 2 минуты (защита от спама).
+- Если Telegram недоступен, гость увидит «Не удалось отправить заказ. Позовите официанта», а заказ будет отмечен в админке как «Не доставлен в Telegram».
+- Акции (Business Hookah, 2-й/3-й кальян) в сумме заказа не считаются — их применяет официант при расчёте. Автоматически считается только −15% за наличные/крипто.
+- Время в сообщениях — по Буэнос-Айресу; другой часовой пояс: переменная `VENUE_TIMEZONE`.
+
+## Для разработчика
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm run build && npm start
+cp .env.example .env.local        # заполнить
+npm run db:setup                  # схема + меню + столы (идемпотентно); также запускается перед каждым build
+npm run dev
 ```
 
-"Send to waiter" currently only shows a confirmation on the guest's phone; it is not wired to any backend yet.
+| Что | Где |
+| --- | --- |
+| Схема базы | `db/schema.sql` |
+| Меню гостя (UI) | `src/components/DarkskyMenu.jsx` |
+| Исходное меню (для первого заполнения базы), переводы интерфейса, акции, правила | `src/lib/darksky-data.js` |
+| Заказы: проверка, цены, статусы | `src/lib/orders.js`, `src/app/api/orders` |
+| Telegram: сообщения, кнопки, вебхук | `src/lib/telegram.js`, `src/app/api/telegram` |
+| Админка | `src/app/admin`, `src/components/admin`, `src/app/api/admin` |
+| Анимация дыма / 3D-плитки (three.js) | `src/lib/smoke-scene.js`, `src/lib/tiles-scene.js` |

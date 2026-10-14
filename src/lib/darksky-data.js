@@ -267,3 +267,19 @@ export const MEDIA = {
   // 'h-premium': 'media/h-premium.mp4',
   // 'aburi': 'media/aburi.glb',
 };
+
+// Ordering from the table (QR link): extra UI strings.
+const OK = ['scanQr', 'accepted', 'served', 'sendFail', 'wait', 'sending', 'unavailable'];
+const ORAW = {
+  en: ['Scan the QR code on your table to order', 'Your waiter has taken the order', 'Enjoy!', "Couldn't send the order. Please call your waiter.", 'Please wait a minute before the next order', 'Sending…', 'Some items are no longer available'],
+  es: ['Escaneá el QR de tu mesa para pedir', 'Tu mozo tomó el pedido', '¡Que lo disfrutes!', 'No se pudo enviar el pedido. Llamá al mozo.', 'Esperá un minuto antes del próximo pedido', 'Enviando…', 'Algunos productos ya no están disponibles'],
+  ru: ['Отсканируйте QR-код на столе, чтобы заказать', 'Официант принял заказ', 'Приятного отдыха!', 'Не удалось отправить заказ. Позовите официанта.', 'Подождите минуту перед следующим заказом', 'Отправляем…', 'Некоторых позиций уже нет в наличии'],
+  zh: ['扫描桌上的二维码即可点单', '服务员已接单', '请慢用！', '订单发送失败，请呼叫服务员。', '请稍等一分钟再下单', '发送中…', '部分菜品已售罄'],
+  hi: ['ऑर्डर करने के लिए अपनी टेबल पर QR कोड स्कैन करें', 'वेटर ने ऑर्डर ले लिया है', 'आनंद लें!', 'ऑर्डर नहीं भेजा जा सका। कृपया वेटर को बुलाएँ।', 'अगला ऑर्डर देने से पहले एक मिनट रुकें', 'भेजा जा रहा है…', 'कुछ आइटम अब उपलब्ध नहीं हैं'],
+  ar: ['امسح رمز QR على طاولتك للطلب', 'استلم النادل طلبك', 'بالهناء والشفاء!', 'تعذّر إرسال الطلب. يرجى مناداة النادل.', 'يرجى الانتظار دقيقة قبل الطلب التالي', 'جارٍ الإرسال…', 'بعض الأصناف لم تعد متوفرة'],
+  fr: ['Scannez le QR code de votre table pour commander', 'Votre serveur a pris la commande', 'Bonne dégustation !', "Impossible d'envoyer la commande. Appelez le serveur.", 'Patientez une minute avant la prochaine commande', 'Envoi…', 'Certains articles ne sont plus disponibles'],
+  pt: ['Escaneie o QR code da sua mesa para pedir', 'O garçom recebeu o pedido', 'Aproveite!', 'Não foi possível enviar o pedido. Chame o garçom.', 'Aguarde um minuto antes do próximo pedido', 'Enviando…', 'Alguns itens não estão mais disponíveis'],
+  de: ['Scanne den QR-Code auf deinem Tisch, um zu bestellen', 'Dein Kellner hat die Bestellung angenommen', 'Viel Genuss!', 'Bestellung konnte nicht gesendet werden. Bitte ruf den Kellner.', 'Bitte warte eine Minute bis zur nächsten Bestellung', 'Wird gesendet…', 'Einige Artikel sind nicht mehr verfügbar'],
+  ja: ['ご注文はテーブルのQRコードを読み取ってください', 'スタッフが注文を受け付けました', 'ごゆっくりどうぞ！', '注文を送信できませんでした。スタッフをお呼びください。', '次のご注文まで1分お待ちください', '送信中…', '一部の商品は品切れです'],
+};
+export const UI_ORDER = Object.fromEntries(Object.entries(ORAW).map(([l, a]) => [l, Object.fromEntries(OK.map((k, i) => [k, a[i]]))]));

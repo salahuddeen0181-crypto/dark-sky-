@@ -89,8 +89,9 @@ function Badge({ children, bg, color, size = 10, pad = '4px 7px', radius = 6 }) 
 }
 
 export default class DarkskyMenu extends React.Component {
-  static defaultProps = { smokeIntensity: 0.4, skipIntro: false };
-  state = { gi: 0, gOn: true, ready: false, phase: 'intro', view: 'home', sec: null, contentOn: true, lang: 'es', cat: 'hookah', q: '', searchOpen: false, sheetId: null, vi: 0, qty: 1, cartOpen: false, langOpen: false, cart: [], cash: false, table: '', tableErr: false, sent: false, toast: '', toastOn: false };
+  // items: menu from the database (falls back to the bundled menu); table: { number, token } from the QR link, or null.
+  static defaultProps = { smokeIntensity: 0.4, skipIntro: false, items: D.ITEMS, table: null };
+  state = { gi: 0, gOn: true, ready: false, phase: 'intro', view: 'home', sec: null, contentOn: true, lang: 'es', cat: 'hookah', q: '', searchOpen: false, sheetId: null, vi: 0, qty: 1, cartOpen: false, langOpen: false, cart: [], cash: false, sent: false, sending: false, sendErr: '', orderId: null, orderStatus: null, toast: '', toastOn: false };
   canvasRef = React.createRef();
   introRef = React.createRef();
   _els = {}; _kinds = {}; _refs = {};
@@ -116,7 +117,7 @@ export default class DarkskyMenu extends React.Component {
     } catch (e) { console.error('smoke scene', e); }
   }
   componentDidUpdate(pp) { if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal()); }
-  componentWillUnmount() { clearInterval(this._gt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); }
+  componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); }
 
   loadTiles() {
     if (this._tilesLoading || this.state.no3d) return; this._tilesLoading = true;
@@ -157,7 +158,7 @@ export default class DarkskyMenu extends React.Component {
   tx(o) { if (o == null) return ''; if (typeof o === 'string') return o; const l = this.state.lang; return o[l] ?? o.en ?? o.es ?? ''; }
   fmt(n) { return n == null ? this.t('onRequest') : '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
   fromFmt(p) { return this.tX('from').replace('{p}', this.fmt(p)); }
-  item(id) { if (!this._map) { this._map = {}; D.ITEMS.forEach(i => { this._map[i.id] = i; }); } return this._map[id]; }
+  item(id) { if (!this._map) { this._map = {}; this.props.items.forEach(i => { this._map[i.id] = i; }); } return this._map[id]; }
   catName(id) { const c = D.CATS.find(c => c.id === id); return c ? this.tx(c.n) : ''; }
   price(it, vi) { return it.v ? it.v[vi || 0].p : it.p; }
   norm(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
@@ -189,7 +190,7 @@ export default class DarkskyMenu extends React.Component {
     });
   }
   mediaVm(it, ctl) {
-    const src = (D.MEDIA || {})[it.id] || '', ext = (src.split('?')[0].split('.').pop() || '').toLowerCase();
+    const src = it.media || (it.img ? '/api/img/' + it.img : ''), ext = (src.split('?')[0].split('.').pop() || '').toLowerCase();
     const vid = ['mp4', 'webm', 'mov', 'm4v'].includes(ext), mdl = ['glb', 'gltf'].includes(ext);
     if (mdl) this.needModelViewer();
     return { mSrc: src, mImg: !!src && !vid && !mdl, mVideo: vid, mModel: mdl, mCtl: !!ctl, mPh: it.name };
@@ -217,15 +218,15 @@ export default class DarkskyMenu extends React.Component {
     const kind = searching ? 'list' : !sec ? 'home' : (sec.kind || cat.kind || 'list');
     const SEC = id => D.SECTIONS.find(x => x.id === id);
     const secVm = (S, extra) => {
-      const its = D.ITEMS.filter(i => S.cats.includes(i.cat)), ps = its.map(i => this.price(i, 0)).filter(p => p != null);
+      const its = this.props.items.filter(i => S.cats.includes(i.cat)), ps = its.map(i => this.price(i, 0)).filter(p => p != null);
       const from = ps.length ? this.fromFmt(Math.min(...ps)) : '';
       return { id: S.id, name: this.tx(S.n), tag: this.tx(S.tag), from, count: its.length, big: '', row: 'auto', col: 'auto', border: 'rgba(255,255,255,.09)', ref: this.tileRef('tile-' + S.id, S.id), onOpen: () => this.nav('section', S.id), ...extra };
     };
     const bizLive = live([14, 17]);
 
     let items = [];
-    if (searching) { const q = this.norm(s.q); items = D.ITEMS.filter(it => this.norm(it.name + ' ' + this.tx(it.d) + ' ' + this.catName(it.cat)).includes(q)); }
-    else if (kind === 'list') items = D.ITEMS.filter(it => it.cat === cat.id);
+    if (searching) { const q = this.norm(s.q); items = this.props.items.filter(it => this.norm(it.name + ' ' + this.tx(it.d) + ' ' + this.catName(it.cat)).includes(q)); }
+    else if (kind === 'list') items = this.props.items.filter(it => it.cat === cat.id);
 
     const it = s.sheetId ? this.item(s.sheetId) : null;
     let sh = null, addLabel = '';
@@ -258,9 +259,9 @@ export default class DarkskyMenu extends React.Component {
         secVm(SEC('bar')), secVm(SEC('soft')),
         secVm(SEC('promos'), { col: 'span 2', big: bizLive ? '−20%' : '−15%', border: 'rgba(232,121,60,.4)' }),
       ],
-      hits: D.ITEMS.filter(i => i.hit).map(i => this.miniVm(i)),
+      hits: this.props.items.filter(i => i.hit).map(i => this.miniVm(i)),
       rulesName: this.tx(SEC('rules').n),
-      hookahs: D.ITEMS.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[0]}–${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: (h.t || []).map(k => this.tx(D.TASTE[k])), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
+      hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[0]}–${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: (h.t || []).map(k => this.tx(D.TASTE[k])), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
       listTitle: searching ? '“' + s.q.trim() + '”' : this.tx(cat.n), items: items.map(x => this.rowVm(x)),
       promos: D.PROMOS.map(p => ({ tag: this.tx(p.tag), title: this.tx(p.title), big: p.big, desc: this.tx(p.d), live: live(p.window) })),
       promoNote: this.tx(D.PROMO_NOTE),
@@ -648,8 +649,8 @@ export default class DarkskyMenu extends React.Component {
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 14.5l5.5 5.5L22 9" stroke="#f2a676" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
             <span style={css('font:400 18px/1.3 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{t('sent')}</span>
-            <span style={css('font:400 15px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.72)')}>{t('sentSub')} · {t('table')} {s.table}</span>
-            <button onClick={() => this.setState({ cart: [], sent: false, cartOpen: false, cash: false })} style={css('margin-top:10px;height:52px;padding:0 24px;border-radius:16px;border:1px solid rgba(255,255,255,.18);font:600 14px/1 Manrope,sans-serif')}>{t('newOrder')}</button>
+            <span style={css('font:400 15px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.72)')}>{s.orderStatus === 'served' ? this.tO('served') : s.orderStatus === 'accepted' ? this.tO('accepted') : t('sentSub')} · {t('table')} {this.props.table && this.props.table.number}</span>
+            <button onClick={() => this.newOrder()} style={css('margin-top:10px;height:52px;padding:0 24px;border-radius:16px;border:1px solid rgba(255,255,255,.18);font:600 14px/1 Manrope,sans-serif')}>{t('newOrder')}</button>
           </div>
         )}
 
@@ -690,10 +691,12 @@ export default class DarkskyMenu extends React.Component {
               </span>
             </button>
 
-            <div style={css('display:flex;align-items:center;justify-content:space-between;gap:14px')}>
-              <span style={css('font:400 10px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.7)')}>{t('table')}</span>
-              <input value={s.table} onChange={e => this.setState({ table: e.target.value.replace(/[^0-9]/g, '').slice(0, 3), tableErr: false })} inputMode="numeric" placeholder={t('tablePh')} style={css(`width:110px;height:48px;border-radius:14px;border:1px solid ${s.tableErr ? '#e8793c' : 'rgba(255,255,255,.14)'};background:rgba(255,255,255,.05);padding:0 14px;font:600 16px/1 Manrope,sans-serif;text-align:center;outline:none`)} />
-            </div>
+            {this.props.table && (
+              <div style={css('display:flex;align-items:center;justify-content:space-between;gap:14px')}>
+                <span style={css('font:400 10px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.7)')}>{t('table')}</span>
+                <span style={css('min-width:64px;height:48px;padding:0 16px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font:600 18px/1 Manrope,sans-serif')}>{this.props.table.number}</span>
+              </div>
+            )}
 
             <div style={css('display:flex;flex-direction:column;gap:8px;padding-top:4px;font:500 14px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>
               <div style={css('display:flex;justify-content:space-between;color:rgba(242,242,244,.7)')}><span>{t('subtotal')}</span><span>{v.subtotal}</span></div>
@@ -702,10 +705,15 @@ export default class DarkskyMenu extends React.Component {
               {v.onReq && <span style={css('font:400 12px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.55)')}>+ {t('onRequest')}</span>}
             </div>
 
-            <button className="ds-press" onClick={() => (s.table ? this.setState({ sent: true }) : this.setState({ tableErr: true }))} style={css('height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:center;gap:12px;font:400 12px/1 Michroma,sans-serif;letter-spacing:.16em;text-transform:uppercase')}>
-              <span>{t('send')}</span>
-              <Arrow w={1.5} />
-            </button>
+            {s.sendErr && <div role="alert" style={css('padding:12px 14px;border-radius:14px;border:1px solid rgba(232,121,60,.5);background:rgba(232,121,60,.1);font:500 14px/1.4 Manrope,sans-serif;color:#f6c3a3')}>{this.tO(s.sendErr)}</div>}
+            {this.props.table ? (
+              <button className="ds-press" disabled={s.sending} onClick={() => this.sendOrder()} style={css(`height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:center;gap:12px;font:400 12px/1 Michroma,sans-serif;letter-spacing:.16em;text-transform:uppercase;opacity:${s.sending ? 0.6 : 1}`)}>
+                <span>{s.sending ? this.tO('sending') : t('send')}</span>
+                {!s.sending && <Arrow w={1.5} />}
+              </button>
+            ) : (
+              <div style={css('padding:16px;border-radius:18px;border:1px dashed rgba(255,255,255,.2);text-align:center;font:500 14px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.75)')}>{this.tO('scanQr')}</div>
+            )}
           </>
         )}
       </div>
@@ -713,6 +721,44 @@ export default class DarkskyMenu extends React.Component {
   }
 
   closeAll() { this.setState({ sheetId: null, cartOpen: false, langOpen: false }); }
+  tO(k) { const U = D.UI_ORDER; return (U[this.state.lang] || U.en)[k]; }
+
+  async sendOrder() {
+    const s = this.state, table = this.props.table;
+    if (!table || s.sending || !s.cart.length) return;
+    this.setState({ sending: true, sendErr: '' });
+    try {
+      const r = await fetch('/api/orders', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, qty: l.qty })), cash: s.cash, lang: s.lang }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const err = j.error === 'rate' ? 'wait' : j.error === 'unavailable' ? 'unavailable' : 'sendFail';
+        return this.setState({ sending: false, sendErr: err });
+      }
+      this.setState({ sending: false, sent: true, orderId: j.id, orderStatus: j.status || 'new' });
+      this.pollOrder(j.id);
+    } catch (e) {
+      this.setState({ sending: false, sendErr: 'sendFail' });
+    }
+  }
+  // Waiter taps "Принял" / "Подано" in Telegram → the guest sees it here.
+  pollOrder(id) {
+    clearInterval(this._poll);
+    const started = Date.now();
+    this._poll = setInterval(async () => {
+      if (this.state.orderId !== id || Date.now() - started > 45 * 60e3) return clearInterval(this._poll);
+      try {
+        const r = await fetch(`/api/orders/${id}?t=${encodeURIComponent(this.props.table.token)}`, { cache: 'no-store' });
+        if (!r.ok) return;
+        const { status } = await r.json();
+        if (status !== this.state.orderStatus) this.setState({ orderStatus: status });
+        if (status === 'served') clearInterval(this._poll);
+      } catch (e) { /* offline for a moment: try again next tick */ }
+    }, 4000);
+  }
+  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, cash: false, orderId: null, orderStatus: null, sendErr: '' }); }
 
   render() {
     const s = this.state;

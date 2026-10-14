@@ -4,14 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "node scripts/setup-db.mjs --if-env && next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:setup": "node scripts/setup-db.mjs"
   },
   "dependencies": {
     "next": "15.5.27",
+    "postgres": "^3.4.5",
+    "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "server-only": "^0.0.1",
     "three": "^0.170.0"
   },
   "devDependencies": {

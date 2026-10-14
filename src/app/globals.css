@@ -1,12 +1,19 @@
 @import "tailwindcss";
 
-html, body { margin: 0; background: #030305; color: #f2f2f4; font-family: Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
-* { box-sizing: border-box; }
-a { color: #f2f2f4; }
-a:hover { color: #e8793c; }
-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
-input { font: inherit; color: inherit; }
-input::placeholder { color: rgba(242, 242, 244, .45); }
+/* Base rules live in the base layer so Tailwind utilities (admin) can override them;
+   the guest menu styles everything inline. */
+@layer base {
+  html, body { margin: 0; background: #030305; color: #f2f2f4; font-family: Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; }
+  a { color: inherit; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+  button:disabled { cursor: default; }
+  input { font: inherit; color: inherit; }
+  input::placeholder, textarea::placeholder { color: rgba(242, 242, 244, .45); }
+}
+
+/* Michroma has no Cyrillic: Russian headings fall back to Manrope. */
+.font-display { font-family: Michroma, Manrope, sans-serif; }
 
 /* Pressed states (the design's style-active) */
 .ds-press:active { transform: scale(.98); }
