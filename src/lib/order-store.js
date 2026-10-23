@@ -1,0 +1,112 @@
+import 'server-only';
+import { db } from './db';
+import * as D from './darksky-data';
+
+// Storage for tables and orders. With DATABASE_URL it is Postgres; without one (local preview) orders live in server
+// memory until restart, tables 1–20 open as /t/demo-<number> and prices come from the bundled menu.
+export const memMode = () => !process.env.DATABASE_URL;
+
+const mem = () => (globalThis.__darkskyOrders ||= { seq: 0, orders: [] });
+const memOrder = id => mem().orders.find(o => o.id === Number(id)) || null;
+const DEMO = /^demo-(\d{1,2})$/;
+const ACTIVE = new Set(['new', 'accepted']);
+
+export async function findTable(token) {
+  token = String(token || '');
+  if (memMode()) {
+    const n = Number((token.match(DEMO) || [])[1]);
+    return n >= 1 && n <= 20 ? { id: n, number: n, token } : null;
+  }
+  const [t] = await db()`select id, number, token from tables where token = ${token} and active`;
+  return t || null;
+}
+
+export async function recentOrders(tableId, minutes) {
+  if (memMode()) return mem().orders.filter(o => o.table_id === tableId && Date.now() - o.created_at < minutes * 60e3).length;
+  const [{ n }] = await db()`select count(*)::int as n from orders where table_id = ${tableId} and created_at > now() - make_interval(mins => ${minutes}) and status <> 'failed'`;
+  return n;
+}
+
+// [{ id, hidden, data }] — data is the item as the menu renders it
+export async function menuRows(ids) {
+  if (memMode()) return D.ITEMS.filter(it => ids.includes(it.id)).map(it => ({ id: it.id, hidden: false, data: it }));
+  return db()`select id, hidden, data from menu_items where id in ${db()(ids)}`;
+}
+
+export async function insertOrder(o) {
+  if (memMode()) {
+    const row = { ...o, id: ++mem().seq, status: 'new', accepted_by: null, tg_message_id: null, created_at: Date.now(), accepted_at: null, served_at: null, edited_at: null };
+    mem().orders.unshift(row);
+    return row;
+  }
+  const sql = db();
+  const [row] = await sql`
+    insert into orders (table_id, table_number, lines, subtotal, discount, total, cash, on_request, lang, note)
+    values (${o.table_id}, ${o.table_number}, ${sql.json(o.lines)}, ${o.subtotal}, ${o.discount}, ${o.total}, ${o.cash}, ${o.on_request}, ${o.lang}, ${o.note})
+    returning *`;
+  return row;
+}
+
+export async function setTgMessage(id, mid) {
+  if (memMode()) { const o = memOrder(id); if (o) o.tg_message_id = mid; return; }
+  await db()`update orders set tg_message_id = ${mid} where id = ${id}`;
+}
+
+// Atomic transitions: two waiters tapping "Принять" at once → only the first wins, the other gets null.
+export async function markAccepted(id, by, byId = null) {
+  if (memMode()) {
+    const o = memOrder(id);
+    if (!o || o.status !== 'new') return null;
+    return Object.assign(o, { status: 'accepted', accepted_by: by, accepted_by_id: byId, accepted_at: Date.now() });
+  }
+  const [o] = await db()`update orders set status = 'accepted', accepted_by = ${by}, accepted_by_id = ${byId}, accepted_at = now() where id = ${id} and status = 'new' returning *`;
+  return o || null;
+}
+
+export async function markServed(id, byId = null) {
+  if (memMode()) {
+    const o = memOrder(id);
+    if (!o || o.status !== 'accepted') return null;
+    return Object.assign(o, { status: 'served', served_by_id: byId, served_at: Date.now() });
+  }
+  const [o] = await db()`update orders set status = 'served', served_by_id = ${byId}, served_at = now() where id = ${id} and status = 'accepted' returning *`;
+  return o || null;
+}
+
+// New lines and sums; only while the order is still open (new or accepted).
+export async function replaceLines(id, s) {
+  if (memMode()) {
+    const o = memOrder(id);
+    if (!o || !ACTIVE.has(o.status)) return null;
+    return Object.assign(o, s, { edited_at: Date.now() });
+  }
+  const sql = db();
+  const [o] = await sql`
+    update orders set lines = ${sql.json(s.lines)}, subtotal = ${s.subtotal}, discount = ${s.discount}, total = ${s.total}, on_request = ${s.on_request}, edited_at = now()
+    where id = ${id} and status in ('new', 'accepted') returning *`;
+  return o || null;
+}
+
+export async function getOrder(id) {
+  if (memMode()) return memOrder(id);
+  const [o] = await db()`select * from orders where id = ${id}`;
+  return o || null;
+}
+
+export async function getOrderForTable(id, token) {
+  if (memMode()) { const o = memOrder(id); return o && `demo-${o.table_number}` === String(token || '') ? o : null; }
+  const [o] = await db()`select o.* from orders o join tables t on t.id = o.table_id where o.id = ${id} and t.token = ${String(token || '')}`;
+  return o || null;
+}
+
+// Staff board: everything still open plus what was served in the last 12 hours, newest first.
+export async function listOrders() {
+  if (memMode()) return mem().orders.filter(o => ACTIVE.has(o.status) || Date.now() - o.created_at < 12 * 3600e3).slice(0, 200);
+  return db()`select * from orders where status in ('new', 'accepted') or created_at > now() - interval '12 hours' order by created_at desc limit 200`;
+}
+
+// Statistics: every order created since the date, oldest first.
+export async function ordersSince(date) {
+  if (memMode()) return mem().orders.filter(o => o.created_at >= +date).reverse();
+  return db()`select * from orders where created_at >= ${date} order by created_at`;
+}
