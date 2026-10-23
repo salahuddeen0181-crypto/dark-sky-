@@ -1,0 +1,7 @@
+# https for SITE_HOST (a domain, or <ip-with-dashes>.sslip.io until there is one); certificates are automatic
+{$SITE_HOST} {
+	encode zstd gzip
+	@media path /media/*
+	header @media Cache-Control "public, max-age=604800"
+	reverse_proxy app:3000
+}

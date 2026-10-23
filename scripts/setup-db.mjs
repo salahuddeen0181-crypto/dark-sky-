@@ -21,7 +21,8 @@ if (!url) {
   if (process.argv.includes('--if-env')) { console.log('db:setup skipped (no DATABASE_URL)'); process.exit(0); }
   console.error('Set DATABASE_URL first'); process.exit(1);
 }
-const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+// no TLS for a database on this machine or next to the app (Docker: ?sslmode=disable)
+const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url) || /[?&]sslmode=disable\b/.test(url);
 const sql = postgres(url, { ssl: local ? false : 'require', prepare: false, max: 1, onnotice: () => {} });
 
 // darksky-data.js is an ES module inside a CommonJS package: load a copy as .mjs.
