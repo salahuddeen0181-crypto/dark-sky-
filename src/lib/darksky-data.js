@@ -1,4 +1,6 @@
 // DARKSKY Hookah Lounge — menu data (from HOOKAH / COMIDA / BEBIDAS / PROMOCIONES / REGLAS PDFs)
+import { I18N } from './darksky-i18n.mjs';
+
 const L = (en, es, ru, zh, hi, ar, fr, pt, de, ja) => ({ en, es, ru, zh, hi, ar, fr, pt, de, ja });
 const T3 = (es, en, ru) => ({ es, en, ru });
 
@@ -45,14 +47,15 @@ export const CATS = [
 ];
 
 const CN = id => CATS.find(c => c.id === id).n;
+// clip: keyed product clip for the section's tile on the home screen and its banner (instead of the 3D scene)
 export const SECTIONS = [
-  { id: 'hookah', kind: 'hookah', cats: ['hookah'], n: CN('hookah'), tag: T3('Tres líneas, de suave a cigar.', 'Three lines, from soft to cigar.', 'Три линейки — от мягкой до сигарной.') },
-  { id: 'kitchen', cats: ['starters', 'rolls', 'hotrolls', 'wok', 'salads', 'desserts'], n: L('Kitchen','Cocina','Кухня','厨房','किचन','المطبخ','Cuisine','Cozinha','Küche','キッチン'), tag: T3('Rolls, wok, entradas y postres.', 'Rolls, wok, starters & desserts.', 'Роллы, вок, закуски и десерты.') },
-  { id: 'cocktails', cats: ['classics', 'signature'], n: L('Cocktails','Tragos','Коктейли','鸡尾酒','कॉकटेल','الكوكتيلات','Cocktails','Drinks','Cocktails','カクテル'), tag: T3('Clásicos y de autor.', 'Classics & signature.', 'Классика и авторские.') },
-  { id: 'tea', cats: ['tea', 'authortea'], n: L('Tea','Té','Чай','茶','चाय','الشاي','Thé','Chá','Tee','お茶'), tag: T3('De hoja y de autor · 800 ml.', 'Loose-leaf & signature · 800 ml.', 'Листовой и авторский · 800 мл.') },
-  { id: 'bar', cats: ['wine', 'sparkling', 'shots', 'beer'], n: L('Bar','Bar','Бар','酒吧','बार','البار','Bar','Bar','Bar','バー'), tag: T3('Vino, whisky, cerveza.', 'Wine, whisky, beer.', 'Вино, виски, пиво.') },
-  { id: 'soft', cats: ['soft'], n: L('Soft drinks','Sin alcohol','Без алкоголя','无酒精','सॉफ्ट ड्रिंक्स','بدون كحول','Sans alcool','Sem álcool','Alkoholfrei','ノンアル'), tag: T3('Limonadas y jugos.', 'Lemonades & juices.', 'Лимонады и соки.') },
-  { id: 'promos', kind: 'promos', cats: [], n: CN('promos'), tag: T3('Hasta 20% OFF · acumulables con efectivo o cripto.', 'Up to 20% off · stacks with cash or crypto.', 'До −20% · суммируются со скидкой за наличные.') },
+  { id: 'hookah', clip: '/media/hookah.webm#t=0.04', kind: 'hookah', cats: ['hookah'], n: CN('hookah'), tag: T3('Tres líneas, de suave a cigar.', 'Three lines, from soft to cigar.', 'Три линейки — от мягкой до сигарной.') },
+  { id: 'kitchen', clip: '/media/roll-phila.webm#t=1.08', cats: ['starters', 'rolls', 'hotrolls', 'wok', 'salads', 'desserts'], n: L('Kitchen','Cocina','Кухня','厨房','किचन','المطبخ','Cuisine','Cozinha','Küche','キッチン'), tag: T3('Rolls, wok, entradas y postres.', 'Rolls, wok, starters & desserts.', 'Роллы, вок, закуски и десерты.') },
+  { id: 'cocktails', clip: '/media/cocktail-amber.webm#t=5.92', cats: ['classics', 'signature'], n: L('Cocktails','Tragos','Коктейли','鸡尾酒','कॉकटेल','الكوكتيلات','Cocktails','Drinks','Cocktails','カクテル'), tag: T3('Clásicos y de autor.', 'Classics & signature.', 'Классика и авторские.') },
+  { id: 'tea', clip: '/media/tea-tropic.webm#t=1.54', cats: ['tea', 'authortea'], n: L('Tea','Té','Чай','茶','चाय','الشاي','Thé','Chá','Tee','お茶'), tag: T3('De hoja y de autor · 800 ml.', 'Loose-leaf & signature · 800 ml.', 'Листовой и авторский · 800 мл.') },
+  { id: 'bar', clip: '/media/whiskey.webm#t=3.50', cats: ['wine', 'sparkling', 'shots', 'beer'], n: L('Bar','Bar','Бар','酒吧','बार','البار','Bar','Bar','Bar','バー'), tag: T3('Vino, whisky, cerveza.', 'Wine, whisky, beer.', 'Вино, виски, пиво.') },
+  { id: 'soft', clip: '/media/passion-lemonade.webm#t=0.83', cats: ['soft'], n: L('Soft drinks','Sin alcohol','Без алкоголя','无酒精','सॉफ्ट ड्रिंक्स','بدون كحول','Sans alcool','Sem álcool','Alkoholfrei','ノンアル'), tag: T3('Limonadas y jugos.', 'Lemonades & juices.', 'Лимонады и соки.') },
+  { id: 'promos', clip: '/media/cash.webm#t=4.79', kind: 'promos', cats: [], n: CN('promos'), tag: T3('Hasta 20% OFF · acumulables con efectivo o cripto.', 'Up to 20% off · stacks with cash or crypto.', 'До −20% · суммируются со скидкой за наличные.') },
   { id: 'rules', kind: 'rules', cats: [], n: CN('rules'), tag: T3('Antes de tu visita.', 'Before your visit.', 'Перед визитом.') },
 ];
 
@@ -101,51 +104,51 @@ export const ITEMS = [
   // STARTERS
   { id: 'jerky', cat: 'starters', name: 'Jerky artesanal', m: '150 g', p: 22857, d: T3('Carne curada artesanal.', 'House-made cured jerky.', 'Вяленое мясо собственного приготовления.'), t: ['savory', 'smoky'], v: [V('Cerdo', 'Pork', 'Свинина', 22857), V('Pollo', 'Chicken', 'Курица', 22857), V('Carne', 'Beef', 'Говядина', 22857), V('Pescado', 'Fish', 'Рыба', 22857)], hit: true },
   { id: 'falafel', cat: 'starters', name: 'Falafel', m: '300 g', p: 16262, d: T3('Falafel (nuez, especias), pan árabe, pepinillos, pepino, tomate cherry, salsa cremosa de ajo.', 'Falafel (nuts, spices), pita, pickles, cucumber, cherry tomato, creamy garlic sauce.', 'Фалафель (орехи, специи), арабский хлеб, корнишоны, огурец, черри, сливочный чесночный соус.'), t: ['spicy', 'creamy'] },
-  { id: 'langostinos', cat: 'starters', name: 'Langostinos apanados', m: '9 u.', p: 25941, d: T3('9 langostinos apanados con mayo Sweet Chili.', '9 breaded prawns with sweet chili mayo.', '9 креветок в панировке с майонезом sweet chili.'), t: ['savory', 'sweet'] },
-  { id: 'panqueques', cat: 'starters', name: 'Panqueques rellenos', p: 15540, d: T3('Panqueques rellenos a elección.', 'Filled crêpes of your choice.', 'Блинчики с начинкой на выбор.'), t: ['creamy', 'savory'], v: [V('Ricotta', 'Ricotta', 'Рикотта', 15540), V('Pollo y champiñones', 'Chicken & mushrooms', 'Курица и грибы', 15540), V('Carne', 'Beef', 'Говядина', 15540)] },
+  { id: 'langostinos', cat: 'starters', name: 'Langostinos apanados', m: L('9 pcs', '9 u.', '9 шт.', '9只', '9 पीस', '9 قطع', '9 pièces', '9 un.', '9 Stück', '9尾'), p: 25941, d: T3('9 langostinos apanados con mayo Sweet Chili.', '9 breaded prawns with sweet chili mayo.', '9 креветок в панировке с майонезом sweet chili.'), t: ['savory', 'sweet'] },
+  { id: 'panqueques', cat: 'starters', name: 'Crepes caseros (blinis)', m: T3('2 u.', '2 pcs.', '2 шт.'), p: 15540, d: T3('Panqueques finos y tiernos con un relleno abundante a elección. Se sirven con crema agria.', 'Thin, tender crepes with a generous filling of your choice. Served with sour cream.', 'Нежные тонкие блинчики с сытной начинкой на выбор. Подаются со сметаной.'), t: ['creamy', 'savory'], v: [V('Carne picada de vaca', 'Ground beef', 'Говяжий фарш', 15540), V('Julienne', 'Julienne', 'Жульен', 15540), V('Ricota', 'Ricotta', 'Творог', 15540)] },
   // ROLLS
-  { id: 'phila-ebi', cat: 'rolls', name: 'Philadelphia Ebi Ponzu', m: '310 g', p: 29094, d: T3('Salmón, arroz, nori, queso crema, langostinos fritos, salsa ponzu, salsa spicy tuna.', 'Salmon, rice, nori, cream cheese, fried prawns, ponzu, spicy tuna sauce.', 'Лосось, рис, нори, сливочный сыр, жареные креветки, соус понзу, спайси-тунец.'), t: ['savory', 'citrus'], hit: true },
-  { id: 'phila', cat: 'rolls', name: 'Philadelphia', m: '310 g', p: 26134, d: T3('Arroz, salmón, queso crema.', 'Rice, salmon, cream cheese.', 'Рис, лосось, сливочный сыр.'), t: ['creamy'] },
-  { id: 'newyork', cat: 'rolls', name: 'New York', m: '300 g', p: 25714, d: T3('Salmón, palta, queso crema, sésamo.', 'Salmon, avocado, cream cheese, sesame.', 'Лосось, авокадо, сливочный сыр, кунжут.'), t: ['creamy'] },
+  { id: 'phila-ebi', cat: 'rolls', name: 'Philadelphia Ebi Ponzu', m: '310 g', p: 27180, d: T3('Salmón, arroz, nori, queso crema, langostinos fritos, salsa ponzu, salsa spicy tuna.', 'Salmon, rice, nori, cream cheese, fried prawns, ponzu, spicy tuna sauce.', 'Лосось, рис, нори, сливочный сыр, жареные креветки, соус понзу, спайси-тунец.'), t: ['savory', 'citrus'], hit: true },
+  { id: 'phila', cat: 'rolls', name: 'Philadelphia', m: '300–320 g', p: 24320, d: T3('Arroz, salmón, queso crema.', 'Rice, salmon, cream cheese.', 'Рис, лосось, сливочный сыр.'), t: ['creamy'], v: [V('Clásico', 'Classic', 'Классический', 24320), P('atun', 29090), P('lang', 27810), P('palta', 25710), P('pepino', 25020)] },
+  { id: 'newyork', cat: 'rolls', name: 'New York', m: '260 g', p: 22740, d: T3('Salmón, palta, queso crema, sésamo.', 'Salmon, avocado, cream cheese, sesame.', 'Лосось, авокадо, сливочный сыр, кунжут.'), t: ['creamy'] },
   { id: 'maki', cat: 'rolls', name: 'Maki roll', m: '240 g', p: 16389, d: T3('Roll japonés clásico.', 'Classic Japanese roll.', 'Классический японский ролл.'), t: ['soft'], v: [P('pepino', 16389), P('palta', 17660), P('lang', 18295), P('salmon', 18930), P('atun', 21356)] },
-  { id: 'aburi', cat: 'rolls', name: 'Atún Aburi', m: '360 g', p: 32906, d: T3('Roll de autor con atún, queso crema, palta, salsa especial, ciboulette y atún flameado por encima.', 'Signature roll: tuna, cream cheese, avocado, special sauce, chives, flame-seared tuna on top.', 'Авторский ролл: тунец, сливочный сыр, авокадо, фирменный соус, шнитт-лук, тунец, обожжённый сверху.'), t: ['smoky', 'savory'], hit: true },
+  { id: 'aburi', cat: 'rolls', name: 'Atún Aburi', m: '330 g', p: 28760, d: T3('Roll de autor con atún, queso crema, palta, salsa especial, ciboulette y atún flameado por encima.', 'Signature roll: tuna, cream cheese, avocado, special sauce, chives, flame-seared tuna on top.', 'Авторский ролл: тунец, сливочный сыр, авокадо, фирменный соус, шнитт-лук, тунец, обожжённый сверху.'), t: ['smoky', 'savory'], hit: true },
   { id: 'kanikama', cat: 'rolls', name: 'Kanikama', m: '250 g', p: 17660, d: T3('Cangrejo, arroz, pepino, queso crema.', 'Crab, rice, cucumber, cream cheese.', 'Краб, рис, огурец, сливочный сыр.'), t: ['soft', 'creamy'] },
-  { id: 'unagi', cat: 'rolls', name: 'Unagi roll', m: '270 g', p: 29094, d: T3('Arroz, queso crema, pepino, anguila, salsa unagi.', 'Rice, cream cheese, cucumber, eel, unagi sauce.', 'Рис, сливочный сыр, огурец, угорь, соус унаги.'), t: ['sweet', 'smoky'] },
-  { id: 'horno', cat: 'rolls', name: 'Roll al horno', p: 22742, d: T3('Roll horneado con tapa picante.', 'Baked roll with a spicy topping.', 'Запечённый ролл с острой шапочкой.'), t: ['spicy', 'creamy'], v: [P('teri', 22742), P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('ang', 28759), P('atun', 26322)] },
+  { id: 'unagi', cat: 'rolls', name: 'Unagi roll', m: '260 g', p: 29094, d: T3('Arroz, queso crema, pepino, anguila, salsa unagi.', 'Rice, cream cheese, cucumber, eel, unagi sauce.', 'Рис, сливочный сыр, огурец, угорь, соус унаги.'), t: ['sweet', 'smoky'] },
+  { id: 'horno', cat: 'rolls', name: 'Roll al horno', p: 22742, d: T3('Roll horneado con tapa picante.', 'Baked roll with a spicy topping.', 'Запечённый ролл с острой шапочкой.'), t: ['spicy', 'creamy'], v: [P('teri', 22742), P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('ang', 32910), P('atun', 26322)] },
   // HOT ROLLS
-  { id: 'tempura', cat: 'hotrolls', name: 'Tempura roll', p: 24012, d: T3('Frito en tempura y panko. Arroz, queso crema, pepino.', 'Fried in tempura & panko. Rice, cream cheese, cucumber.', 'Обжарен в темпуре и панко. Рис, сливочный сыр, огурец.'), t: ['creamy', 'savory'], v: [P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('atun', 27477)] },
-  { id: 'tempura-teri', cat: 'hotrolls', name: 'Tempura teriyaki roll', p: 25179, d: T3('Frito en tempura y panko con teriyaki. Arroz, queso crema, pepino.', 'Tempura & panko with teriyaki. Rice, cream cheese, cucumber.', 'Темпура и панко с терияки. Рис, сливочный сыр, огурец.'), t: ['sweet', 'savory'], v: [P('pollo', 25179), P('salmon', 26438), P('lang', 26438), P('ang', 33137)] },
+  { id: 'tempura', cat: 'hotrolls', name: 'Tempura roll', m: '320 g', p: 24012, d: T3('Frito en tempura y panko. Arroz, queso crema, pepino.', 'Fried in tempura & panko. Rice, cream cheese, cucumber.', 'Обжарен в темпуре и панко. Рис, сливочный сыр, огурец.'), t: ['creamy', 'savory'], v: [P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('atun', 27477)] },
+  { id: 'tempura-teri', cat: 'hotrolls', name: 'Tempura teriyaki roll', m: '320 g', p: 25179, d: T3('Frito en tempura y panko con teriyaki. Arroz, queso crema, pepino.', 'Tempura & panko with teriyaki. Rice, cream cheese, cucumber.', 'Темпура и панко с терияки. Рис, сливочный сыр, огурец.'), t: ['sweet', 'savory'], v: [P('pollo', 25179), P('salmon', 26438), P('lang', 26438), P('ang', 33137)] },
   // WOK
   { id: 'wok-rice', cat: 'wok', name: 'Wok de arroz', p: 16389, d: T3('Arroz salteado al wok.', 'Wok-fried rice.', 'Рис, обжаренный в воке.'), t: ['savory'], v: [P('veg', 16389), P('pollo', 19566), P('lang', 22742), P('salmon', 24012)] },
   { id: 'udon', cat: 'wok', name: 'Udon de fideos', p: 15754, d: T3('Fideos udon salteados.', 'Stir-fried udon noodles.', 'Лапша удон из вока.'), t: ['savory'], v: [P('veg', 15754), P('pollo', 20201), P('lang', 22742), P('salmon', 24012)] },
   // SALADS
-  { id: 'cesar', cat: 'salads', name: 'Ensalada César', m: '340 g', p: 21471, d: T3('Clásica César a elección.', 'Classic Caesar, your choice of protein.', 'Классический «Цезарь» на выбор.'), t: ['creamy', 'savory'], v: [P('pollo', 21471), P('salmon', 22742), P('lang', 23377)] },
+  { id: 'cesar', cat: 'salads', name: 'Ensalada César', m: '340 g', p: 21471, d: T3('Clásica César a elección.', 'Classic Caesar, your choice of protein.', 'Классический «Цезарь» на выбор.'), t: ['creamy', 'savory'], v: [P('pollo', 21471), P('salmon', 23380), P('lang', 22740)] },
   { id: 'griega', cat: 'salads', name: 'Ensalada griega', m: '340 g', p: 22615, d: T3('Queso feta, tomate cherry, pepino, morrón, aceitunas.', 'Feta, cherry tomato, cucumber, bell pepper, olives.', 'Фета, черри, огурец, перец, оливки.'), t: ['fresh'] },
   // DESSERTS
   { id: 'trufa', cat: 'desserts', name: 'Trufa Deluxe', p: 11040, d: T3('Chocolate belga 54,5%.', 'Belgian chocolate 54.5%.', 'Бельгийский шоколад 54,5%.'), t: ['sweet', 'bitter'] },
-  { id: 'brownie', cat: 'desserts', name: 'Brownie', p: 11261, d: T3('Bizcocho de chocolate.', 'Chocolate sponge.', 'Шоколадный бисквит.'), t: ['sweet'] },
-  { id: 'noche', cat: 'desserts', name: 'Noche Blanca Pistacho', p: 16008, d: T3('Mousse de leche, pistachos, pasta de pistacho.', 'Milk mousse, pistachios, pistachio paste.', 'Молочный мусс, фисташки, фисташковая паста.'), t: ['creamy', 'sweet'] },
-  { id: 'cinnabon', cat: 'desserts', name: 'Cinnabon roll', p: 13555, d: T3('Rol de canela a elección.', 'Cinnamon roll, your choice.', 'Синнабон на выбор.'), t: ['sweet', 'spicy'], new: true, v: [V('Pistacho', 'Pistachio', 'Фисташка', 13555), V('Nutella', 'Nutella', 'Нутелла', 13555), V('Doble chocolate', 'Double chocolate', 'Двойной шоколад', 13555)] },
+  { id: 'brownie', cat: 'desserts', name: 'Brownie', p: 16010, d: T3('Bizcocho de chocolate.', 'Chocolate sponge.', 'Шоколадный бисквит.'), t: ['sweet'] },
+  { id: 'noche', cat: 'desserts', name: 'Noche Blanca Pistacho', p: 13560, d: T3('Mousse de leche, pistachos, pasta de pistacho.', 'Milk mousse, pistachios, pistachio paste.', 'Молочный мусс, фисташки, фисташковая паста.'), t: ['creamy', 'sweet'] },
+  { id: 'cinnabon', cat: 'desserts', name: 'Cinnabon roll', p: 11260, d: T3('Rol de canela a elección.', 'Cinnamon roll, your choice.', 'Синнабон на выбор.'), t: ['sweet', 'spicy'], new: true, v: [V('Pistacho', 'Pistachio', 'Фисташка', 11260), V('Nutella', 'Nutella', 'Нутелла', 11260), V('Doble chocolate', 'Double chocolate', 'Двойной шоколад', 11260)] },
   // SOFT
-  { id: 'agua', cat: 'soft', name: 'Agua c/s gas', m: 'Ivess · 500 ml', p: 5463, d: T3('Con o sin gas, botella de vidrio.', 'Still or sparkling, glass bottle.', 'С газом или без, стекло.'), t: ['fresh'], v: [V('Sin gas', 'Still', 'Без газа', 5463), V('Con gas', 'Sparkling', 'С газом', 5463)] },
-  { id: 'limonada', cat: 'soft', name: 'Limonada · Pomelada', m: '800 ml', p: 10418, d: T3('Menta, exprimido de limón o pomelo.', 'Mint, fresh-squeezed lemon or grapefruit.', 'Мята, свежевыжатый лимон или грейпфрут.'), t: ['citrus', 'fresh'], v: [V('Limonada', 'Lemonade', 'Лимонад', 10418), V('Pomelada', 'Grapefruit', 'Грейпфрут', 10418)], hit: true },
-  { id: 'passion', cat: 'soft', name: 'Passion lemonade', m: '800 ml', p: 11688, d: T3('Menta, maracuyá, semillas.', 'Mint, passion fruit, seeds.', 'Мята, маракуйя, семена.'), t: ['fruity', 'fresh'] },
-  { id: 'citric', cat: 'soft', name: 'Orange · Peach orange', m: 'Citric · 330 ml', p: 6606, d: T3('Jugo Citric.', 'Citric juice.', 'Сок Citric.'), t: ['fruity'], v: [V('Orange', 'Orange', 'Апельсин', 6606), V('Peach orange', 'Peach orange', 'Персик-апельсин', 6606)] },
-  { id: 'gaseosa', cat: 'soft', name: 'Coca-Cola · Sprite · Fanta', m: '350 ml', p: 6606, d: T3('Gaseosa a elección.', 'Soda of your choice.', 'Газировка на выбор.'), t: ['sweet'], v: [V('Coca-Cola', 'Coca-Cola', 'Coca-Cola', 6606), V('Coca-Cola Zero', 'Coca-Cola Zero', 'Coca-Cola Zero', 6606), V('Sprite', 'Sprite', 'Sprite', 6606), V('Fanta', 'Fanta', 'Fanta', 6606)] },
-  { id: 'tonica', cat: 'soft', name: 'Tónica', m: 'Schweppes · 350 ml', p: 6733, d: T3('Agua tónica.', 'Tonic water.', 'Тоник.'), t: ['bitter'] },
-  { id: 'redbull', cat: 'soft', name: 'Red Bull', m: '350 ml', p: 9020, d: T3('Clásico.', 'Classic.', 'Классический.'), t: ['sweet'] },
+  { id: 'agua', cat: 'soft', name: 'Agua c/s gas', m: 'Smartwater · 591 ml', p: 5460, d: T3('Con o sin gas.', 'Still or sparkling.', 'С газом или без.'), t: ['fresh'], v: [V('Sin gas', 'Still', 'Без газа', 5460), V('Con gas', 'Sparkling', 'С газом', 5460)] },
+  { id: 'limonada', cat: 'soft', name: 'Limonada · Pomelada', m: '800 ml', p: 10400, d: T3('Menta, exprimido de limón o pomelo.', 'Mint, fresh-squeezed lemon or grapefruit.', 'Мята, свежевыжатый лимон или грейпфрут.'), t: ['citrus', 'fresh'], v: [V('Limonada', 'Lemonade', 'Лимонад', 10400), V('Pomelada', 'Grapefruit', 'Грейпфрут', 10400)], hit: true },
+  { id: 'passion', cat: 'soft', name: 'Passion lemonade', m: '800 ml', p: 11660, d: T3('Menta, maracuyá, semillas.', 'Mint, passion fruit, seeds.', 'Мята, маракуйя, семена.'), t: ['fruity', 'fresh'] },
+  { id: 'citric', cat: 'soft', name: 'Orange · Peach orange', m: 'Citric · 330 ml', p: 6620, d: T3('Jugo Citric.', 'Citric juice.', 'Сок Citric.'), t: ['fruity'], v: [V('Orange', 'Orange', 'Апельсин', 6620), V('Peach orange', 'Peach orange', 'Персик-апельсин', 6620)] },
+  { id: 'gaseosa', cat: 'soft', name: 'Coca-Cola · Sprite · Fanta', m: '350 ml', p: 6720, d: T3('Gaseosa a elección.', 'Soda of your choice.', 'Газировка на выбор.'), t: ['sweet'], v: [V('Coca-Cola', 'Coca-Cola', 'Coca-Cola', 6720), V('Coca-Cola Zero', 'Coca-Cola Zero', 'Coca-Cola Zero', 6720), V('Sprite', 'Sprite', 'Sprite', 6720), V('Fanta', 'Fanta', 'Fanta', 6720)] },
+  { id: 'tonica', cat: 'soft', name: 'Tónica', m: 'Schweppes · 350 ml', p: 6620, d: T3('Agua tónica.', 'Tonic water.', 'Тоник.'), t: ['bitter'] },
+  { id: 'redbull', cat: 'soft', name: 'Red Bull', m: '350 ml', p: 9030, d: T3('Clásico.', 'Classic.', 'Классический.'), t: ['sweet'] },
   // TEA
   { id: 'assam', cat: 'tea', name: 'Assam', p: 8766, d: T3('Té negro.', 'Black tea.', 'Чёрный чай.'), t: ['strong'] },
   { id: 'earlgrey', cat: 'tea', name: 'Earl Grey', p: 8766, d: T3('Té negro con bergamota.', 'Black tea with bergamot.', 'Чёрный чай с бергамотом.'), t: ['citrus', 'floral'] },
-  { id: 'sencha', cat: 'tea', name: 'Sencha', p: 12450, d: T3('Té verde.', 'Green tea.', 'Зелёный чай.'), t: ['fresh', 'herbal'] },
-  { id: 'puer', cat: 'tea', name: 'Puer cocido', p: 8766, d: T3('Negro (China).', 'Ripe pu-erh (China).', 'Шу пуэр (Китай).'), t: ['smoky', 'strong'] },
+  { id: 'sencha', cat: 'tea', name: 'Sencha', p: 8770, d: T3('Té verde.', 'Green tea.', 'Зелёный чай.'), t: ['fresh', 'herbal'] },
+  { id: 'puer', cat: 'tea', name: 'Puer cocido', p: 12450, d: T3('Negro (China).', 'Ripe pu-erh (China).', 'Шу пуэр (Китай).'), t: ['smoky', 'strong'] },
   { id: 'krishna', cat: 'tea', name: 'Krishna Chai', p: 8766, d: T3('Té negro, jengibre, cardamomo, pimienta rosa, anís estrellado, canela.', 'Black tea, ginger, cardamom, pink pepper, star anise, cinnamon.', 'Чёрный чай, имбирь, кардамон, розовый перец, бадьян, корица.'), t: ['spicy', 'sweet'], hit: true },
-  { id: 'joie', cat: 'tea', name: 'Joie', p: 10037, d: T3('Té negro, rosa mosqueta, cascarilla de cacao.', 'Black tea, rosehip, cacao husk.', 'Чёрный чай, шиповник, шелуха какао.'), t: ['fruity', 'sweet'] },
-  { id: 'kospi', cat: 'tea', name: 'Kospi', p: 8766, d: T3('Menta, cedrón, lavanda, manzanilla.', 'Mint, lemon verbena, lavender, chamomile.', 'Мята, вербена, лаванда, ромашка.'), t: ['herbal', 'floral'] },
-  { id: 'akasha', cat: 'tea', name: 'Akasha & Pei Chen', p: 7496, d: T3('Wulong (China).', 'Oolong (China).', 'Улун (Китай).'), t: ['floral'] },
-  { id: 'mudanwan', cat: 'tea', name: 'Mudanwan', p: 8766, d: T3('Té blanco (China).', 'White tea (China).', 'Белый чай (Китай).'), t: ['soft', 'floral'] },
-  { id: 'karkade', cat: 'tea', name: 'Karkade Flower', p: 11088, d: T3('Hibiscus, rosas.', 'Hibiscus, roses.', 'Гибискус, розы.'), t: ['floral', 'fruity'] },
-  { id: 'dahongpao', cat: 'tea', name: 'Da Hong Pao', p: 8766, d: T3('Wulong negro.', 'Dark oolong.', 'Тёмный улун.'), t: ['smoky', 'strong'] },
+  { id: 'joie', cat: 'tea', name: 'Joie', p: 8770, d: T3('Té negro, rosa mosqueta, cascarilla de cacao.', 'Black tea, rosehip, cacao husk.', 'Чёрный чай, шиповник, шелуха какао.'), t: ['fruity', 'sweet'] },
+  { id: 'kospi', cat: 'tea', name: 'Kospi', p: 10040, d: T3('Menta, cedrón, lavanda, manzanilla.', 'Mint, lemon verbena, lavender, chamomile.', 'Мята, вербена, лаванда, ромашка.'), t: ['herbal', 'floral'] },
+  { id: 'akasha', cat: 'tea', name: 'Akasha & Pei Chen', p: 8770, d: T3('Wulong (China).', 'Oolong (China).', 'Улун (Китай).'), t: ['floral'] },
+  { id: 'mudanwan', cat: 'tea', name: 'Mudanwan', p: 7500, d: T3('Té blanco (China).', 'White tea (China).', 'Белый чай (Китай).'), t: ['soft', 'floral'] },
+  { id: 'karkade', cat: 'tea', name: 'Karkade Flower', p: 8770, d: T3('Hibiscus, rosas.', 'Hibiscus, roses.', 'Гибискус, розы.'), t: ['floral', 'fruity'] },
+  { id: 'dahongpao', cat: 'tea', name: 'Da Hong Pao', p: 11090, d: T3('Wulong negro.', 'Dark oolong.', 'Тёмный улун.'), t: ['smoky', 'strong'] },
   // AUTHOR TEA
   ...[
     ['Apple Muse', T3('Té verde, Monin de manzana, vainilla, limón, miel, menta.', 'Green tea, apple Monin, vanilla, lemon, honey, mint.', 'Зелёный чай, яблочный Monin, ваниль, лимон, мёд, мята.'), ['fruity', 'sweet']],
@@ -163,7 +166,7 @@ export const ITEMS = [
     ['Aperol Spritz', 'Espumante Gambei, Aperol, soda, piel de naranja', '10,4%', ['bitter', 'citrus'], true],
     ['Black Russian', 'Vodka Sernova, licor de café', '33,3%', ['strong']],
     ['Boulevardier', 'Jim Beam, Vermouth Rosso, Campari, piel de naranja', '28,3%', ['bitter', 'strong']],
-    ['White Russian', 'Licor de café, licor crema, vodka', '30%', ['creamy', 'sweet']],
+    null, // White Russian — no longer served
     ['Margarita', 'Tequila, Triple Sec, lima, simple syrup', '24%', ['citrus']],
     ['Old Fashioned', 'Jim Beam, Angostura, almíbar simple', '26,7%', ['strong', 'bitter']],
     ['Manhattan', 'Jim Beam, Vermouth Rosso, Angostura, cereza, piel de naranja', '32,2%', ['strong']],
@@ -175,7 +178,12 @@ export const ITEMS = [
     ['Penicillin', 'Johnnie Walker, limón, almíbar de miel, jengibre, piel de limón', '20%', ['spicy', 'smoky']],
     ['Pisco Sour', 'Capel Pisco, exprimido de lima, almíbar de azúcar', '35%', ['citrus']],
     ['Daiquiri', 'Ron blanco, lima, simple syrup', '22%', ['citrus', 'fresh']],
-  ].map(([name, es, abv, t, hit], i) => ({ id: 'cl' + i, cat: 'classics', name, d: { es }, m: abv, t, p: 14610, hit: !!hit })),
+    ['Mint Julep', 'Jim Beam, almíbar, menta', null, ['fresh', 'strong']],
+    ['Fernet Cola', 'Fernet Branca, Coca-Cola', null, ['bitter', 'sweet']],
+    ['Hanky Panky', 'Gin Heráclito, Vermouth Rosso, Fernet Branca, piel de naranja', null, ['bitter', 'strong']],
+    ['Gimlet', 'Gin Heráclito, almíbar, lima', null, ['citrus', 'fresh']],
+    ['Gin Tonic', 'Gin Heráclito, tónica, garnish a elección', null, ['fresh', 'bitter']],
+  ].map((r, i) => r && { id: 'cl' + i, cat: 'classics', name: r[0], d: { es: r[1] }, m: r[2] || undefined, t: r[3], p: 14610, hit: !!r[4] }).filter(Boolean),
   // SIGNATURE
   ...[
     ['Piña Colada', 'Ron, licor Malibu, jugo y almíbar de ananá, Amarula', ['creamy', 'sweet']],
@@ -185,28 +193,27 @@ export const ITEMS = [
     ['Bramble Shock', 'Gin, jugo de limón, almíbar de azúcar, licor de cassis', ['fruity', 'citrus']],
     ['Mai Tai', 'Ron blanco, ron negro, amaretto, limón, almíbar, jugo de naranja, Aperol', ['strong', 'fruity']],
     ['Sweet Dreams', 'Amaretto, bourbon vainilla, licor de café, limón, almíbar de azúcar', ['sweet', 'creamy']],
-    ['Peach Sour', 'Disaronno, licor de damasco, jugo de durazno, naranja, limón, almíbar', ['fruity', 'citrus']],
-  ].map(([name, es, t], i) => ({ id: 'sg' + i, cat: 'signature', name, d: { es }, t, p: null, new: i === 3 })),
+  ].map(([name, es, t], i) => ({ id: 'sg' + i, cat: 'signature', name, d: { es }, t, p: 16770, new: i === 3 })),
   // WINE
-  { id: 'malbec', cat: 'wine', name: 'Norton Altura Malbec', m: '750 ml', p: 34176, t: ['fruity', 'strong'] },
   { id: 'cabfranc', cat: 'wine', name: 'Norton Altura Cabernet Franc', m: '750 ml', p: 34176, t: ['spicy', 'fruity'] },
   { id: 'agrelo', cat: 'wine', name: 'Norton Lote Agrelo', m: '750 ml', p: 45357, t: ['strong'] },
   { id: 'whiteblend', cat: 'wine', name: 'Norton Altura White Blend', m: '750 ml', p: 34049, t: ['fresh', 'fruity'] },
-  { id: 'glass', cat: 'wine', name: 'Copa · Norton Libre Malbec', m: T3('Copa', 'Glass', 'Бокал'), p: 8766, t: ['fruity'] },
+  { id: 'glass', cat: 'wine', name: 'Copa · Norton Libre Grüner Veltliner', m: T3('Copa · blanco', 'Glass · white', 'Бокал · белое'), p: 8770, t: ['fresh'] },
+  { id: 'rose', cat: 'wine', name: 'Aristides Blend Rosé', m: '750 ml', p: 31500, t: ['fruity', 'fresh'] },
   // SPARKLING
-  { id: 'navarro', cat: 'sparkling', name: 'Navarro Correas Extra Brut', m: '750 cc', p: 30282, t: ['fresh'] },
-  { id: 'nortonbrut', cat: 'sparkling', name: 'Norton Cosecha Especial Brut Nature', m: '750 cc', p: 37086, t: ['fresh', 'citrus'] },
+  { id: 'navarro', cat: 'sparkling', name: 'Navarro Correas Extra Brut', m: '750 cc', p: 28840, t: ['fresh'] },
+  { id: 'nortonbrut', cat: 'sparkling', name: 'Norton Cosecha Especial Brut Nature', m: '750 cc', p: 35320, t: ['fresh', 'citrus'] },
   // SHOTS
   ...[
-    ['Vodka', 'Sernova', 7496], ['Vodka', 'Absolut', 7859], ['Whisky', 'Macallan', 64333], ['Whisky', "Jack Daniel's", 13848],
-    ['Whisky', 'Jameson', 12578], ['Whisky', 'Chivas Regal 12', 13848], ['Whisky', 'Chivas Regal 18', 26553], ['Whisky', 'Red Label', 11943],
-    ['Whisky', 'Ballantine’s', 12450], ['Whisky', 'Aberlour', 18803], ['Whisky', 'Monkey Shoulder', 18930], ['Whisky', 'Jim Beam', 10106],
-    ['Whisky', 'Black Label', 16389], ['Tequila', 'José Cuervo Blanco', 12416], ['Tequila', 'José Cuervo Especial', 13513],
-    ['Ron', 'Havana Club 7', 18803], ['Cognac', 'Hennessy', 23885], ['Gin', 'Bombay', 16459], ['Gin', 'Hendrick’s', 18237],
-  ].map(([m, name, p], i) => ({ id: 'sh' + i, cat: 'shots', name, m, p, t: ['strong'] })),
+    ['Vodka', 'Sernova', 7496], ['Vodka', 'Absolut', 10110], ['Whisky', 'Macallan', 64333], ['Whisky', "Jack Daniel's", 13848],
+    ['Whisky', 'Jameson', 16390], ['Whisky', 'Chivas Regal 12', 18800], ['Whisky', 'Chivas Regal 18', 26553], ['Whisky', 'Red Label', 12450],
+    ['Whisky', 'Ballantine’s', 18930], ['Whisky', 'Aberlour', 18803], ['Whisky', 'Monkey Shoulder', 23890], ['Whisky', 'Jim Beam', 12420],
+    ['Whisky', 'Black Label', 13510], ['Tequila', 'José Cuervo Dorado', 13850], null,
+    ['Ron', 'Havana Club 7', 11940], ['Cognac', 'Hennessy', 18240], ['Gin', 'Bombay', 7860], ['Gin', 'Hendrick’s', 16460],
+  ].map((r, i) => r && { id: 'sh' + i, cat: 'shots', name: r[1], m: r[0], p: r[2], t: ['strong'] }).filter(Boolean),
   // BEER
   { id: 'corona', cat: 'beer', name: 'Corona', m: '330 ml', p: 9528, t: ['fresh'] },
-  { id: 'stella', cat: 'beer', name: 'Stella Artois', m: '330 ml', p: 9723, t: ['fresh'] },
+  { id: 'stella', cat: 'beer', name: 'Stella Artois', m: '330 ml', p: 9780, t: ['fresh'] },
   { id: 'coronazero', cat: 'beer', name: 'Corona Zero', m: '330 ml · 0%', p: 9528, t: ['fresh'] },
   { id: 'guinness', cat: 'beer', name: 'Guinness', m: '473 ml', p: 12070, t: ['bitter', 'creamy'] },
   { id: 'rabieta', cat: 'beer', name: 'Rabieta Red Honey', m: '473 ml', p: 11261, t: ['sweet'] },
@@ -260,26 +267,80 @@ export const RULES = {
 };
 
 // Item media: replace placeholders with real photos, video or 3D.
-// Key = item id, value = path in project (e.g. 'media/h-premium.mp4').
+// Key = item id, value = URL under public/ (e.g. '/media/h-premium.mp4').
 // .jpg/.png/.webp → photo · .mp4/.webm → looping video · .glb → rotating 3D model.
-// Without an entry the item shows a drop-zone: drag a photo onto it in the preview.
+// '/media/<slug>.webm#t=…' → keyed product clip made by scripts/key-videos.mjs (it prints these lines).
+// Cut-out photos of cocktails and bottles (Wikimedia Commons / Pexels / Bodega Norton's shop; credits in darksky-credits.js): id → public/media/cut/<name>.webp
+const CUTS = {
+  cl0: 'negroni', cl1: 'long-island', cl2: 'mojito', cl3: 'aperol-spritz', cl4: 'black-russian',
+  cl5: 'boulevardier', cl7: 'margarita', cl8: 'old-fashioned', cl9: 'manhattan', cl10: 'dry-martini',
+  cl11: 'cuba-libre', cl12: 'garibaldi', cl13: 'new-york-sour', cl14: 'cynar-julep', cl15: 'penicillin',
+  cl16: 'pisco-sour', cl17: 'daiquiri', cl18: 'mint-julep', cl19: 'fernet-cola', cl20: 'hanky-panky',
+  cl21: 'gimlet', cl22: 'gin-tonic', sg0: 'pina-colada', sg1: 'tropic-sin', sg2: 'apricot-sunshine',
+  sg3: 'cosmoflower', sg4: 'bramble-shock', sg6: 'sweet-dreams', glass: 'norton-libre-gruner-veltliner', cabfranc: 'norton-altura-cabernet-franc', agrelo: 'norton-lote-agrelo', whiteblend: 'norton-altura-white-blend', nortonbrut: 'norton-cosecha-brut-nature', sh1: 'absolut',
+  sh2: 'macallan', sh3: 'jack-daniels', sh4: 'jameson', sh5: 'chivas-regal-12', sh6: 'chivas-regal-18',
+  sh7: 'red-label', sh8: 'ballantines', sh9: 'aberlour', sh10: 'monkey-shoulder', sh11: 'jim-beam',
+  sh12: 'black-label', sh13: 'jose-cuervo-dorado', sh15: 'havana-club-7', sh16: 'hennessy', sh17: 'bombay',
+  sh18: 'hendricks', stella: 'stella-artois', guinness: 'guinness',
+};
+
 export const MEDIA = {
-  // 'h-premium': 'media/h-premium.mp4',
-  // 'aburi': 'media/aburi.glb',
+  ...Object.fromEntries(Object.entries(CUTS).map(([id, f]) => [id, '/media/cut/' + f + '.webp'])),
+  // photos from darkskyhookah.com (cut out onto the smoky stage); tea shares its section photo, as on that site
+  ...Object.fromEntries(['assam', 'earlgrey', 'sencha', 'puer', 'krishna', 'joie', 'kospi', 'akasha', 'mudanwan', 'karkade', 'dahongpao', 'at0', 'at1', 'at2', 'at3', 'at4'].map(id => [id, '/media/cut/tea.webp'])),
+  'tempura-teri': '/media/cut/tempura-teri.webp', trufa: '/media/cut/trufa.webp', limonada: '/media/cut/limonada.webp',
+  corona: '/media/cut/beer-corona.webp', coronazero: '/media/cut/beer-corona.webp',
+  // keyed product clips (scripts/key-videos.mjs)
+  'h-classic': '/media/hookah.webm#t=0.04', 'h-premium': '/media/hookah.webm#t=0.04', 'h-cigar': '/media/hookah.webm#t=0.04',
+  jerky: '/media/jerky.webm#t=2.21',
+  falafel: '/media/falafel.webm#t=2.46',
+  langostinos: '/media/langostinos.webm#t=3.54',
+  panqueques: '/media/panqueques.webm#t=5.63',
+  'phila-ebi': '/media/roll-phila-ebi.webm#t=4.08',
+  phila: '/media/roll-phila.webm#t=1.08',
+  maki: '/media/roll-maki.webm#t=2.71',
+  aburi: '/media/roll-aburi.webm#t=5.38',
+  horno: '/media/roll-horno.webm#t=4.75',
+  tempura: '/media/roll-tempura.webm#t=1.88',
+  kanikama: '/media/roll-kanikama.webm#t=4.38',
+  newyork: '/media/roll-newyork.webm#t=4.13',
+  unagi: '/media/roll-unagi.webm#t=3.33',
+  'wok-rice': '/media/wok-rice.webm#t=3.79',
+  udon: '/media/udon.webm#t=3.63',
+  cesar: '/media/salad-cesar.webm#t=2.29',
+  griega: '/media/salad-greek.webm#t=2.38',
+  brownie: '/media/brownie.webm#t=3.00',
+  noche: '/media/pistachio-mousse.webm#t=4.21',
+  cinnabon: '/media/cinnabon.webm#t=5.08',
+  sg5: '/media/cocktail-amber.webm#t=5.92', // Mai Tai
+  at5: '/media/tea-tropic.webm#t=1.54', // Tropic Rey: tea, passion fruit, mint
+  passion: '/media/passion-lemonade.webm#t=0.83',
 };
 
 // Ordering from the table (QR link): extra UI strings.
-const OK = ['scanQr', 'accepted', 'served', 'sendFail', 'wait', 'sending', 'unavailable'];
+const OK = ['scanQr', 'accepted', 'served', 'sendFail', 'wait', 'sending', 'unavailable', 'checkout', 'review', 'note', 'notePh', 'edit', 'stSent', 'stAcc', 'stServed', 'changed'];
 const ORAW = {
-  en: ['Scan the QR code on your table to order', 'Your waiter has taken the order', 'Enjoy!', "Couldn't send the order. Please call your waiter.", 'Please wait a minute before the next order', 'Sending…', 'Some items are no longer available'],
-  es: ['Escaneá el QR de tu mesa para pedir', 'Tu mozo tomó el pedido', '¡Que lo disfrutes!', 'No se pudo enviar el pedido. Llamá al mozo.', 'Esperá un minuto antes del próximo pedido', 'Enviando…', 'Algunos productos ya no están disponibles'],
-  ru: ['Отсканируйте QR-код на столе, чтобы заказать', 'Официант принял заказ', 'Приятного отдыха!', 'Не удалось отправить заказ. Позовите официанта.', 'Подождите минуту перед следующим заказом', 'Отправляем…', 'Некоторых позиций уже нет в наличии'],
-  zh: ['扫描桌上的二维码即可点单', '服务员已接单', '请慢用！', '订单发送失败，请呼叫服务员。', '请稍等一分钟再下单', '发送中…', '部分菜品已售罄'],
-  hi: ['ऑर्डर करने के लिए अपनी टेबल पर QR कोड स्कैन करें', 'वेटर ने ऑर्डर ले लिया है', 'आनंद लें!', 'ऑर्डर नहीं भेजा जा सका। कृपया वेटर को बुलाएँ।', 'अगला ऑर्डर देने से पहले एक मिनट रुकें', 'भेजा जा रहा है…', 'कुछ आइटम अब उपलब्ध नहीं हैं'],
-  ar: ['امسح رمز QR على طاولتك للطلب', 'استلم النادل طلبك', 'بالهناء والشفاء!', 'تعذّر إرسال الطلب. يرجى مناداة النادل.', 'يرجى الانتظار دقيقة قبل الطلب التالي', 'جارٍ الإرسال…', 'بعض الأصناف لم تعد متوفرة'],
-  fr: ['Scannez le QR code de votre table pour commander', 'Votre serveur a pris la commande', 'Bonne dégustation !', "Impossible d'envoyer la commande. Appelez le serveur.", 'Patientez une minute avant la prochaine commande', 'Envoi…', 'Certains articles ne sont plus disponibles'],
-  pt: ['Escaneie o QR code da sua mesa para pedir', 'O garçom recebeu o pedido', 'Aproveite!', 'Não foi possível enviar o pedido. Chame o garçom.', 'Aguarde um minuto antes do próximo pedido', 'Enviando…', 'Alguns itens não estão mais disponíveis'],
-  de: ['Scanne den QR-Code auf deinem Tisch, um zu bestellen', 'Dein Kellner hat die Bestellung angenommen', 'Viel Genuss!', 'Bestellung konnte nicht gesendet werden. Bitte ruf den Kellner.', 'Bitte warte eine Minute bis zur nächsten Bestellung', 'Wird gesendet…', 'Einige Artikel sind nicht mehr verfügbar'],
-  ja: ['ご注文はテーブルのQRコードを読み取ってください', 'スタッフが注文を受け付けました', 'ごゆっくりどうぞ！', '注文を送信できませんでした。スタッフをお呼びください。', '次のご注文まで1分お待ちください', '送信中…', '一部の商品は品切れです'],
+  en: ['Scan the QR code on your table to order', 'Your waiter has taken the order', 'Enjoy!', "Couldn't send the order. Please call your waiter.", 'Please wait a minute before the next order', 'Sending…', 'Some items are no longer available', 'Place order', 'Check your order', 'Note for the waiter', 'E.g. no ice, bring it later', 'Edit', 'Sent', 'Accepted', 'Served', 'Your waiter updated the order'],
+  es: ['Escaneá el QR de tu mesa para pedir', 'Tu mozo tomó el pedido', '¡Que lo disfrutes!', 'No se pudo enviar el pedido. Llamá al mozo.', 'Esperá un minuto antes del próximo pedido', 'Enviando…', 'Algunos productos ya no están disponibles', 'Hacer el pedido', 'Revisá tu pedido', 'Comentario para el mozo', 'Ej.: sin hielo, traer más tarde', 'Modificar', 'Enviado', 'Aceptado', 'Servido', 'El mozo modificó tu pedido'],
+  ru: ['Отсканируйте QR-код на столе, чтобы заказать', 'Официант принял заказ', 'Приятного отдыха!', 'Не удалось отправить заказ. Позовите официанта.', 'Подождите минуту перед следующим заказом', 'Отправляем…', 'Некоторых позиций уже нет в наличии', 'Оформить заказ', 'Проверьте заказ', 'Комментарий для официанта', 'Например: без льда, принести позже', 'Изменить', 'Отправлен', 'Принят', 'Подано', 'Официант изменил заказ'],
+  zh: ['扫描桌上的二维码即可点单', '服务员已接单', '请慢用！', '订单发送失败，请呼叫服务员。', '请稍等一分钟再下单', '发送中…', '部分菜品已售罄', '提交订单', '确认您的订单', '给服务员的备注', '例如：不加冰，稍后上', '修改', '已发送', '已接单', '已上菜', '服务员已修改您的订单'],
+  hi: ['ऑर्डर करने के लिए अपनी टेबल पर QR कोड स्कैन करें', 'वेटर ने ऑर्डर ले लिया है', 'आनंद लें!', 'ऑर्डर नहीं भेजा जा सका। कृपया वेटर को बुलाएँ।', 'अगला ऑर्डर देने से पहले एक मिनट रुकें', 'भेजा जा रहा है…', 'कुछ आइटम अब उपलब्ध नहीं हैं', 'ऑर्डर करें', 'अपना ऑर्डर जाँचें', 'वेटर के लिए नोट', 'जैसे: बिना बर्फ, बाद में लाएँ', 'बदलें', 'भेजा गया', 'स्वीकार', 'परोसा गया', 'वेटर ने आपका ऑर्डर बदला है'],
+  ar: ['امسح رمز QR على طاولتك للطلب', 'استلم النادل طلبك', 'بالهناء والشفاء!', 'تعذّر إرسال الطلب. يرجى مناداة النادل.', 'يرجى الانتظار دقيقة قبل الطلب التالي', 'جارٍ الإرسال…', 'بعض الأصناف لم تعد متوفرة', 'تأكيد الطلب', 'راجع طلبك', 'ملاحظة للنادل', 'مثلاً: بدون ثلج، أحضره لاحقاً', 'تعديل', 'تم الإرسال', 'تم القبول', 'تم التقديم', 'قام النادل بتعديل طلبك'],
+  fr: ['Scannez le QR code de votre table pour commander', 'Votre serveur a pris la commande', 'Bonne dégustation !', "Impossible d'envoyer la commande. Appelez le serveur.", 'Patientez une minute avant la prochaine commande', 'Envoi…', 'Certains articles ne sont plus disponibles', 'Commander', 'Vérifiez votre commande', 'Note pour le serveur', 'Ex. : sans glaçons, à servir plus tard', 'Modifier', 'Envoyée', 'Acceptée', 'Servie', 'Le serveur a modifié votre commande'],
+  pt: ['Escaneie o QR code da sua mesa para pedir', 'O garçom recebeu o pedido', 'Aproveite!', 'Não foi possível enviar o pedido. Chame o garçom.', 'Aguarde um minuto antes do próximo pedido', 'Enviando…', 'Alguns itens não estão mais disponíveis', 'Fazer pedido', 'Confira seu pedido', 'Observação para o garçom', 'Ex.: sem gelo, trazer depois', 'Alterar', 'Enviado', 'Aceito', 'Servido', 'O garçom alterou seu pedido'],
+  de: ['Scanne den QR-Code auf deinem Tisch, um zu bestellen', 'Dein Kellner hat die Bestellung angenommen', 'Viel Genuss!', 'Bestellung konnte nicht gesendet werden. Bitte ruf den Kellner.', 'Bitte warte eine Minute bis zur nächsten Bestellung', 'Wird gesendet…', 'Einige Artikel sind nicht mehr verfügbar', 'Bestellen', 'Bestellung prüfen', 'Hinweis für den Kellner', 'Z. B. ohne Eis, später bringen', 'Ändern', 'Gesendet', 'Angenommen', 'Serviert', 'Der Kellner hat deine Bestellung geändert'],
+  ja: ['ご注文はテーブルのQRコードを読み取ってください', 'スタッフが注文を受け付けました', 'ごゆっくりどうぞ！', '注文を送信できませんでした。スタッフをお呼びください。', '次のご注文まで1分お待ちください', '送信中…', '一部の商品は品切れです', '注文する', 'ご注文の確認', 'スタッフへのメモ', '例：氷なし、あとで持ってきて', '変更', '送信済み', '受付済み', '提供済み', 'スタッフがご注文を変更しました'],
 };
 export const UI_ORDER = Object.fromEntries(Object.entries(ORAW).map(([l, a]) => [l, Object.fromEntries(OK.map((k, i) => [k, a[i]]))]));
+
+// The remaining languages come from darksky-i18n.mjs. Guest-facing dish names go to `nm`; `name` stays what staff
+// see in Telegram and the admin.
+const addLangs = (o, key) => { const t = I18N[key]; if (t && o && typeof o === 'object') for (const l in t) o[l] ??= t[l]; };
+for (const it of ITEMS) {
+  const k = 'item:' + it.id;
+  if (I18N[k + ':name']) it.nm = { ...I18N[k + ':name'] };
+  addLangs(it.d, k + ':d'); addLangs(it.m, k + ':m');
+  it.v?.forEach((x, i) => addLangs(x.n, k + ':v' + i));
+}
+const fillAll = (o, path) => { if (!o || typeof o !== 'object') return; addLangs(o, path); for (const key of Object.keys(o)) fillAll(o[key], path + '.' + key); };
+for (const [name, o] of Object.entries({ PROMOS, PROMO_NOTE, RULES, SECTIONS })) fillAll(o, name);

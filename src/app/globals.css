@@ -6,7 +6,8 @@
   html, body { margin: 0; background: #030305; color: #f2f2f4; font-family: Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
   * { box-sizing: border-box; }
   a { color: inherit; }
-  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+  /* manipulation: iOS Safari otherwise reads quick repeated taps (−, −) as double-tap zoom and drops them */
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; touch-action: manipulation; }
   button:disabled { cursor: default; }
   input { font: inherit; color: inherit; }
   input::placeholder, textarea::placeholder { color: rgba(242, 242, 244, .45); }
@@ -20,3 +21,21 @@
 .ds-press-hero:active { transform: scale(.985); }
 .ds-press-tile:active { transform: scale(.97); }
 .ds-press-bg:active { background: rgba(255, 255, 255, .06) !important; }
+
+/* Smoke drifting behind the product clips: two layers of one seamless tile (public/media/smoke.webp),
+   each 200% wide and moved by exactly one container width, so the loop has no seam. */
+.ds-smoke { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.ds-smoke i { position: absolute; top: -20%; left: 0; width: 200%; height: 140%; background: url(/media/smoke.webp) 0 0 / 50% auto repeat; opacity: .42; animation: ds-smoke 38s linear infinite; }
+.ds-smoke i + i { top: -45%; height: 190%; background-size: 25% auto; opacity: .22; animation-duration: 24s; animation-direction: reverse; }
+@keyframes ds-smoke { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+.ds-smoke.still i { animation: none; }
+@media (prefers-reduced-motion: reduce) { .ds-smoke i { animation: none; } }
+
+/* Item sheet: the next / previous dish slides in from the side it was swiped from */
+@keyframes ds-in-r { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
+@keyframes ds-in-l { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
+.ds-in-r { animation: ds-in-r .32s cubic-bezier(.2, .8, .2, 1); }
+.ds-in-l { animation: ds-in-l .32s cubic-bezier(.2, .8, .2, 1); }
+
+/* Current step of the guest's order status */
+@keyframes ds-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }

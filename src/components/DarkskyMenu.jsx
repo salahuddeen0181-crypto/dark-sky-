@@ -3,46 +3,117 @@
 // the logic (state, view-model) is kept as one class; the markup keeps the design's inline styles verbatim.
 import React from 'react';
 import * as D from '@/lib/darksky-data';
+import { PHOTO_CREDITS } from '@/lib/darksky-credits';
+import { css, Arrow, Close, CLOSE_BTN, GLASS } from './menu-ui';
+import OrderReview from './OrderReview';
 
 const GREET = ['Hola', 'Hello', 'Привет', '你好', 'नमस्ते', 'مرحبا', 'Bonjour', 'Olá', 'Hallo', 'こんにちは'];
 const EN = { en: 'English', es: 'Spanish', ru: 'Russian', zh: 'Chinese', hi: 'Hindi', ar: 'Arabic', fr: 'French', pt: 'Portuguese', de: 'German', ja: 'Japanese' };
 
-// 'a:b;c-d:e' → { a: 'b', cD: 'e' }, memoised: lets the design's style strings stay as written.
-const cssCache = new Map();
-function css(str) {
-  let o = cssCache.get(str);
-  if (o) return o;
-  o = {};
-  for (const decl of str.split(';')) {
-    const i = decl.indexOf(':');
-    if (i < 0) continue;
-    const k = decl.slice(0, i).trim();
-    if (!k) continue;
-    const key = k.startsWith('--') ? k : k.replace(/^-webkit-/, 'Webkit-').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-    o[key] = decl.slice(i + 1).trim();
-  }
-  if (cssCache.size > 2000) cssCache.clear();
-  cssCache.set(str, o);
-  return o;
-}
-
 const Plus = ({ size = 16, w = 1.6 }) => (
   <svg width={size} height={size} viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth={w} strokeLinecap="round" /></svg>
 );
-const Arrow = ({ size = 18, w = 1.6, flip }) => (
-  <svg width={size} height={size} viewBox="0 0 18 18" fill="none" style={{ transform: flip }}><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" /></svg>
-);
-const Close = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-);
+// Previous / next dish on the photo in the item sheet
+const STEP_BTN = 'position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(5,5,8,.45);border:1px solid rgba(255,255,255,.2);color:#f2f2f4;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)';
 const Grip = () => (
   <div style={css('display:flex;justify-content:center')}><div style={css('width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.2)')} /></div>
 );
 
-// Product media: photo, looping video or a 3D model from MEDIA; a quiet name placeholder until one is set.
-function Media({ m, label = true }) {
+// The logo file is white on black. Turn the black into real transparency so the logo sits on the smoke without
+// mix-blend-mode — iOS Safari does not blend a fixed element over the WebGL canvas and showed a black box.
+function alphaLogo(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+      for (let k = 0; k < p.length; k += 4) {
+        const l = Math.max(p[k], p[k + 1], p[k + 2]);
+        p[k + 3] = Math.max(0, Math.min(255, (l - 40) * 255 / 150)); // near-black → clear, soft edges kept, crisp body
+        p[k] = p[k + 1] = p[k + 2] = 255;
+      }
+      g.putImageData(d, 0, 0); res(c.toDataURL('image/png'));
+    };
+    img.onerror = rej; img.src = src;
+  });
+}
+
+// Bottom-sheet gestures: pull down to close (only when scrolled to the top, so normal scrolling still works);
+// swipe sideways to step to the neighbouring dish — unless the touch starts on a horizontally scrolling strip.
+const hScroller = (n, root) => { for (; n && n !== root; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true; return false; };
+function sheetDrag(el, close, swipe) {
+  let x0 = 0, y0 = 0, dx = 0, dy = 0, t0 = 0, mode = null, noX = false, atTop = false;
+  const start = e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = dy = 0; t0 = performance.now(); mode = null; noX = !swipe || hScroller(e.target, el); atTop = el.scrollTop <= 0; };
+  const move = e => {
+    const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+    if (!mode) {
+      if (!noX && Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my) * 1.3) mode = 'x';
+      else if (my > 8 && my > Math.abs(mx) && atTop && el.scrollTop <= 0) { mode = 'y'; el.style.transition = 'none'; }
+      else if (Math.abs(my) > 10 || Math.abs(mx) > 10) mode = 'none';
+    }
+    const page = el.firstElementChild;
+    if (mode === 'y') { dy = Math.max(0, my); el.style.transform = `translateY(${dy}px)`; e.preventDefault(); }
+    else if (mode === 'x' && page) { dx = mx; page.style.transition = 'none'; page.style.transform = `translateX(${dx * .5}px)`; page.style.opacity = String(1 - Math.min(.5, Math.abs(dx) / 500)); e.preventDefault(); }
+  };
+  const end = () => {
+    const fast = performance.now() - t0 < 260, page = el.firstElementChild;
+    if (mode === 'y') {
+      el.style.transition = 'transform .3s cubic-bezier(.2,.8,.2,1)';
+      if (dy > 140 || (fast && dy > 60)) { close(); setTimeout(() => { el.style.transform = ''; }, 400); } else el.style.transform = '';
+    } else if (mode === 'x' && page) {
+      page.style.transition = 'transform .25s ease, opacity .25s ease'; page.style.transform = ''; page.style.opacity = '';
+      if (Math.abs(dx) > 60 || (fast && Math.abs(dx) > 25)) swipe(dx < 0 ? 1 : -1);
+    }
+    mode = null;
+  };
+  el.addEventListener('touchstart', start, { passive: true }); el.addEventListener('touchmove', move, { passive: false });
+  el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
+  return () => { el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', move); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); };
+}
+
+// Drifting smoke behind the products (texture: scripts/make-smoke.mjs, motion: .ds-smoke in globals.css)
+// still: no drift (list rows, where dozens of them would all animate at once)
+const Smoke = ({ still }) => <div className={still ? 'ds-smoke still' : 'ds-smoke'} aria-hidden="true"><i /><i /></div>;
+
+// Keyed product clip from scripts/key-videos.mjs: the still first, the video only while it is on screen.
+// Safari and iOS get HEVC with alpha (.mov), everyone else VP9 with alpha (.webm); '#t=' starts it on the still's frame.
+const CLIP = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;transform:scale(1.2)');
+function ProductClip({ src, v, fit }) {
+  const ref = React.useRef(null);
+  const [file, t] = src.split('#t='), stem = file.replace(/\.webm$/i, ''), still = stem + '.webp';
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const ua = navigator.userAgent, hevc = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android|Firefox/.test(ua);
+    const url = stem + (v === 'sm' ? '-sm' : '') + (hevc ? '.mov' : '.webm') + (t ? '#t=' + t : '');
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return el.pause();
+      if (!el.getAttribute('src')) el.src = url;
+      el.play().catch(() => {});
+    }, { rootMargin: '120px' });
+    io.observe(el);
+    return () => { io.disconnect(); el.pause(); };
+  }, [stem, t, v]);
+  const style = fit ? { ...CLIP, ...fit } : CLIP;
+  if (v === 'still') return <img src={still} alt="" loading="lazy" style={style} />; // eslint-disable-line @next/next/no-img-element
+  return <video ref={ref} poster={still} muted loop playsInline preload="none" style={style} />;
+}
+
+const CUT = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;padding:7% 6%;box-sizing:border-box;filter:drop-shadow(0 10px 16px rgba(0,0,0,.6))');
+
+// Section tiles on the home screen: the dish sits where the 3D scene was (right of the text / above it)
+const HERO_FIT = { objectPosition: '82% 50%', transform: 'scale(1.08)' }, TILE_FIT = { objectPosition: '50% 20%', transform: 'scale(1.1)' };
+const WIDE_FIT = { objectPosition: '88% 60%', transform: 'scale(1.3)', transformOrigin: '88% 60%' }; // wide tile: keep clear of the big number on the left
+
+// Product media: photo, keyed clip, plain looping video or a 3D model from MEDIA; a quiet name placeholder until one is set.
+// v: 'full' for the big boxes, 'sm' for small cards (lighter clip), 'still' for list rows (picture only).
+function Media({ m, label = true, v = 'full' }) {
   const fill = css('width:100%;height:100%;object-fit:cover;display:block');
+  // cut-out product photo (scripts/cutout.swift, or background removed in the admin): on the same smoky stage as the clips
+  if (m.mImg && m.mCut) return <><Smoke still={v === 'still'} /><img src={m.mSrc} alt="" loading="lazy" style={CUT} /></>; // eslint-disable-line @next/next/no-img-element
   if (m.mImg) return <img src={m.mSrc} alt="" style={fill} />; // eslint-disable-line @next/next/no-img-element
+  if (m.mVideo && /^\/media\/.+\.webm(#|$)/.test(m.mSrc)) return <><Smoke still={v === 'still'} /><ProductClip src={m.mSrc} v={v} /></>;
   if (m.mVideo) return <video src={m.mSrc} autoPlay muted loop playsInline style={fill} />;
   if (m.mModel) {
     return React.createElement('model-viewer', {
@@ -50,20 +121,25 @@ function Media({ m, label = true }) {
       'shadow-intensity': '1', exposure: '1.1', style: css('width:100%;height:100%;display:block;background:transparent;--poster-color:transparent'),
     });
   }
-  if (!label) return null;
+  if (!label) return <Smoke still />;
   return (
-    <div style={css('position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px 12px;font:500 10px/1.25 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:rgba(242,242,244,.22)')}>
-      {m.mPh}
-    </div>
+    <>
+      <Smoke />
+      <div style={css('position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px 12px;font:500 10px/1.25 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:rgba(242,242,244,.22)')}>
+        {m.mPh}
+      </div>
+    </>
   );
 }
 
-const MEDIA_BG = 'position:relative;overflow:hidden;background:radial-gradient(80% 80% at 50% 35%, rgba(232,121,60,.12), rgba(12,12,16,0) 70%), #0c0c10';
+// Product stage: black with a soft light-grey glow behind the dish (and drifting smoke from <Media>)
+const MEDIA_BG = 'position:relative;overflow:hidden;background:radial-gradient(70% 62% at 50% 45%, rgba(196,199,208,.34), rgba(110,112,120,.12) 48%, rgba(0,0,0,0) 76%), #020203';
+const GLASS_TINT = 'rgba(160,165,180,.13)', GLASS_TINT_TEXT = 'rgba(150,155,170,.17)'; // light veil; a touch denser under running text
 
 function MiniCard({ p, w, mh, bg, btn }) {
   return (
     <div onClick={p.onOpen} style={css(`flex:none;width:${w}px;padding:0 14px 14px;overflow:hidden;border-radius:${w > 160 ? 18 : 16}px;border:1px solid rgba(255,255,255,.1);background:${bg};display:flex;flex-direction:column;justify-content:space-between;gap:${w > 160 ? 16 : 12}px;cursor:${p.onOpen ? 'pointer' : 'default'}`)}>
-      <div style={css(`height:${mh}px;margin:0 -14px;${MEDIA_BG}`)}><Media m={p} /></div>
+      <div style={css(`height:${mh}px;margin:0 -14px;${MEDIA_BG}`)}><Media m={p} v="sm" /></div>
       <div style={css(`display:flex;flex-direction:column;gap:${w > 160 ? 6 : 5}px`)}>
         <span style={css(`font:500 10px/1 Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,242,244,${w > 160 ? '.55' : '.5'})`)}>{p.cat}</span>
         <span style={css(`font:600 ${w > 160 ? '14.5px' : '14px'}/1.3 Manrope,sans-serif`)}>{p.name}</span>
@@ -94,7 +170,14 @@ export default class DarkskyMenu extends React.Component {
   state = { gi: 0, gOn: true, ready: false, phase: 'intro', view: 'home', sec: null, contentOn: true, lang: 'es', cat: 'hookah', q: '', searchOpen: false, sheetId: null, vi: 0, qty: 1, cartOpen: false, langOpen: false, cart: [], cash: false, sent: false, sending: false, sendErr: '', orderId: null, orderStatus: null, toast: '', toastOn: false };
   canvasRef = React.createRef();
   introRef = React.createRef();
-  _els = {}; _kinds = {}; _refs = {};
+  _els = {}; _kinds = {}; _refs = {}; _drag = {}; _dragOff = {};
+  dragRef(key) {
+    return (this._drag[key] ||= el => {
+      this._dragOff[key]?.();
+      if (key === 'item') this._sheetEl = el;
+      this._dragOff[key] = el ? sheetDrag(el, () => this.closeAll(), key === 'item' ? dir => this.stepItem(dir) : null) : null;
+    });
+  }
 
   async componentDidMount() {
     this.D = D;
@@ -102,13 +185,14 @@ export default class DarkskyMenu extends React.Component {
     if (!lang) { const n = (navigator.language || 'es').slice(0, 2); lang = D.LANGS.some(l => l.code === n) ? n : 'es'; }
     const skip = !!this.props.skipIntro;
     this.setState({ ready: true, lang, phase: skip ? 'menu' : 'intro' });
+    alphaLogo(this.props.logoUrl).then(logoAlpha => this.setState({ logoAlpha })).catch(() => {});
     if (skip) setTimeout(() => this.loadTiles(), 300);
     requestAnimationFrame(() => this.layoutIntro());
     this._gt = setInterval(() => { if (this.state.phase !== 'intro') return; this.setState({ gOn: false }); setTimeout(() => this.setState(st => ({ gi: st.gi + 1, gOn: true })), 450); }, 2400);
     try {
       const S = await import('@/lib/smoke-scene');
       if (!this.canvasRef.current) return;
-      this.scene = await S.createSmoke(this.canvasRef.current, { logoUrl: this.props.logoUrl, onSlow: () => this.setState({ no3d: true }) });
+      this.scene = await S.createSmoke(this.canvasRef.current, { logoUrl: this.props.logoUrl, onSlow: () => this.setState({ no3d: true }), onLanded: () => this.setState({ logoOn: true }) });
       if (this.scene.fallback) this.setState({ no3d: true }); else setTimeout(() => this.setState({ sceneOn: true }), 2200);
       if (this.state.phase !== 'intro') { this.scene.enter(true); this.scene.setDim(this.dimVal()); }
       this.layoutIntro();
@@ -116,11 +200,17 @@ export default class DarkskyMenu extends React.Component {
       window.addEventListener('resize', this._onResize);
     } catch (e) { console.error('smoke scene', e); }
   }
-  componentDidUpdate(pp) { if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal()); }
+  componentDidUpdate(pp) {
+    if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal());
+    // the page behind an open sheet must not scroll
+    const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen) ? 'hidden' : '';
+    if (document.documentElement.style.overflow !== lock) document.documentElement.style.overflow = document.body.style.overflow = lock;
+  }
   componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); }
 
   loadTiles() {
-    if (this._tilesLoading || this.state.no3d) return; this._tilesLoading = true;
+    // three.js is only needed for sections without a clip; skip it while no 3D canvas is on the page
+    if (this._tilesLoading || this.state.no3d || !Object.keys(this._els).length) return; this._tilesLoading = true;
     import('@/lib/tiles-scene').then(TS => {
       this.tiles = TS.createTiles();
       Object.entries(this._els).forEach(([k, el]) => this.tiles.register(el, this._kinds[k]));
@@ -130,14 +220,14 @@ export default class DarkskyMenu extends React.Component {
     if (!this._refs[key]) {
       this._kinds[key] = kind;
       this._refs[key] = el => {
-        if (el) { this._els[key] = el; this.tiles && this.tiles.register(el, kind); }
+        if (el) { this._els[key] = el; if (this.tiles) this.tiles.register(el, kind); else if (this.state.phase !== 'intro') this.loadTiles(); }
         else { const o = this._els[key]; o && this.tiles && this.tiles.unregister(o); delete this._els[key]; }
       };
     }
     return this._refs[key];
   }
   nav(view, sec) {
-    const S = sec && D.SECTIONS.find(x => x.id === sec);
+    const S = sec && this.C.SECTIONS.find(x => x.id === sec);
     this.setState({ view, sec: sec || null, cat: (S && S.cats[0]) || 'hookah', q: '', searchOpen: false, contentOn: false });
     window.scrollTo(0, 0);
     clearTimeout(this._nt); this._nt = setTimeout(() => this.setState({ contentOn: true }), 40);
@@ -150,16 +240,21 @@ export default class DarkskyMenu extends React.Component {
     const top = this.scene.setTopFree(free);
     const st = top + 'px', on = top + 24 < free;
     if (st !== this.state.subTop || on !== this.state.subOn || lf !== this.state.logoFree) this.setState({ subTop: st, subOn: on, logoFree: lf });
+    const b = this.scene.logoBox(), bs = b ? `left:${b.left.toFixed(1)}px;top:${b.top.toFixed(1)}px;width:${b.width.toFixed(1)}px;height:${b.height.toFixed(1)}px` : '';
+    if (bs !== (this.state.logoBox || '')) this.setState({ logoBox: bs });
   }
   dimVal() { return this.props.smokeIntensity ?? 0.4; }
 
   t(k) { const U = D.UI; return (U[this.state.lang] || U.en)[k] ?? U.en[k]; }
   tX(k) { const X = D.UI_X; return (X[this.state.lang] || X.en)[k]; }
+  // Tiles, categories, promotions and rules as edited in the admin (src/lib/content.js), else the bundled ones
+  get C() { return this.props.content || D; }
   tx(o) { if (o == null) return ''; if (typeof o === 'string') return o; const l = this.state.lang; return o[l] ?? o.en ?? o.es ?? ''; }
+  nm(it) { return (it.nm && this.tx(it.nm)) || it.name; } // guest-facing name in the current language
   fmt(n) { return n == null ? this.t('onRequest') : '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
   fromFmt(p) { return this.tX('from').replace('{p}', this.fmt(p)); }
   item(id) { if (!this._map) { this._map = {}; this.props.items.forEach(i => { this._map[i.id] = i; }); } return this._map[id]; }
-  catName(id) { const c = D.CATS.find(c => c.id === id); return c ? this.tx(c.n) : ''; }
+  catName(id) { const c = this.C.CATS.find(c => c.id === id); return c ? this.tx(c.n) : ''; }
   price(it, vi) { return it.v ? it.v[vi || 0].p : it.p; }
   norm(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   count(id) { return this.state.cart.filter(l => l.id === id).reduce((a, l) => a + l.qty, 0); }
@@ -177,10 +272,18 @@ export default class DarkskyMenu extends React.Component {
       if (k >= 0) cart[k] = { ...cart[k], qty: cart[k].qty + qty }; else cart.push({ id, vi, qty });
       return { cart, sent: false };
     });
-    this.showToast(this.t('added') + ' · ' + this.item(id).name);
+    this.showToast(this.t('added') + ' · ' + this.nm(this.item(id)));
   }
   changeLine(i, d) { this.setState(s => { const cart = s.cart.slice(); const q = cart[i].qty + d; if (q <= 0) cart.splice(i, 1); else cart[i] = { ...cart[i], qty: q }; return { cart }; }); }
-  openItem(id) { this.setState({ sheetId: id, vi: 0, qty: 1, cartOpen: false, langOpen: false }); }
+  openItem(id) { this.setState({ sheetId: id, vi: 0, qty: 1, cartOpen: false, langOpen: false, slide: 0 }); }
+  // dishes of the open one's category, in menu order: the sheet steps through them (wrapping round)
+  siblings(it) { return this.props.items.filter(i => i.cat === it.cat && !i.hidden); }
+  stepItem(dir) {
+    const cur = this.state.sheetId && this.item(this.state.sheetId); if (!cur) return;
+    const list = this.siblings(cur), i = list.findIndex(x => x.id === cur.id); if (list.length < 2 || i < 0) return;
+    this.setState({ sheetId: list[(i + dir + list.length) % list.length].id, vi: 0, qty: 1, slide: dir });
+    if (this._sheetEl) this._sheetEl.scrollTop = 0;
+  }
   quickAdd(id, e) { e && e.stopPropagation && e.stopPropagation(); const it = this.item(id); if (it.v) return this.openItem(id); this.addToCart(id, 0, 1); }
 
   segs(str) {
@@ -190,21 +293,21 @@ export default class DarkskyMenu extends React.Component {
     });
   }
   mediaVm(it, ctl) {
-    const src = it.media || (it.img ? '/api/img/' + it.img : ''), ext = (src.split('?')[0].split('.').pop() || '').toLowerCase();
+    const src = it.media || (it.img ? '/api/img/' + it.img : ''), ext = (src.split(/[?#]/)[0].split('.').pop() || '').toLowerCase();
     const vid = ['mp4', 'webm', 'mov', 'm4v'].includes(ext), mdl = ['glb', 'gltf'].includes(ext);
     if (mdl) this.needModelViewer();
-    return { mSrc: src, mImg: !!src && !vid && !mdl, mVideo: vid, mModel: mdl, mCtl: !!ctl, mPh: it.name };
+    return { mSrc: src, mImg: !!src && !vid && !mdl, mCut: !!it.cut || src.startsWith('/media/cut/'), mVideo: vid, mModel: mdl, mCtl: !!ctl, mPh: this.nm(it) };
   }
   needModelViewer() { if (this._mv) return; this._mv = 1; const s = document.createElement('script'); s.type = 'module'; s.src = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js'; document.head.appendChild(s); }
   rowVm(it) {
     const c = this.count(it.id), d = this.tx(it.d), meta = this.tx(it.m);
     let price = this.fmt(it.p);
     if (it.v) { const ps = it.v.map(v => v.p), mn = Math.min(...ps), mx = Math.max(...ps); price = this.fmt(mn) + (mx > mn ? '+' : ''); }
-    return { ...this.mediaVm(it), id: it.id, name: it.name, desc: d, meta, price, hit: !!it.hit, isNew: !!it.new,
+    return { ...this.mediaVm(it), id: it.id, name: this.nm(it), desc: d, meta, price, hit: !!it.hit, isNew: !!it.new,
       inCart: c > 0, count: c, addBg: c ? '#e8793c' : '#111116', addColor: c ? '#050507' : '#f2f2f4',
       onOpen: () => this.openItem(it.id), onAdd: e => this.quickAdd(it.id, e) };
   }
-  miniVm(it) { return { ...this.mediaVm(it), id: it.id, name: it.name, cat: this.catName(it.cat), price: this.fmt(this.price(it, 0)), onOpen: () => this.openItem(it.id), onAdd: e => this.quickAdd(it.id, e) }; }
+  miniVm(it) { return { ...this.mediaVm(it), id: it.id, name: this.nm(it), cat: this.catName(it.cat), price: this.fmt(this.price(it, 0)), onOpen: () => this.openItem(it.id), onAdd: e => this.quickAdd(it.id, e) }; }
 
   vm() {
     const s = this.state, t = k => this.t(k);
@@ -213,19 +316,19 @@ export default class DarkskyMenu extends React.Component {
     const hour = new Date().getHours();
     const live = w => !!w && hour >= w[0] && hour < w[1];
     const searching = s.searchOpen && s.q.trim().length > 0;
-    const sec = s.view === 'section' ? D.SECTIONS.find(x => x.id === s.sec) : null;
-    const cat = D.CATS.find(c => c.id === s.cat) || D.CATS[0];
+    const sec = s.view === 'section' ? this.C.SECTIONS.find(x => x.id === s.sec) : null;
+    const cat = this.C.CATS.find(c => c.id === s.cat) || this.C.CATS[0];
     const kind = searching ? 'list' : !sec ? 'home' : (sec.kind || cat.kind || 'list');
-    const SEC = id => D.SECTIONS.find(x => x.id === id);
+    const SEC = id => this.C.SECTIONS.find(x => x.id === id);
     const secVm = (S, extra) => {
       const its = this.props.items.filter(i => S.cats.includes(i.cat)), ps = its.map(i => this.price(i, 0)).filter(p => p != null);
       const from = ps.length ? this.fromFmt(Math.min(...ps)) : '';
-      return { id: S.id, name: this.tx(S.n), tag: this.tx(S.tag), from, count: its.length, big: '', row: 'auto', col: 'auto', border: 'rgba(255,255,255,.09)', ref: this.tileRef('tile-' + S.id, S.id), onOpen: () => this.nav('section', S.id), ...extra };
+      return { id: S.id, name: this.tx(S.n), tag: this.tx(S.tag), from, count: its.length, big: '', row: 'auto', col: 'auto', border: 'rgba(255,255,255,.09)', ref: this.tileRef('tile-' + S.id, S.id), clip: S.clip, onOpen: () => this.nav('section', S.id), ...extra };
     };
     const bizLive = live([14, 17]);
 
     let items = [];
-    if (searching) { const q = this.norm(s.q); items = this.props.items.filter(it => this.norm(it.name + ' ' + this.tx(it.d) + ' ' + this.catName(it.cat)).includes(q)); }
+    if (searching) { const q = this.norm(s.q); items = this.props.items.filter(it => this.norm(it.name + ' ' + this.nm(it) + ' ' + this.tx(it.d) + ' ' + this.catName(it.cat)).includes(q)); }
     else if (kind === 'list') items = this.props.items.filter(it => it.cat === cat.id);
 
     const it = s.sheetId ? this.item(s.sheetId) : null;
@@ -233,7 +336,8 @@ export default class DarkskyMenu extends React.Component {
     if (it) {
       const pairs = (it.pair || D.PAIR[it.cat] || []).filter(id => id !== it.id).map(id => this.item(id)).filter(Boolean).map(p => this.miniVm(p));
       const variants = (it.v || []).map((v, i) => { const on = i === s.vi; return { name: this.tx(v.n), price: this.fmt(v.p), onPick: () => this.setState({ vi: i }), border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' }; });
-      sh = { ...this.mediaVm(it, true), id: it.id, name: it.name, desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: (it.t || []).map(k => this.tx(D.TASTE[k])), strLabel: it.str ? `${it.str[0]}–${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, pairs };
+      const sib = this.siblings(it), at = sib.findIndex(x => x.id === it.id);
+      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: (it.t || []).map(k => this.tx(D.TASTE[k])), strLabel: it.str ? `${it.str[0]}–${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, pairs };
       const p = this.price(it, s.vi);
       addLabel = p == null ? t('add') : `${t('add')} · ${this.fmt(p * s.qty)}`;
     }
@@ -241,18 +345,18 @@ export default class DarkskyMenu extends React.Component {
     let sub = 0, onReq = false, cnt = 0;
     const lines = s.cart.map((l, i) => {
       const ci = this.item(l.id), p = this.price(ci, l.vi); cnt += l.qty; if (p == null) onReq = true; else sub += p * l.qty;
-      return { key: l.id + ':' + l.vi, name: ci.name, variant: ci.v ? this.tx(ci.v[l.vi].n) : '', qty: l.qty, total: this.fmt(p == null ? null : p * l.qty), onInc: () => this.changeLine(i, 1), onDec: () => this.changeLine(i, -1) };
+      return { key: l.id + ':' + l.vi, name: this.nm(ci), variant: ci.v ? this.tx(ci.v[l.vi].n) : '', qty: l.qty, total: this.fmt(p == null ? null : p * l.qty), onInc: () => this.changeLine(i, 1), onDec: () => this.changeLine(i, -1) };
     });
     const disc = s.cash ? Math.round(sub * 0.15) : 0;
     const inCart = new Set(s.cart.map(l => l.id)), seen = new Set(), suggest = [];
     s.cart.forEach(l => (D.PAIR[this.item(l.id).cat] || []).forEach(id => { if (!inCart.has(id) && !seen.has(id) && suggest.length < 5) { seen.add(id); const x = this.item(id); x && suggest.push(this.miniVm(x)); } }));
     const anySheet = !!it || s.cartOpen || s.langOpen;
-    const R = D.RULES;
+    const R = this.C.RULES;
 
     return {
       rtl, flip: rtl ? 'scaleX(-1)' : 'none', langCode: s.lang, t, searching, sec, cat, kind, bizLive, live,
       langs: D.LANGS.map((l, i) => { const on = l.code === s.lang; return { code: l.code, name: l.name, sub: EN[l.code], on, last: i === D.LANGS.length - 1, onPick: () => this.setLang(l.code) }; }),
-      cats: (sec ? sec.cats : []).map(id => D.CATS.find(c => c.id === id)).map(c => ({ id: c.id, name: this.tx(c.n), on: c.id === s.cat, onPick: () => this.setState({ cat: c.id }) })),
+      cats: (sec ? sec.cats : []).map(id => this.C.CATS.find(c => c.id === id)).map(c => ({ id: c.id, name: this.tx(c.n), on: c.id === s.cat, onPick: () => this.setState({ cat: c.id }) })),
       hero: secVm(SEC('hookah')),
       tiles: [
         secVm(SEC('kitchen'), { row: 'span 2' }), secVm(SEC('cocktails')), secVm(SEC('tea')),
@@ -263,8 +367,8 @@ export default class DarkskyMenu extends React.Component {
       rulesName: this.tx(SEC('rules').n),
       hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[0]}–${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: (h.t || []).map(k => this.tx(D.TASTE[k])), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
       listTitle: searching ? '“' + s.q.trim() + '”' : this.tx(cat.n), items: items.map(x => this.rowVm(x)),
-      promos: D.PROMOS.map(p => ({ tag: this.tx(p.tag), title: this.tx(p.title), big: p.big, desc: this.tx(p.d), live: live(p.window) })),
-      promoNote: this.tx(D.PROMO_NOTE),
+      promos: this.C.PROMOS.map(p => ({ tag: this.tx(p.tag), title: this.tx(p.title), big: p.big, desc: this.tx(p.d), live: live(p.window) })),
+      promoNote: this.tx(this.C.PROMO_NOTE),
       rules: { peopleTitle: this.tx(R.peopleTitle), people: R.people.map(([g, n]) => ({ n, label: g + ' ' + this.tx(R.peopleUnit) })), info: R.info.map(x => this.tx(x)), noTitle: this.tx(R.noTitle), no: R.no.map(x => this.tx(x)), liability: this.tx(R.liability) },
       sh, addLabel, lines, suggest, cnt, onReq, anySheet,
       subtotal: this.fmt(sub), discount: '−' + this.fmt(disc), cartTotal: this.fmt(sub - disc),
@@ -278,7 +382,7 @@ export default class DarkskyMenu extends React.Component {
       <div style={css(`position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;opacity:${s.phase === 'intro' ? 1 : 0};pointer-events:${s.phase === 'intro' ? 'auto' : 'none'};transition:opacity .7s ease`)}>
         {s.no3d && (
           <div style={css(`position:absolute;left:0;right:0;top:0;height:${s.logoFree || '55%'};display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:none`)}>
-            <img src={this.props.logoUrl} alt="DARKSKY Hookah Lounge" style={css('max-width:min(78vw,380px);max-height:100%;object-fit:contain;mix-blend-mode:screen')} /> {/* eslint-disable-line @next/next/no-img-element */}
+            <img src={s.logoAlpha || this.props.logoUrl} alt="DARKSKY Hookah Lounge" style={css('max-width:min(78vw,380px);max-height:100%;object-fit:contain')} /> {/* eslint-disable-line @next/next/no-img-element */}
           </div>
         )}
         <div ref={this.introRef} style={css('width:100%;height:min(64vh,640px);display:flex;justify-content:center')}>
@@ -287,7 +391,7 @@ export default class DarkskyMenu extends React.Component {
               <span style={css(`font:600 clamp(34px,10vw,44px)/1.05 Manrope,sans-serif;letter-spacing:-.02em;opacity:${s.gOn === false ? 0 : 1};transform:translateY(${s.gOn === false ? '8px' : '0px'});transition:opacity .5s ease, transform .6s cubic-bezier(.2,.8,.2,1);min-height:46px`)}>{GREET[s.gi % GREET.length]}</span>
               <span style={css('font:400 15px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.7)')}>{t('chooseLang')}</span>
             </div>
-            <div style={css('flex:1;min-height:0;overflow-y:auto;border-radius:16px;background:#141418;border:1px solid rgba(255,255,255,.06);scrollbar-width:none')}>
+            <div style={css('flex:1;min-height:0;overflow-y:auto;border-radius:18px;background:linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03)), rgba(18,18,24,.42);border:1px solid rgba(255,255,255,.14);scrollbar-width:none' + GLASS)}>
               {ready && D.LANGS.map((l, i) => (
                 <button key={l.code} className="ds-press-bg" onClick={() => this.setLang(l.code)} style={css('width:100%;min-height:58px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:transparent;transition:background .2s')}>
                   <span style={css(`flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;padding:10px 0;border-bottom:${i < D.LANGS.length - 1 ? '1px solid rgba(255,255,255,.08)' : '0'};text-align:start`)}>
@@ -312,9 +416,11 @@ export default class DarkskyMenu extends React.Component {
     const { t, hero } = v;
     return (
       <div style={css('display:flex;flex-direction:column;gap:10px')}>
-        <div className="ds-press-hero" onClick={hero.onOpen} style={css('position:relative;overflow:hidden;height:300px;border-radius:26px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 120% at 78% 40%, rgba(232,121,60,.16), rgba(10,10,14,0) 62%), #08080b;cursor:pointer;transition:transform .2s')}>
-          <canvas ref={hero.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />
-          <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.85) 0%, rgba(5,5,8,.45) 42%, rgba(5,5,8,0) 66%)')} />
+        <div className="ds-press-hero" onClick={hero.onOpen} style={css('position:relative;overflow:hidden;height:300px;border-radius:26px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 120% at 78% 40%, rgba(232,121,60,.16), rgba(10,10,14,0) 62%), ' + GLASS_TINT + ';cursor:pointer;transition:transform .2s' + GLASS)}>
+          {hero.clip
+            ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={hero.clip} v="full" fit={HERO_FIT} /></div>
+            : <canvas ref={hero.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
+          <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.5) 0%, rgba(5,5,8,.25) 42%, rgba(5,5,8,0) 66%)')} />
           <div style={css('position:absolute;inset:0;padding:20px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;max-width:64%')}>
             {v.bizLive
               ? <span style={css('align-self:flex-start;display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:10px;background:#e8793c;color:#050507;font:700 10.5px/1 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase')}><span style={css('width:6px;height:6px;border-radius:50%;background:#050507')} />Business Hookah −20% · {t('now')}</span>
@@ -332,9 +438,11 @@ export default class DarkskyMenu extends React.Component {
 
         <div style={css('display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:176px;gap:10px')}>
           {v.tiles.map(tl => (
-            <div key={tl.id} className="ds-press-tile" onClick={tl.onOpen} style={css(`position:relative;overflow:hidden;border-radius:22px;border:1px solid ${tl.border};background:radial-gradient(110% 80% at 60% 30%, rgba(232,121,60,.11), rgba(10,10,14,0) 65%), #08080b;grid-row:${tl.row};grid-column:${tl.col};cursor:pointer;transition:transform .2s`)}>
-              <canvas ref={tl.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />
-              <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top, rgba(5,5,8,.94) 0%, rgba(5,5,8,.5) 34%, rgba(5,5,8,0) 58%)')} />
+            <div key={tl.id} className="ds-press-tile" onClick={tl.onOpen} style={css(`position:relative;overflow:hidden;border-radius:22px;border:1px solid ${tl.border};background:radial-gradient(110% 80% at 60% 30%, rgba(232,121,60,.11), rgba(10,10,14,0) 65%), ${GLASS_TINT};grid-row:${tl.row};grid-column:${tl.col};cursor:pointer;transition:transform .2s${GLASS}`)}>
+              {tl.clip
+                ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={tl.clip} v={tl.row === 'auto' ? 'sm' : 'full'} fit={tl.col === 'auto' ? TILE_FIT : WIDE_FIT} /></div>
+                : <canvas ref={tl.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
+              <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top, rgba(5,5,8,.6) 0%, rgba(5,5,8,.3) 34%, rgba(5,5,8,0) 58%)')} />
               {tl.big && <span style={css('position:absolute;top:16px;left:16px;font:400 30px/1 Michroma,sans-serif;color:#f2a676;pointer-events:none')}>{tl.big}</span>}
               {tl.count > 0 && <span style={css('position:absolute;top:12px;right:12px;min-width:30px;height:24px;padding:0 8px;border-radius:8px;background:rgba(5,5,8,.6);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font:600 11px/1 Manrope,sans-serif;color:rgba(242,242,244,.8);pointer-events:none')}>{tl.count}</span>}
               <div style={css('position:absolute;left:14px;right:14px;bottom:14px;display:flex;flex-direction:column;gap:6px;pointer-events:none')}>
@@ -349,11 +457,11 @@ export default class DarkskyMenu extends React.Component {
         <div style={css('display:flex;flex-direction:column;gap:12px;margin-top:14px')}>
           <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.75)')}>{this.tX('hits')}</span>
           <div style={css('display:flex;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none')}>
-            {v.hits.map(p => <MiniCard key={p.id} p={p} w={164} mh={120} bg="#0e0e13" btn={38} />)}
+            {v.hits.map(p => <MiniCard key={p.id} p={p} w={164} mh={120} bg={GLASS_TINT_TEXT + GLASS} btn={38} />)}
           </div>
         </div>
 
-        <button onClick={() => this.nav('section', 'rules')} style={css('margin-top:10px;min-height:56px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:#0e0e13;display:flex;align-items:center;justify-content:space-between;gap:12px')}>
+        <button onClick={() => this.nav('section', 'rules')} style={css('margin-top:10px;min-height:56px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;align-items:center;justify-content:space-between;gap:12px' + GLASS)}>
           <span style={css('display:flex;flex-direction:column;gap:5px')}>
             <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.rulesName}</span>
             <span style={css('font:400 12.5px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.6)')}>{t('lasts')} · 18+</span>
@@ -379,7 +487,7 @@ export default class DarkskyMenu extends React.Component {
           <span style={css('font:400 22px/1 Michroma,sans-serif;color:#f2a676;white-space:nowrap')}>−20%</span>
         </button>
         {v.hookahs.map(h => (
-          <div key={h.id} onClick={h.onOpen} style={css('position:relative;overflow:hidden;cursor:pointer;padding:0 20px 20px;border-radius:22px;border:1px solid rgba(255,255,255,.1);background:#0e0e13;display:flex;flex-direction:column;gap:14px')}>
+          <div key={h.id} onClick={h.onOpen} style={css('position:relative;overflow:hidden;cursor:pointer;padding:0 20px 20px;border-radius:22px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;flex-direction:column;gap:14px' + GLASS)}>
             <div style={css(`height:190px;margin:0 -20px;border-bottom:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}><Media m={h} /></div>
             <div style={css('display:flex;flex-direction:column;gap:8px')}>
               <div style={css('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
@@ -408,7 +516,7 @@ export default class DarkskyMenu extends React.Component {
           </div>
         ))}
         <div style={css('display:flex;justify-content:center;gap:10px;flex-wrap:wrap;font:500 12px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.6);padding:4px 0')}>
-          <span>{t('lasts')}</span><span>·</span><span>{t('prep')}</span>
+          <span>{t('lasts')}</span><span>·</span><span>{this.C.PREP ? this.tx(this.C.PREP) : t('prep')}</span>
         </div>
       </div>
     );
@@ -417,7 +525,7 @@ export default class DarkskyMenu extends React.Component {
   renderList(v) {
     const { t } = v;
     return (
-      <div style={css('display:flex;flex-direction:column;background:#0b0b0f;border:1px solid rgba(255,255,255,.07);border-radius:22px;padding:16px 16px 4px')}>
+      <div style={css('display:flex;flex-direction:column;background:' + GLASS_TINT_TEXT + ';border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:16px 16px 4px' + GLASS)}>
         <div style={css('display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-bottom:6px')}>
           <h2 style={css('margin:0;font:400 15px/1.3 Michroma,sans-serif;letter-spacing:.08em;text-transform:uppercase')}>{v.listTitle}</h2>
           <span style={css('font:500 12px/1 Manrope,sans-serif;color:rgba(242,242,244,.5)')}>{v.items.length || ''}</span>
@@ -425,7 +533,7 @@ export default class DarkskyMenu extends React.Component {
         {v.searching && v.items.length === 0 && <div style={css('padding:40px 0;text-align:center;font:400 14px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.6)')}>{t('noResults')}</div>}
         {v.items.map(it => (
           <div key={it.id} onClick={it.onOpen} style={css('display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer')}>
-            <div style={css(`width:76px;height:76px;border-radius:16px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}><Media m={it} label={false} /></div>
+            <div style={css(`width:76px;height:76px;border-radius:16px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}><Media m={it} label={false} v="still" /></div>
             <div style={css('display:flex;flex-direction:column;gap:5px;min-width:0')}>
               <div style={css('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
                 <span style={css('font:600 15px/1.3 Manrope,sans-serif;letter-spacing:.01em')}>{it.name}</span>
@@ -451,7 +559,7 @@ export default class DarkskyMenu extends React.Component {
     return (
       <div style={css('display:flex;flex-direction:column;gap:12px')}>
         {v.promos.map((p, i) => (
-          <div key={i} style={css(`padding:22px 20px;border-radius:22px;border:1px solid ${p.live ? 'rgba(232,121,60,.55)' : 'rgba(255,255,255,.1)'};background:#0e0e13;display:flex;flex-direction:column;gap:10px`)}>
+          <div key={i} style={css(`padding:22px 20px;border-radius:22px;border:1px solid ${p.live ? 'rgba(232,121,60,.55)' : 'rgba(255,255,255,.1)'};background:${GLASS_TINT_TEXT};display:flex;flex-direction:column;gap:10px${GLASS}`)}>
             <div style={css('display:flex;align-items:center;justify-content:space-between;gap:10px')}>
               <span style={css('font:500 11px/1 Manrope,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(242,242,244,.6)')}>{p.tag}</span>
               {p.live && <span style={css('font:700 10px/1 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:4px 7px;border-radius:6px;background:#e8793c;color:#050507')}>{v.t('now')}</span>}
@@ -474,7 +582,7 @@ export default class DarkskyMenu extends React.Component {
           <h3 style={css('margin:0;font:400 12px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,242,244,.75)')}>{r.peopleTitle}</h3>
           <div style={css('display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px')}>
             {r.people.map((p, i) => (
-              <div key={i} style={css('padding:16px 8px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:#111116;display:flex;flex-direction:column;align-items:center;gap:8px')}>
+              <div key={i} style={css('padding:16px 8px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;flex-direction:column;align-items:center;gap:8px' + GLASS)}>
                 <span style={css('font:400 26px/1 Michroma,sans-serif')}>{p.n}</span>
                 <span style={css('font:500 11px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.65);text-align:center')}>{p.label}</span>
               </div>
@@ -484,7 +592,7 @@ export default class DarkskyMenu extends React.Component {
         <div style={css('display:flex;flex-direction:column;gap:10px')}>
           {r.info.map((x, i) => <div key={i} style={css('display:flex;gap:12px;font:400 14px/1.5 Manrope,sans-serif;color:rgba(242,242,244,.82)')}><span style={css('flex:none;width:6px;height:6px;border-radius:50%;background:#e8793c;margin-top:8px')} /><span>{x}</span></div>)}
         </div>
-        <div style={css('display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:#101015')}>
+        <div style={css('display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + GLASS)}>
           <h3 style={css('margin:0;font:400 12px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#f2a676')}>{r.noTitle}</h3>
           {r.no.map((x, i) => <div key={i} style={css('display:flex;gap:12px;font:400 14px/1.45 Manrope,sans-serif;color:rgba(242,242,244,.82)')}><span style={css('flex:none;color:#f2a676;font-weight:600')}>×</span><span>{x}</span></div>)}
         </div>
@@ -497,7 +605,7 @@ export default class DarkskyMenu extends React.Component {
     const s = this.state, { t, sec } = v;
     return (
       <div style={css(`position:relative;z-index:2;max-width:540px;margin:0 auto;min-height:100vh;padding-bottom:130px;opacity:${s.phase === 'menu' ? 1 : 0};transition:opacity .9s ease .15s`)}>
-        <div style={css('position:sticky;top:0;z-index:4;background:#050507;border-bottom:1px solid rgba(255,255,255,.06);padding-top:env(safe-area-inset-top)')}>
+        <div style={css('position:sticky;top:0;z-index:4;background:rgba(34,35,42,.5);border-bottom:1px solid rgba(255,255,255,.06);padding-top:env(safe-area-inset-top)' + GLASS)}>
           <div style={css('display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 18px')}>
             {!sec ? (
               <button onClick={() => this.nav('home')} style={css('display:flex;flex-direction:column;gap:3px;align-items:flex-start')}>
@@ -530,7 +638,7 @@ export default class DarkskyMenu extends React.Component {
           {!v.searching && sec && sec.cats.length > 1 && (
             <div style={css('display:flex;gap:8px;overflow-x:auto;padding:2px 16px 12px;scrollbar-width:none')}>
               {v.cats.map(c => (
-                <button key={c.id} onClick={c.onPick} style={css(`flex:none;height:38px;padding:0 15px;border-radius:19px;border:1px solid ${c.on ? '#f2f2f4' : 'rgba(255,255,255,.12)'};background:${c.on ? '#f2f2f4' : '#111116'};color:${c.on ? '#050507' : '#f2f2f4'};font:500 13px/1 Manrope,sans-serif;white-space:nowrap;transition:background .2s,color .2s`)}>{c.name}</button>
+                <button key={c.id} onClick={c.onPick} style={css(`flex:none;height:38px;padding:0 15px;border-radius:19px;border:1px solid ${c.on ? '#f2f2f4' : 'rgba(255,255,255,.12)'};background:${c.on ? '#f2f2f4' : 'rgba(255,255,255,.08)'};color:${c.on ? '#050507' : '#f2f2f4'};font:500 13px/1 Manrope,sans-serif;white-space:nowrap;transition:background .2s,color .2s`)}>{c.name}</button>
               ))}
             </div>
           )}
@@ -539,9 +647,11 @@ export default class DarkskyMenu extends React.Component {
         <div style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;opacity:${s.contentOn ? 1 : 0};transform:translateY(${s.contentOn ? '0px' : '14px'});transition:opacity .45s ease, transform .55s cubic-bezier(.2,.8,.2,1)`)}>
           {v.kind === 'home' && this.renderHome(v)}
           {!v.searching && sec && sec.id !== 'rules' && (
-            <div style={css('position:relative;overflow:hidden;height:168px;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), #08080b')}>
-              <canvas ref={this.tileRef('banner-' + sec.id, sec.id)} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />
-              <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.85) 0%, rgba(5,5,8,.35) 50%, rgba(5,5,8,0) 72%)')} />
+            <div style={css('position:relative;overflow:hidden;height:168px;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), ' + GLASS_TINT + GLASS)}>
+              {sec.clip
+                ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={sec.clip} v="full" fit={HERO_FIT} /></div>
+                : <canvas ref={this.tileRef('banner-' + sec.id, sec.id)} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
+              <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.5) 0%, rgba(5,5,8,.2) 50%, rgba(5,5,8,0) 72%)')} />
               <div style={css('position:absolute;left:18px;bottom:18px;max-width:62%;display:flex;flex-direction:column;gap:8px;pointer-events:none')}>
                 <span style={css('font:400 22px/1.1 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{this.tx(sec.n)}</span>
                 <span style={css('font:400 13px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.75)')}>{this.tx(sec.tag)}</span>
@@ -561,9 +671,21 @@ export default class DarkskyMenu extends React.Component {
     const s = this.state, sh = v.sh, { t } = v;
     if (!sh) return null;
     return (
-      <div style={css('padding:10px 20px 0;display:flex;flex-direction:column;gap:20px')}>
+      <div key={sh.id} className={s.slide > 0 ? 'ds-in-r' : s.slide < 0 ? 'ds-in-l' : ''} style={css('padding:10px 20px 0;display:flex;flex-direction:column;gap:20px')}>
+        {/* pinned to the sheet's top-right corner while the content scrolls */}
+        <div style={css('position:sticky;top:0;z-index:5;height:0;margin-bottom:-20px')}>
+          <button onClick={() => this.closeAll()} aria-label="Close" style={css('position:absolute;top:12px;right:-6px;' + CLOSE_BTN)}><Close /></button>
+        </div>
         <Grip />
-        <div style={css(`height:min(42vh,72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG.replace('.12)', '.14)')}`)}><Media m={sh} /></div>
+        <div style={css(`height:min(42vh,72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}>
+          <Media m={sh} />
+          {sh.pos && <>
+            <button onClick={() => this.stepItem(-1)} aria-label="Previous" style={css('left:10px;' + STEP_BTN)}><Arrow size={16} flip="scaleX(-1)" /></button>
+            <button onClick={() => this.stepItem(1)} aria-label="Next" style={css('right:10px;' + STEP_BTN)}><Arrow size={16} /></button>
+            <span style={css('position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:2;padding:5px 10px;border-radius:10px;background:rgba(5,5,8,.5);font:600 11px/1 Manrope,sans-serif;letter-spacing:.06em;color:rgba(242,242,244,.85);pointer-events:none')}>{sh.pos}</span>
+          </>}
+        </div>
+        {sh.credit && <div style={css('margin-top:-8px;font:400 10.5px/1.35 Manrope,sans-serif;color:rgba(242,242,244,.38)')}>© {sh.credit}</div>}
         <div style={css('display:flex;align-items:flex-start;justify-content:space-between;gap:12px')}>
           <div style={css('display:flex;flex-direction:column;gap:10px;min-width:0')}>
             <div style={css('display:flex;gap:6px')}>
@@ -574,7 +696,7 @@ export default class DarkskyMenu extends React.Component {
             <h2 style={css('margin:0;font:400 22px/1.25 Michroma,sans-serif;letter-spacing:.03em;text-transform:uppercase;text-wrap:balance')}>{sh.name}</h2>
             {sh.meta && <span style={css('font:500 12px/1 Manrope,sans-serif;letter-spacing:.06em;color:rgba(242,242,244,.55)')}>{sh.meta}</span>}
           </div>
-          <button onClick={() => this.closeAll()} aria-label="Close" style={css('flex:none;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center')}><Close /></button>
+          
         </div>
         {sh.desc && <p style={css('margin:0;font:400 15px/1.6 Manrope,sans-serif;color:rgba(242,242,244,.78);text-wrap:pretty')}>{sh.desc}</p>}
 
@@ -620,7 +742,7 @@ export default class DarkskyMenu extends React.Component {
           </div>
         )}
 
-        <div style={css('position:sticky;bottom:0;margin:0 -20px;padding:14px 20px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(to top, rgba(13,13,18,1) 70%, rgba(13,13,18,0));display:flex;gap:10px')}>
+        <div style={css('position:sticky;bottom:0;z-index:3;margin:0 -20px;padding:14px 20px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(to top, rgba(13,13,18,1) 70%, rgba(13,13,18,0));display:flex;gap:10px')}>
           <div style={css('display:flex;align-items:center;border-radius:16px;border:1px solid rgba(255,255,255,.14);height:58px')}>
             <button onClick={() => this.setState(st => ({ qty: Math.max(1, st.qty - 1) }))} aria-label="−" style={css('width:46px;height:58px;display:flex;align-items:center;justify-content:center;font:400 20px/1 Manrope,sans-serif')}>−</button>
             <span style={css('min-width:22px;text-align:center;font:600 16px/1 Manrope,sans-serif')}>{s.qty}</span>
@@ -640,7 +762,7 @@ export default class DarkskyMenu extends React.Component {
         <Grip />
         <div style={css('display:flex;align-items:center;justify-content:space-between;gap:12px')}>
           <h2 style={css('margin:0;font:400 18px/1.2 Michroma,sans-serif;letter-spacing:.06em;text-transform:uppercase')}>{t('order')}</h2>
-          <button onClick={() => this.closeAll()} aria-label="Close" style={css('width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center')}><Close /></button>
+          <button onClick={() => this.closeAll()} aria-label="Close" style={css(CLOSE_BTN)}><Close /></button>
         </div>
 
         {s.sent && (
@@ -667,7 +789,9 @@ export default class DarkskyMenu extends React.Component {
                     <span style={css('font:600 13px/1 Manrope,sans-serif;color:rgba(242,242,244,.85);font-variant-numeric:tabular-nums;margin-top:2px')}>{ln.total}</span>
                   </div>
                   <div style={css('display:flex;align-items:center;border-radius:14px;border:1px solid rgba(255,255,255,.14);height:44px')}>
-                    <button onClick={ln.onDec} style={css('width:40px;height:44px;font:400 18px/1 Manrope,sans-serif;text-align:center')}>−</button>
+                    <button onClick={ln.onDec} aria-label={ln.qty > 1 ? '−' : 'Remove'} style={css('width:40px;height:44px;display:flex;align-items:center;justify-content:center;font:400 18px/1 Manrope,sans-serif')}>
+                      {ln.qty > 1 ? '−' : <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#f2a676" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.5h6.6L12 4M6.8 6.8v4M9.2 6.8v4" /></svg>}
+                    </button>
                     <span style={css('min-width:18px;text-align:center;font:600 14px/1 Manrope,sans-serif')}>{ln.qty}</span>
                     <button onClick={ln.onInc} style={css('width:40px;height:44px;font:400 18px/1 Manrope,sans-serif;text-align:center')}>+</button>
                   </div>
@@ -707,9 +831,9 @@ export default class DarkskyMenu extends React.Component {
 
             {s.sendErr && <div role="alert" style={css('padding:12px 14px;border-radius:14px;border:1px solid rgba(232,121,60,.5);background:rgba(232,121,60,.1);font:500 14px/1.4 Manrope,sans-serif;color:#f6c3a3')}>{this.tO(s.sendErr)}</div>}
             {this.props.table ? (
-              <button className="ds-press" disabled={s.sending} onClick={() => this.sendOrder()} style={css(`height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:center;gap:12px;font:400 12px/1 Michroma,sans-serif;letter-spacing:.16em;text-transform:uppercase;opacity:${s.sending ? 0.6 : 1}`)}>
-                <span>{s.sending ? this.tO('sending') : t('send')}</span>
-                {!s.sending && <Arrow w={1.5} />}
+              <button className="ds-press" onClick={() => this.setState({ cartOpen: false, reviewOpen: true, sendErr: '' })} style={css('height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:center;gap:12px;font:400 12px/1 Michroma,sans-serif;letter-spacing:.16em;text-transform:uppercase')}>
+                <span>{this.tO('checkout')}</span>
+                <Arrow w={1.5} flip={v.flip} />
               </button>
             ) : (
               <div style={css('padding:16px;border-radius:18px;border:1px dashed rgba(255,255,255,.2);text-align:center;font:500 14px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.75)')}>{this.tO('scanQr')}</div>
@@ -730,7 +854,7 @@ export default class DarkskyMenu extends React.Component {
     try {
       const r = await fetch('/api/orders', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, qty: l.qty })), cash: s.cash, lang: s.lang }),
+        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, qty: l.qty })), cash: s.cash, lang: s.lang, note: s.note }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -743,7 +867,7 @@ export default class DarkskyMenu extends React.Component {
       this.setState({ sending: false, sendErr: 'sendFail' });
     }
   }
-  // Waiter taps "Принял" / "Подано" in Telegram → the guest sees it here.
+  // Staff accept / serve / edit it (staff page or Telegram) → the guest sees it here.
   pollOrder(id) {
     clearInterval(this._poll);
     const started = Date.now();
@@ -752,13 +876,31 @@ export default class DarkskyMenu extends React.Component {
       try {
         const r = await fetch(`/api/orders/${id}?t=${encodeURIComponent(this.props.table.token)}`, { cache: 'no-store' });
         if (!r.ok) return;
-        const { status } = await r.json();
-        if (status !== this.state.orderStatus) this.setState({ orderStatus: status });
-        if (status === 'served') clearInterval(this._poll);
+        const o = await r.json();
+        this.setState({ orderStatus: o.status, orderView: o });
+        if (o.status === 'served') clearInterval(this._poll);
       } catch (e) { /* offline for a moment: try again next tick */ }
     }, 4000);
   }
-  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, cash: false, orderId: null, orderStatus: null, sendErr: '' }); }
+  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '' }); }
+
+  // Full-screen order: before sending — the cart as it stands; after — the order as the staff see it now.
+  reviewVm(v) {
+    const s = this.state, o = s.sent && s.orderView;
+    const lines = o ? o.lines.map((l, i) => {
+      const ci = this.item(l.id);
+      return { key: i, name: ci ? this.nm(ci) : l.id, variant: ci && ci.v && l.vi != null && ci.v[l.vi] ? this.tx(ci.v[l.vi].n) : l.variant, qty: l.qty, total: this.fmt(l.total) };
+    }) : v.lines;
+    return {
+      open: !!s.reviewOpen && lines.length > 0, t: v.t, tO: k => this.tO(k), flip: v.flip, table: this.props.table ? this.props.table.number : '',
+      lines, sent: !!s.sent, status: s.orderStatus, by: o ? o.by : null, edited: !!(o && o.edited),
+      subtotal: o ? this.fmt(o.subtotal) : v.subtotal, discount: o ? '−' + this.fmt(o.discount) : v.discount, total: o ? this.fmt(o.total) : v.cartTotal,
+      hasDiscount: o ? o.discount > 0 : s.cash, onReq: o ? o.onRequest : v.onReq,
+      cash: s.cash, onCash: () => this.setState(st => ({ cash: !st.cash })), note: s.note || '', onNote: note => this.setState({ note }),
+      sending: s.sending, err: s.sendErr ? this.tO(s.sendErr) : '', onSend: () => this.sendOrder(),
+      onBack: () => this.setState({ reviewOpen: false, cartOpen: true }), onClose: () => this.setState({ reviewOpen: false }), onNew: () => this.newOrder(),
+    };
+  }
 
   render() {
     const s = this.state;
@@ -768,6 +910,11 @@ export default class DarkskyMenu extends React.Component {
       <div dir={v && v.rtl ? 'rtl' : 'ltr'} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:hidden')}>
         <canvas ref={this.canvasRef} style={css('position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;background:radial-gradient(80% 50% at 50% 100%, rgba(232,121,60,.18), rgba(3,3,5,0) 70%), #030305')} />
 
+        {/* Crisp logo at native resolution: fades in over the particle lettering once the smoke has condensed into it */}
+        {s.logoBox && s.logoAlpha && !s.no3d && s.phase !== 'menu' && !this.props.skipIntro && (
+          <img src={s.logoAlpha} alt="DARKSKY Hookah Lounge" style={css(`position:fixed;${s.logoBox};z-index:1;pointer-events:none;opacity:${s.logoOn && s.phase === 'intro' ? 1 : 0};transition:opacity ${s.phase === 'intro' ? '.9s' : '.3s'} ease`)} /> /* eslint-disable-line @next/next/no-img-element */
+        )}
+
         {s.phase !== 'menu' && !this.props.skipIntro && this.renderIntro()}
 
         {v && s.phase !== 'intro' && (
@@ -775,7 +922,7 @@ export default class DarkskyMenu extends React.Component {
             {this.renderMenu(v)}
             {v.cnt > 0 && !v.anySheet && s.phase === 'menu' && (
               <div style={css('position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;justify-content:center;padding:12px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top, rgba(3,3,5,.9), rgba(3,3,5,0))')}>
-                <button onClick={() => this.setState({ cartOpen: true })} style={css('width:100%;max-width:508px;height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 10px 0 20px;box-shadow:0 10px 40px rgba(232,121,60,.25)')}>
+                <button onClick={() => this.setState(s.sent && this.props.table ? { reviewOpen: true } : { cartOpen: true })} style={css('width:100%;max-width:508px;height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 10px 0 20px;box-shadow:0 10px 40px rgba(232,121,60,.25)')}>
                   <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.t('viewOrder')}</span>
                   <span style={css('display:flex;align-items:center;gap:10px')}>
                     <span style={css('font:700 15px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{v.cartTotal}</span>
@@ -793,27 +940,27 @@ export default class DarkskyMenu extends React.Component {
 
         {v && (
           <>
-            <div onClick={() => this.closeAll()} style={css(`position:fixed;inset:0;z-index:7;background:rgba(0,0,0,.55);opacity:${v.anySheet ? 1 : 0};pointer-events:${v.anySheet ? 'auto' : 'none'};transition:opacity .35s ease`)} />
+            <div onClick={() => this.closeAll()} style={css(`position:fixed;inset:0;z-index:7;touch-action:none;background:rgba(0,0,0,.55);opacity:${v.anySheet ? 1 : 0};pointer-events:${v.anySheet ? 'auto' : 'none'};transition:opacity .35s ease`)} />
 
             <div style={sheetWrap(v.sh ? '0%' : '110%')}>
-              <div style={css('pointer-events:auto;width:100%;max-width:540px;max-height:88vh;overflow-y:auto;border-radius:26px 26px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;background:#0d0d12')}>
+              <div ref={this.dragRef('item')} style={css('pointer-events:auto;width:100%;max-width:540px;max-height:88dvh;overflow-y:auto;overscroll-behavior:contain;border-radius:26px 26px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;background:#0d0d12')}>
                 {this.renderItemSheet(v)}
               </div>
             </div>
 
             <div style={sheetWrap(s.cartOpen ? '0%' : '110%')}>
-              <div style={css('pointer-events:auto;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;border-radius:26px 26px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;background:#0d0d12')}>
+              <div ref={this.dragRef('cart')} style={css('pointer-events:auto;width:100%;max-width:540px;max-height:90dvh;overflow-y:auto;overscroll-behavior:contain;border-radius:26px 26px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;background:#0d0d12')}>
                 {this.renderCart(v)}
               </div>
             </div>
 
             <div style={sheetWrap(s.langOpen ? '0%' : '110%')}>
-              <div style={css('pointer-events:auto;width:100%;max-width:540px;border-radius:26px 26px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;background:#0d0d12;padding:10px 20px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px')}>
+              <div ref={this.dragRef('lang')} style={css('pointer-events:auto;width:100%;max-width:540px;border-radius:26px 26px 0 0;border:1px solid rgba(255,255,255,.12);border-bottom:0;background:rgba(18,18,24,.62);padding:10px 20px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px' + GLASS)}>
                 <Grip />
                 <span style={css('font:400 12px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;text-align:center')}>{v.t('language')}</span>
                 <div style={css('display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px')}>
                   {v.langs.map(l => (
-                    <button key={l.code} onClick={l.onPick} style={css(`height:50px;padding:0 14px;border-radius:14px;border:1px solid ${l.on ? 'rgba(232,121,60,.85)' : 'rgba(255,255,255,.12)'};background:${l.on ? 'rgba(232,121,60,.14)' : '#111116'};display:flex;align-items:center;justify-content:space-between;gap:8px`)}>
+                    <button key={l.code} onClick={l.onPick} style={css(`height:50px;padding:0 14px;border-radius:14px;border:1px solid ${l.on ? 'rgba(232,121,60,.85)' : 'rgba(255,255,255,.12)'};background:${l.on ? 'rgba(232,121,60,.16)' : 'rgba(255,255,255,.06)'};display:flex;align-items:center;justify-content:space-between;gap:8px`)}>
                       <span style={css('font:500 14.5px/1 Manrope,sans-serif')}>{l.name}</span>
                       <span style={css('font:400 9px/1 Michroma,sans-serif;letter-spacing:.12em;color:rgba(242,242,244,.55);text-transform:uppercase')}>{l.code}</span>
                     </button>
@@ -821,6 +968,8 @@ export default class DarkskyMenu extends React.Component {
                 </div>
               </div>
             </div>
+
+            {this.props.table && <OrderReview r={this.reviewVm(v)} />}
           </>
         )}
       </div>

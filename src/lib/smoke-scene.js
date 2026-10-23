@@ -10,6 +10,7 @@ float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fr
 float noise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.-2.*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),u.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x), u.y); }
 float fbm(vec2 p){ float v=0., a=.5; mat2 r=mat2(.8,-.6,.6,.8); for(int i=0;i<5;i++){ v+=a*noise(p); p=r*p*2.03+.17; a*=.5; } return v; }
+float fbm3(vec2 p){ float v=0., a=.5; mat2 r=mat2(.8,-.6,.6,.8); for(int i=0;i<3;i++){ v+=a*noise(p); p=r*p*2.03+.17; a*=.5; } return v; }
 void main(){
   vec2 uv=gl_FragCoord.xy/uRes;
   vec2 p=(gl_FragCoord.xy-.5*uRes)/uRes.y;
@@ -19,10 +20,11 @@ void main(){
   vec2 q=p*1.45; q.y-=uTime*.07;
   vec2 w=vec2(fbm(q+vec2(0.,uTime*.05)), fbm(q+vec2(5.2,1.3)-uTime*.035));
   float f=fbm(q+2.4*w+vec2(uTime*.02,0.));
-  float smoke=smoothstep(.42,1.0,f);
-  float plume=exp(-p.x*p.x*(2.2-clamp(p.y+.5,0.,1.)*1.5))*smoothstep(.75,-.55,p.y);
+  float g=fbm3(p*.7+vec2(uTime*.016,-uTime*.028)+1.3*w.yx+7.3);
+  float smoke=smoothstep(.42,1.0,f)+.55*smoothstep(.34,.9,g)*(1.-.6*uEdge);
+  float fall=mix(.4,1.,smoothstep(.7,-.55,p.y));
   float edge=smoothstep(.12,.62,abs(p.x)/(uRes.x/uRes.y)*1.);
-  float dens=smoke*mix(.28+.72*plume, .15+.85*edge, uEdge);
+  float dens=smoke*mix(fall, .5+.5*edge, uEdge);
   vec3 col=vec3(.012,.012,.018);
   col=mix(col, vec3(.62,.64,.71), dens*.62);
   col+=uWarm*exp(-pow((p.y-.18)*2.6,2.))*exp(-p.x*p.x*2.2)*(.05+.1*f)*uGlow;
@@ -63,7 +65,8 @@ function sampleLogo(img, max) {
   const n = Math.min(max, pts.length), w = maxX - minX || 1, cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
   const out = new Float32Array(n * 2);
   for (let i = 0; i < n; i++) { out[i * 2] = (pts[i][0] - cx) / w + (Math.random() - .5) / w; out[i * 2 + 1] = -(pts[i][1] - cy) / w + (Math.random() - .5) / w; }
-  return { pts: out, n, aspect: (maxY - minY) / w };
+  // plate: the whole picture in lettering-width units, so the page can lay the crisp logo exactly over the particles
+  return { pts: out, n, aspect: (maxY - minY) / w, plate: { w: W / w, h: H / w, x: (W / 2 - cx) / w, y: (cy - H / 2) / w } };
 }
 
 function makePoints(n, sharp) {
@@ -87,13 +90,14 @@ const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 export function isSoftwareGL(gl) {
   try { const ext = gl.getExtension('WEBGL_debug_renderer_info'); const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''; return /swiftshader|llvmpipe|software|basic render|mesa offscreen/i.test(r || ''); } catch (e) { return false; }
 }
-const STUB = { fallback: true, enter() {}, setDim() {}, setTopFree() { return Math.round(innerHeight * .4); }, dispose() {} };
+const STUB = { fallback: true, enter() {}, setDim() {}, setTopFree() { return Math.round(innerHeight * .4); }, logoBox() { return null; }, dispose() {} };
 
-export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
+export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
   let renderer;
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' }); } catch (e) { return STUB; }
   if (isSoftwareGL(renderer.getContext())) { renderer.dispose(); return STUB; }
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  // phones: native-ish resolution is plenty for soft smoke and halves the fragment work; the crisp logo is a DOM image
+  const phone = window.innerWidth < 700, dpr = Math.min(window.devicePixelRatio || 1, phone ? 1 : 1.5);
   renderer.setPixelRatio(dpr);
   renderer.setClearColor(0x030305, 1);
   const scene = new THREE.Scene();
@@ -106,12 +110,25 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
   bg.frustumCulled = false; bg.renderOrder = -1; scene.add(bg);
 
   let img = null; try { img = await loadImg(logoUrl); } catch (e) { }
-  var logo = sampleLogo(img, window.innerWidth < 700 ? 9000 : 14000);
-  const NL = logo.n, NS = window.innerWidth < 700 ? 900 : 1400;
+  var logo = sampleLogo(img, phone ? 6500 : 14000);
+  const NL = logo.n, NS = phone ? 700 : 1400;
 
-  const L = makePoints(NL, 9), S = makePoints(NS, 2.2);
+  const L = makePoints(NL, 9), S = makePoints(NS, 2.2), NP = 260, PF = makePoints(NP, 2.2); // PF: puffs under the finger
   const logoGroup = new THREE.Group(); logoGroup.add(L.pts); scene.add(S.pts); scene.add(logoGroup);
-  L.pts.renderOrder = 2; S.pts.renderOrder = 1;
+  L.pts.renderOrder = 2; S.pts.renderOrder = 1; PF.pts.renderOrder = 3; scene.add(PF.pts);
+  const pv = new Float32Array(NP * 3), plife = new Float32Array(NP); let pnext = 0;
+  // a puff of smoke where the screen is touched (intro only): warm at first, then grey, spreading and fading
+  function puff(x, y, n, power) {
+    for (let k = 0; k < n; k++) {
+      const i = pnext++ % NP, a = Math.random() * Math.PI * 2, sp = (.35 + Math.random() * 1.2) * power;
+      PF.pos[i * 3] = x + gauss() * .06; PF.pos[i * 3 + 1] = y + gauss() * .06; PF.pos[i * 3 + 2] = gauss() * .4;
+      pv[i * 3] = Math.cos(a) * sp; pv[i * 3 + 1] = Math.sin(a) * sp * .7 + .3; pv[i * 3 + 2] = 0;
+      plife[i] = 1; PF.size[i] = .3 + Math.random() * .35; PF.heat[i] = .55;
+    }
+  }
+
+  // Once the particles have landed the page fades the crisp logo in over them (onLanded); crisp mirrors that fade
+  let crisp = 0, landed = false, live = false; // live: past the hidden warm-up pass
 
   let VW = 1, VH = 1, LW = 1, LCY = 0, topFree = 0;
   function layoutLogo() {
@@ -121,13 +138,22 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
     const cyPx = free * .46, halfPx = LW * logo.aspect / 2 / VH * h;
     return Math.round(cyPx + halfPx + 12);
   }
-  const lv = new Float32Array(NL * 3), lz = new Float32Array(NL), lseed = new Float32Array(NL), ldelay = new Float32Array(NL), lmode = new Uint8Array(NL), lspark = new Uint8Array(NL);
+  const lv = new Float32Array(NL * 3), lz = new Float32Array(NL), lseed = new Float32Array(NL), ldelay = new Float32Array(NL), lrel = new Float32Array(NL), lmode = new Uint8Array(NL), lspark = new Uint8Array(NL);
+  const lr = new Float32Array(NL * 3); // where each particle sits in the loose smoke
+  const TRAVEL = 1.7; // seconds a particle takes to condense out of the smoke into the lettering
+  const LANDED = .7 + TRAVEL; // every particle is in place by then
+  // The logo condenses out of a wide bank of smoke that tightens into the letters
+  function seedLogo(i) {
+    L.pos[i * 3] = 0; L.pos[i * 3 + 1] = -VH; L.pos[i * 3 + 2] = 0;
+    lv[i * 3] = lv[i * 3 + 1] = lv[i * 3 + 2] = 0; L.alpha[i] = 0; L.size[i] = 1.07; L.heat[i] = .18;
+  }
   const sv = new Float32Array(NS * 3), sy0 = new Float32Array(NS), sseed = new Float32Array(NS);
 
   function spawnSmoke(pos, v, i, y0arr, seedArr, rand) {
-    const side = Math.random() < .5 ? -1 : 1, x = side * (VW * .5 - Math.abs(gauss()) * VW * .14) * (entered ? 1 : .35), y = -VH / 2 - .4 - Math.random() * .6;
+    // across the whole width; in the intro a little denser towards the centre
+    const x = entered ? (Math.random() - .5) * VW * 1.1 : (Math.random() < .6 ? (Math.random() - .5) * VW * 1.1 : gauss() * VW * .4), y = -VH / 2 - .4 - Math.random() * .6;
     pos[i * 3] = x; pos[i * 3 + 1] = rand ? -VH / 2 + Math.random() * VH * 1.1 : y; pos[i * 3 + 2] = gauss() * 1.4;
-    v[i * 3] = gauss() * .08; v[i * 3 + 1] = .35 + Math.random() * .45; v[i * 3 + 2] = 0;
+    v[i * 3] = gauss() * .08; v[i * 3 + 1] = .35 + Math.random() * .45; v[i * 3 + 2] = .26 + Math.random() * .5; // z slot: own rise speed
     y0arr[i] = y; seedArr[i] = Math.random() * 100;
   }
 
@@ -145,9 +171,10 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
   resize();
 
   for (let i = 0; i < NL; i++) {
-    L.pos[i * 3] = gauss() * VW * .3; L.pos[i * 3 + 1] = -VH / 2 - Math.random() * 2; L.pos[i * 3 + 2] = gauss() * 2;
-    lz[i] = 0; lseed[i] = Math.random() * 100; ldelay[i] = .25 + Math.random() * 1.6 + (logo.pts[i * 2] + .5) * .5;
-    lspark[i] = 0; L.size[i] = .2; L.alpha[i] = 0;
+    seedLogo(i);
+    lz[i] = 0; lseed[i] = Math.random() * 100; ldelay[i] = .15 + Math.abs(logo.pts[i * 2]) * .4 + Math.random() * .35; // centre first
+    lr[i * 3] = gauss(); lr[i * 3 + 1] = gauss(); lr[i * 3 + 2] = gauss();
+    lspark[i] = 0;
   }
   for (let i = 0; i < NS; i++) spawnSmoke(S.pos, sv, i, sy0, sseed, true);
 
@@ -164,15 +191,15 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
     ptr.nx = cx / w - .5; ptr.ny = cy / h - .5;
     bgU.uPtr.value.set((cx - w / 2) / h, (h / 2 - cy) / h);
   }
-  const pm = e => onMove(e.clientX, e.clientY);
-  const pd = e => { ptr.active = false; onMove(e.clientX, e.clientY); ptr.s = Math.min(1, ptr.s + .35); };
+  const pm = e => { onMove(e.clientX, e.clientY); if (!entered && Math.hypot(ptr.vx, ptr.vy) > 1.2) puff(ptr.x, ptr.y, 3, .5); };
+  const pd = e => { ptr.active = false; onMove(e.clientX, e.clientY); ptr.s = Math.min(1, ptr.s + .35); if (!entered) puff(ptr.x, ptr.y, 60, 1.15); };
   const tm = e => { const t = e.touches[0]; if (t) onMove(t.clientX, t.clientY); };
   window.addEventListener('pointermove', pm, { passive: true });
   window.addEventListener('pointerdown', pd, { passive: true });
   window.addEventListener('touchmove', tm, { passive: true });
   window.addEventListener('resize', resize);
 
-  let enterT = 0, dim = 1, dimT = 1, t = 0, last = performance.now(), raf = 0, rotY = 0, rotX = 0;
+  let enterT = 0, dim = 1, dimT = 1, t = 0, last = performance.now(), raf = 0, rotY = 0, rotX = 0, half = false;
 
   function step(dt) {
     t += dt;
@@ -180,7 +207,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
     ptr.s *= decay; ptr.vx *= Math.exp(-dt * 5); ptr.vy *= Math.exp(-dt * 5);
     dim += (dimT - dim) * Math.min(1, dt * 2);
     bgU.uTime.value = t; bgU.uPtrS.value = ptr.s; bgU.uDim.value = dim;
-    S.mat.uniforms.uOpacity.value = .35 + .4 * dim; bgU.uGlow.value = dim; bgU.uEdge.value += ((entered ? 1 : 0) - bgU.uEdge.value) * Math.min(1, dt * 1.5);
+    S.mat.uniforms.uOpacity.value = .15 + .6 * dim; bgU.uGlow.value = dim; bgU.uEdge.value += ((entered ? 1 : 0) - bgU.uEdge.value) * Math.min(1, dt * 1.5);
 
     const R = 0.9, R2 = R * R, pxx = ptr.x, pyy = ptr.y, ps = .35 + ptr.s;
     // tilt
@@ -188,6 +215,8 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
     rotY += ((Math.sin(t * .4) * .32 + ptr.nx * .6) * tr - rotY) * Math.min(1, dt * 2.5);
     rotX += ((Math.cos(t * .3) * .12 + ptr.ny * .35) * tr - rotX) * Math.min(1, dt * 2.5);
     logoGroup.rotation.set(0, 0, 0);
+    if (live && !landed && !entered && t > LANDED - .45) { landed = true; onLanded && onLanded(); }
+    crisp += ((landed && !entered ? 1 : 0) - crisp) * Math.min(1, dt * (entered ? 9 : 2.2));
 
     const P = L.pos;
     for (let i = 0; i < NL; i++) {
@@ -195,26 +224,40 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
       let vx = lv[i3], vy = lv[i3 + 1], vz = lv[i3 + 2];
       const sd = lseed[i];
       if (lmode[i] === 0) {
-        if (t > ldelay[i]) {
-          const tx = logo.pts[i * 2] * LW, ty = logo.pts[i * 2 + 1] * LW + LCY, tz = lz[i];
-          const st = Math.min(1, Math.max(0, (t - ldelay[i]) / 2.2)), k = 14 + st * 60, damp = Math.exp(-dt * (7 + st * 10));
-          vx = (vx + (tx - x) * k * dt) * damp; vy = (vy + (ty - y) * k * dt) * damp; vz = (vz + (tz - z) * k * dt) * damp;
-          if (st > .98 && Math.abs(tx - x) < .002 && Math.abs(ty - y) < .002) { x = tx; y = ty; z = tz; vx = vy = vz = 0; }
-          L.alpha[i] = Math.min(.55 + st * .45, L.alpha[i] + dt * 1.2);
-          L.size[i] += ((.06 - st * .036) - L.size[i]) * Math.min(1, dt * 3);
-          L.heat[i] = 0;
+        if (entered && t >= lrel[i]) {
+          // lift-off: flare up like an ember and get carried upwards
+          lmode[i] = 1; L.heat[i] = 1; L.alpha[i] = Math.min(L.alpha[i], .35);
+          vx += gauss() * .45; vy += 1.3 + Math.random() * 1.7; vz += gauss() * .9;
         } else {
-          vy += .6 * dt; vx += Math.sin(y * 1.6 + t + sd) * .25 * dt;
-          L.alpha[i] = Math.min(.12, L.alpha[i] + dt * .1); L.size[i] = .5; L.heat[i] = .6;
+          const tx = logo.pts[i * 2] * LW, ty = logo.pts[i * 2 + 1] * LW + LCY;
+          const u = Math.min(1, Math.max(0, (t - ldelay[i]) / TRAVEL));
+          if (u >= 1) {
+            x = tx; y = ty; z = lz[i]; L.alpha[i] = 1 - crisp; L.size[i] = .024;
+            L.heat[i] = entered ? Math.max(0, 1 - (lrel[i] - t) / .22) : 0; // glow just before lift-off
+          } else {
+            const e = u < .5 ? 4 * u * u * u : 1 - Math.pow(2 - 2 * u, 3) / 2, m = 1 - e, w = LW / 6.2;
+            // from a wide bank of smoke down to the narrow lettering
+            const bx = tx + (tx * .6 + lr[i * 3] * LW * .6) * m, by = ty + (lr[i * 3 + 1] * VH * .3 - VH * .12) * m;
+            // one flow field warps the whole bank, so it folds and drifts like smoke instead of scattering as dots
+            const wx = Math.sin(by * 1.3 + t * .5) * .5 + Math.sin(by * 2.9 - bx * .7 + t * .8) * .25;
+            const wy = Math.cos(bx * 1.1 - t * .4) * .35 + Math.cos(bx * 2.6 + by * 1.7 + t * .6) * .2;
+            x = bx + wx * .5 * m * w; y = by + wy * .5 * m * w; z = lz[i] + lr[i * 3 + 2] * 1.4 * m;
+            // large, faint and grey while loose; fine, white and bright on landing
+            L.size[i] = .024 + 1.05 * m;
+            L.alpha[i] = Math.min(1, t / .6) * (.013 + .987 * Math.pow(e, 9));
+            L.heat[i] = .18 * m;
+          }
+          vx = vy = vz = 0;
         }
       } else {
-        vy += .55 * dt;
-        vx += (Math.sin(y * 1.3 + t * .6 + sd) * .5 + Math.cos(x * .9 - t * .4)) * .35 * dt;
+        vy += (.35 + (sd % 1) * .4) * dt;
+        // sideways drift depends on height only: an x-dependent term would herd the particles into bright columns
+        vx += (Math.sin(y * 1.3 + t * .6 + sd) * .5 + Math.sin(y * .45 - t * .3 + 1.1) * .5) * .35 * dt;
         const damp = Math.exp(-dt * 1.1); vx *= damp; vy *= damp; vz *= damp;
         L.size[i] += (.9 + (sd % 1) * 1.1 - L.size[i]) * Math.min(1, dt * .9);
-        L.alpha[i] += (.028 - L.alpha[i]) * Math.min(1, dt * 1.4);
-        L.heat[i] += (0 - L.heat[i]) * Math.min(1, dt * 2);
-        if (y > VH / 2 + 1.5) { x = (Math.random() < .5 ? -1 : 1) * (VW * .5 - Math.abs(gauss()) * VW * .14); y = -VH / 2 - .5; vx = 0; vy = .4; L.alpha[i] = 0; }
+        L.alpha[i] += (.012 * (.5 + .5 * dim) - L.alpha[i]) * Math.min(1, dt * 3);
+        L.heat[i] += (0 - L.heat[i]) * Math.min(1, dt * 2.5);
+        if (y > VH / 2 + 1.5) { x = (Math.random() - .5) * VW * 1.1; y = -VH / 2 - .5 - Math.random() * VH * .7; vx = 0; vy = .4; L.alpha[i] = 0; }
       }
       if (ptr.active && lmode[i] === 1) {
         const dx = x - pxx, dy = y - pyy, d2 = dx * dx + dy * dy;
@@ -234,39 +277,53 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
       const i3 = i * 3; let x = Q[i3], y = Q[i3 + 1], z = Q[i3 + 2];
       let vx = sv[i3], vy = sv[i3 + 1];
       const sd = sseed[i];
-      vx += (Math.sin(y * 1.2 + t * .5 + sd) * .6 + Math.sin(x * .8 - t * .3 + sd * .3) * .4) * .3 * dt;
+      // shared flow field (neighbours drift together) plus a little turbulence of their own
+      vx += ((Math.sin(y * .9 + t * .35) * .55 + Math.sin(y * .37 - t * .21 + 1.7) * .45) * .32 + Math.sin(sd + t * .7) * .2) * dt;
       vx *= Math.exp(-dt * .6);
       if (ptr.active) {
         const dx = x - pxx, dy = y - pyy, d2 = dx * dx + dy * dy, RR = 1.8;
         if (d2 < RR) {
-          const d = Math.sqrt(d2) + 1e-4, f = (1 - d2 / RR) * ps;
+          const d = Math.sqrt(d2) + 1e-4, f = (1 - d2 / RR) * ps * (entered ? .35 : 1);
           vx += (dx / d * 2 - dy / d * 3) * f * dt + ptr.vx * f * .05;
           vy += (dy / d * 2 + dx / d * 3) * f * dt + ptr.vy * f * .05;
         }
       }
-      vy += (.5 - vy) * Math.min(1, dt * .4);
+      vy += (sv[i3 + 2] - vy) * Math.min(1, dt * .4);
       x += vx * dt; y += vy * dt;
-      const h = (y - sy0[i]) / (VH + 1);
-      S.size[i] = .5 + Math.max(0, h) * 3.2;
-      S.alpha[i] = .06 * Math.min(1, Math.max(0, h * 6)) * Math.max(0, 1 - h);
+      const h = (y - sy0[i]) / (VH + 1), hm = .6 + (sd % 1) * .45; // each puff thins out at its own height
+      S.size[i] = .5 + Math.max(0, h) * 3.6;
+      S.alpha[i] = .045 * Math.min(1, Math.max(0, h * 6)) * Math.max(0, 1 - h / hm);
       S.heat[i] = Math.max(0, 1 - h * 4) * .85;
-      if (y > VH / 2 + 2 || h > 1.05) { spawnSmoke(Q, sv, i, sy0, sseed, false); continue; }
+      if (y > VH / 2 + 2 || h > hm) { spawnSmoke(Q, sv, i, sy0, sseed, false); continue; }
       Q[i3] = x; Q[i3 + 1] = y; Q[i3 + 2] = z; sv[i3] = vx; sv[i3 + 1] = vy;
     }
 
-    for (const o of [L, S]) {
+    for (let i = 0; i < NP; i++) {
+      if (plife[i] <= 0) { PF.alpha[i] = 0; continue; }
+      const i3 = i * 3, damp = Math.exp(-dt * 2.4);
+      plife[i] -= dt / 1.9;
+      pv[i3] *= damp; pv[i3 + 1] = pv[i3 + 1] * damp + .3 * dt;
+      PF.pos[i3] += pv[i3] * dt + Math.sin(PF.pos[i3 + 1] * 1.4 + t + i) * .08 * dt; PF.pos[i3 + 1] += pv[i3 + 1] * dt;
+      PF.size[i] += dt * (1.1 + (i % 7) * .12);
+      PF.alpha[i] = .2 * Math.pow(Math.max(0, plife[i]), 1.4);
+      PF.heat[i] = .55 * plife[i] * plife[i];
+    }
+    for (const o of [L, S, PF]) {
       o.geo.attributes.position.needsUpdate = true; o.geo.attributes.aSize.needsUpdate = true;
       o.geo.attributes.aAlpha.needsUpdate = true; o.geo.attributes.aHeat.needsUpdate = true;
     }
   }
 
   for (let k = 0; k < 40; k++) step(1 / 15);
-  t = 0; for (let i = 0; i < NL; i++) { L.pos[i * 3 + 1] = -VH / 2 - Math.random() * 2; L.alpha[i] = 0; lv[i * 3] = lv[i * 3 + 1] = lv[i * 3 + 2] = 0; }
+  t = 0; live = true; for (let i = 0; i < NL; i++) seedLogo(i);
 
   let slowN = 0, frames = 0;
   function frame(now) {
     raf = requestAnimationFrame(frame);
     if (document.hidden) { last = now; return; }
+    // in the menu (once the logo has blown away) the dimmed smoke behind the glass runs at half rate: it moves slowly,
+    // and every frame it does change, each glass card has to re-blur what is behind it
+    if (entered && t - enterT > 3 && (half = !half)) return;
     const rdt = (now - last) / 1000;
     const dt = Math.min(.05, rdt); last = now;
     if (++frames > 10 && frames < 200) { if (rdt > .09) slowN++; if (slowN > 25) { cancelAnimationFrame(raf); onSlow && onSlow(); return; } }
@@ -279,15 +336,19 @@ export async function createSmoke(canvas, { logoUrl, onSlow } = {}) {
     enter(instant) {
       if (entered) return; entered = true; enterT = t;
       for (let i = 0; i < NL; i++) {
-        lmode[i] = 1;
-        if (instant) { L.pos[i * 3] = gauss() * VW * .4; L.pos[i * 3 + 1] = -VH / 2 + Math.random() * VH; L.alpha[i] = .028; L.size[i] = 1; continue; }
-        const x = L.pos[i * 3];
-        lv[i * 3] += x * .6 + gauss() * .9; lv[i * 3 + 1] += 1.2 + Math.random() * 1.8; lv[i * 3 + 2] += gauss() * 1.5;
+        if (instant) { lmode[i] = 1; L.pos[i * 3] = gauss() * VW * .4; L.pos[i * 3 + 1] = -VH / 2 + Math.random() * VH; L.alpha[i] = .012; L.size[i] = 1; continue; }
+        lrel[i] = t + .15 + (logo.pts[i * 2] + .5) * .4 + Math.random() * .25; // the lettering lifts off in a wave, once the particles are back
       }
       ptr.s = 1;
     },
     setDim(v) { dimT = v; },
     setTopFree(px) { topFree = px; return layoutLogo(); },
+    // where the logo picture sits on screen (CSS px), matching the particle lettering
+    logoBox() {
+      if (!img) return null;
+      const h = window.innerHeight, k = h / VH, bw = LW * logo.plate.w * k, bh = LW * logo.plate.h * k;
+      return { left: window.innerWidth / 2 + LW * logo.plate.x * k - bw / 2, top: h / 2 - (LCY + LW * logo.plate.y) * k - bh / 2, width: bw, height: bh };
+    },
     dispose() {
       cancelAnimationFrame(raf);
       window.removeEventListener('pointermove', pm); window.removeEventListener('pointerdown', pd);

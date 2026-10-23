@@ -27,6 +27,7 @@ const sql = postgres(url, { ssl: local ? false : 'require', prepare: false, max:
 // darksky-data.js is an ES module inside a CommonJS package: load a copy as .mjs.
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'darksky-')), 'data.mjs');
 fs.copyFileSync(path.join(ROOT, 'src/lib/darksky-data.js'), tmp);
+fs.copyFileSync(path.join(ROOT, 'src/lib/darksky-i18n.mjs'), path.join(path.dirname(tmp), 'darksky-i18n.mjs')); // its translations
 const D = await import(pathToFileURL(tmp).href);
 
 await sql.unsafe(fs.readFileSync(path.join(ROOT, 'db/schema.sql'), 'utf8'));
