@@ -2,9 +2,12 @@
 // DARKSKY Hookah Lounge — digital menu. Ported from the DarkSky_Menu.html design export:
 // the logic (state, view-model) is kept as one class; the markup keeps the design's inline styles verbatim.
 import React from 'react';
+import { preload } from 'react-dom';
 import * as D from '@/lib/darksky-data';
 import { PHOTO_CREDITS } from '@/lib/darksky-credits';
 import { css, Arrow, Close, CLOSE_BTN, GLASS } from './menu-ui';
+// In the first bundle, not a lazy chunk: on a far server every extra round trip delays the intro by ~0.3–1 s
+import { createSmoke } from '@/lib/smoke-scene';
 import OrderReview from './OrderReview';
 
 const GREET = ['Hola', 'Hello', 'Привет', '你好', 'नमस्ते', 'مرحبا', 'Bonjour', 'Olá', 'Hallo', 'こんにちは'];
@@ -190,9 +193,8 @@ export default class DarkskyMenu extends React.Component {
     requestAnimationFrame(() => this.layoutIntro());
     this._gt = setInterval(() => { if (this.state.phase !== 'intro') return; this.setState({ gOn: false }); setTimeout(() => this.setState(st => ({ gi: st.gi + 1, gOn: true })), 450); }, 2400);
     try {
-      const S = await import('@/lib/smoke-scene');
       if (!this.canvasRef.current) return;
-      this.scene = await S.createSmoke(this.canvasRef.current, { logoUrl: this.props.logoUrl, onSlow: () => this.setState({ no3d: true }), onLanded: () => this.setState({ logoOn: true }) });
+      this.scene = await createSmoke(this.canvasRef.current, { logoUrl: this.props.logoUrl, onSlow: () => this.setState({ no3d: true }), onLanded: () => this.setState({ logoOn: true }) });
       if (this.scene.fallback) this.setState({ no3d: true }); else setTimeout(() => this.setState({ sceneOn: true }), 2200);
       if (this.state.phase !== 'intro') { this.scene.enter(true); this.scene.setDim(this.dimVal()); }
       this.layoutIntro();
@@ -903,6 +905,8 @@ export default class DarkskyMenu extends React.Component {
   }
 
   render() {
+    // the intro needs the logo first: fetch it together with the scripts, not after them
+    preload(this.props.logoUrl, { as: 'image', fetchPriority: 'high' });
     const s = this.state;
     const v = s.ready ? this.vm() : null;
     const sheetWrap = y => css(`position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:center;pointer-events:none;transform:translateY(${y});transition:transform .45s cubic-bezier(.2,.8,.2,1)`);
