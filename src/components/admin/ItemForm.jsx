@@ -3,66 +3,30 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from './api';
-
-const LANGS = [['es', 'ES'], ['en', 'EN'], ['ru', 'RU']];
-const asL3 = v => (v && typeof v === 'object' ? { es: v.es || '', en: v.en || '', ru: v.ru || '' } : { es: v || '', en: '', ru: '' });
-const input = 'h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 outline-none focus:border-[#e8793c]';
-const label = 'text-xs font-semibold uppercase tracking-[.12em] text-white/55';
-
-// Resize in the browser so the database only stores ~100 KB per photo.
-async function shrink(file, max = 1200) {
-  const bmp = await createImageBitmap(file);
-  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-  return new Promise(res => c.toBlob(b => res(b), 'image/webp', 0.82));
-}
-
-function L3({ value, onChange, area, placeholder }) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-3">
-      {LANGS.map(([k, tag]) => (
-        <label key={k} className="relative block">
-          <span className="pointer-events-none absolute right-3 top-2.5 text-[10px] font-bold text-white/35">{tag}</span>
-          {area
-            ? <textarea rows={3} value={value[k]} onChange={e => onChange({ ...value, [k]: e.target.value })} placeholder={placeholder} className={`${input} h-auto py-2 pr-9`} />
-            : <input value={value[k]} onChange={e => onChange({ ...value, [k]: e.target.value })} placeholder={placeholder} className={`${input} pr-9`} />}
-        </label>
-      ))}
-    </div>
-  );
-}
+import PhotoPanel from './PhotoPanel';
+import { L3, asML, input, label, LangProvider, LangBar } from './L3';
 
 export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
   const router = useRouter();
   const [f, setF] = useState(() => ({
-    name: item?.name || '', cat: item?.cat || defaultCat, hidden: !!item?.hidden, hit: !!item?.hit, new: !!item?.new,
-    d: asL3(item?.d), m: asL3(item?.m), p: item?.p ?? '', onRequest: item ? item.p == null && !item.v : false,
-    v: (item?.v || []).map(v => ({ n: asL3(v.n), p: v.p ?? '' })), t: item?.t || [], str: item?.str || null,
-    pair: item?.pair || [], img: item?.img || null, media: item?.media || null,
+    // guest name in every language; the Spanish one is also the name staff see (Telegram, admin)
+    nm: { ...asML(item?.nm), es: item?.nm?.es || item?.name || '' }, cat: item?.cat || defaultCat, hidden: !!item?.hidden, hit: !!item?.hit, new: !!item?.new,
+    d: asML(item?.d), m: asML(item?.m), p: item?.p ?? '', onRequest: item ? item.p == null && !item.v : false,
+    v: (item?.v || []).map(v => ({ n: asML(v.n), p: v.p ?? '' })), t: item?.t || [], str: item?.str || null,
+    pair: item?.pair || [], img: item?.img || null, media: item?.media || null, cut: !!item?.cut,
   }));
   const [busy, setBusy] = useState(false), [err, setErr] = useState(''), [upl, setUpl] = useState(false);
   const set = patch => setF(x => ({ ...x, ...patch }));
 
-  async function upload(e) {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUpl(true); setErr('');
-    try { const { id } = await api('/api/admin/images', 'POST', await shrink(file)); set({ img: id, media: null }); }
-    catch (x) { setErr(x.message); }
-    setUpl(false); e.target.value = '';
-  }
-
   async function save() {
     setBusy(true); setErr('');
     const body = {
-      name: f.name, cat: f.cat, hidden: f.hidden, hit: f.hit, new: f.new, d: f.d, m: f.m,
+      name: f.nm.es.trim() || Object.values(f.nm).find(x => x.trim()) || '', nm: f.nm, cat: f.cat, hidden: f.hidden, hit: f.hit, new: f.new, d: f.d, m: f.m,
       p: f.onRequest ? null : f.p, v: f.v, t: f.t, str: f.cat === 'hookah' ? f.str : null, pair: f.pair,
-      img: f.img, keepMedia: !!f.media,
+      img: f.img, cut: f.cut, keepMedia: !!f.media,
     };
     try {
-      if (item) await api(`/api/admin/items/${item.id}`, 'PUT', body);
-      else await api('/api/admin/items', 'POST', body);
+      const r = item ? await api(`/api/admin/items/${item.id}`, 'PUT', body) : await api('/api/admin/items', 'POST', body);
       router.push('/admin'); router.refresh();
     } catch (x) { setErr(x.message); setBusy(false); }
   }
@@ -73,37 +37,29 @@ export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
     catch (x) { setErr(x.message); setBusy(false); }
   }
 
-  const photo = f.img ? `/api/img/${f.img}` : f.media;
   const pairOptions = others.filter(o => o.id !== item?.id && !f.pair.includes(o.id));
   return (
+    <LangProvider data={{ nm: f.nm, d: f.d, v: f.v }}>{/* weight/volume is usually the same in every language: not counted */}
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
         <Link href="/admin" className="rounded-lg border border-white/15 px-3 py-2 text-sm text-white/70">← Меню</Link>
         <h1 className="font-display text-lg uppercase tracking-[.08em]">{item ? 'Изменить блюдо' : 'Новое блюдо'}</h1>
       </div>
+      <LangBar />
 
       <div className="grid gap-6 md:grid-cols-[240px_1fr]">
-        <div className="flex flex-col gap-3">
-          <div className="aspect-square overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_50%_35%,rgba(232,121,60,.18),#0c0c10_70%)]">
-            {photo ? <img alt="" src={photo} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-white/35">Нет фото</div>}
-          </div>
-          <label className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-white/15 text-sm hover:bg-white/5">
-            {upl ? 'Загружаем…' : photo ? 'Заменить фото' : 'Загрузить фото'}
-            <input type="file" accept="image/*" onChange={upload} className="hidden" />
-          </label>
-          {photo && <button onClick={() => set({ img: null, media: null })} className="text-sm text-white/50 hover:text-white">Убрать фото</button>}
-        </div>
+        <PhotoPanel img={f.img} media={f.media} cut={f.cut} onChange={set} onBusy={setUpl} />
 
         <div className="flex flex-col gap-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
-            <label className="flex flex-col gap-2"><span className={label}>Название</span><input value={f.name} onChange={e => set({ name: e.target.value })} className={input} placeholder="Philadelphia" /></label>
+            <div className="flex flex-col gap-2"><span className={label}>Название <span className="normal-case tracking-normal text-white/35">— испанское видит персонал</span></span><L3 value={f.nm} onChange={nm => set({ nm })} placeholder="Philadelphia" /></div>
             <label className="flex flex-col gap-2"><span className={label}>Категория</span>
               <select value={f.cat} onChange={e => set({ cat: e.target.value })} className={input}>{cats.map(c => <option key={c.id} value={c.id} className="bg-[#111]">{c.name}</option>)}</select>
             </label>
           </div>
 
           <div className="flex flex-col gap-2"><span className={label}>Описание</span><L3 area value={f.d} onChange={d => set({ d })} placeholder="Состав, подача…" /></div>
-          <div className="flex flex-col gap-2"><span className={label}>Вес / объём <span className="normal-case tracking-normal text-white/35">— если одинаково на всех языках, заполните одно поле</span></span><L3 value={f.m} onChange={m => set({ m })} placeholder="300 g" /></div>
+          <div className="flex flex-col gap-2"><span className={label}>Вес / объём <span className="normal-case tracking-normal text-white/35">— если одинаково на всех языках, достаточно испанского</span></span><L3 value={f.m} onChange={m => set({ m })} placeholder="300 g" /></div>
 
           <div className="flex flex-col gap-2">
             <span className={label}>Цена</span>
@@ -126,7 +82,7 @@ export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
                 </div>
               </div>
             ))}
-            <button onClick={() => set({ v: [...f.v, { n: { es: '', en: '', ru: '' }, p: f.p || '' }] })} className="h-10 self-start rounded-xl border border-dashed border-white/25 px-4 text-sm text-white/75">+ Вариант</button>
+            <button onClick={() => set({ v: [...f.v, { n: asML(''), p: f.p || '' }] })} className="h-10 self-start rounded-xl border border-dashed border-white/25 px-4 text-sm text-white/75">+ Вариант</button>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -181,5 +137,6 @@ export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
         </div>
       </div>
     </div>
+    </LangProvider>
   );
 }

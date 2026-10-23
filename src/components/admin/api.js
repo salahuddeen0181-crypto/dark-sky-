@@ -12,3 +12,6 @@ export async function api(url, method = 'POST', body) {
 
 export const ru = o => (o && typeof o === 'object' ? o.ru || o.en || o.es || '' : o || '');
 export const fmt = n => (n == null ? 'по запросу' : '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+
+// Preview picture for an item: an uploaded photo, or the menu's own media — a keyed clip shows its still (.webp).
+export const thumb = (img, media) => (img ? `/api/img/${img}` : media ? media.split('#')[0].replace(/\.webm$/i, '.webp') : null);

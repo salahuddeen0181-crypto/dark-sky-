@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api, ru, fmt } from './api';
+import { api, ru, fmt, thumb } from './api';
 
 function priceLabel(it) {
   if (!it.v) return fmt(it.p);
@@ -67,7 +67,7 @@ export default function MenuAdmin({ items: initial, cats }) {
               {list.map((it, i) => (
                 <li key={it.id} className={`flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-0 ${it.hidden ? 'opacity-55' : ''}`}>
                   <div className="h-12 w-12 flex-none overflow-hidden rounded-lg bg-[radial-gradient(circle_at_50%_35%,rgba(232,121,60,.18),#0c0c10_70%)]">
-                    {(it.img || it.media) && <img alt="" src={it.media || `/api/img/${it.img}`} className="h-full w-full object-cover" />}
+                    {(it.img || it.media) && <img alt="" src={thumb(it.img, it.media)} className="h-full w-full object-cover" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

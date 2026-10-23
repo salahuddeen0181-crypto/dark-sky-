@@ -27,6 +27,8 @@ export default async function OrdersPage() {
               </div>
               <div className="text-sm text-white/80">
                 {o.lines.map((l, i) => <div key={i}>{l.name}{l.variant ? ` — ${l.variant}` : ''} × {l.qty}</div>)}
+                {o.note && <div className="mt-1 text-[#f6c3a3]">💬 {o.note}</div>}
+                {o.edited_at && <div className="mt-1 text-xs text-white/45">изменён персоналом</div>}
               </div>
               <div className="flex flex-col items-start gap-1 sm:items-end">
                 <span className={`rounded-md px-2 py-1 text-xs font-semibold ${cls}`}>{label}</span>
