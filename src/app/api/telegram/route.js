@@ -14,11 +14,12 @@ async function appButton() {
   return site.startsWith('https://') ? { inline_keyboard: [[{ text: '📋 Открыть приложение', web_app: { url: `${site}/staff` } }]] } : undefined;
 }
 
-// "Approve" / "Served" pressed in the staff group: done in the name of whoever pressed, if they are an approved waiter
+// «Взять заказ» / «Подано» pressed in a waiter's private chat (or on an old message in the group): done in the name
+// of whoever pressed, if they are an approved waiter
 async function onButton(cq) {
-  const chat = String(cq.message?.chat?.id ?? '');
+  const chat = cq.message?.chat;
   const answer = text => tg('answerCallbackQuery', { callback_query_id: cq.id, text, show_alert: text.length > 60 });
-  if (chat !== staffChatId()) return answer('Нет доступа');
+  if (chat?.type !== 'private' && String(chat?.id ?? '') !== staffChatId()) return answer('Нет доступа');
   const [act, raw] = String(cq.data || '').split(':');
   const id = Number(raw);
   let who = { id: 0, name: [cq.from?.first_name, cq.from?.last_name].filter(Boolean).join(' ') || cq.from?.username || 'официант' };
@@ -34,7 +35,7 @@ async function onButton(cq) {
   if (done && act === 'acc' && who.id) await startShift(who.id);
   if (done) return answer(act === 'acc' ? `Заказ ваш, ${who.name}` : 'Подано');
   const cur = await getOrder(id);
-  return answer(cur?.status === 'accepted' ? `Уже одобрил(а) ${cur.accepted_by}` : cur?.status === 'served' ? 'Уже подано' : 'Заказ не найден');
+  return answer(cur?.status === 'accepted' ? `Заказ уже взял(а) ${cur.accepted_by}` : cur?.status === 'served' ? 'Уже подано' : 'Заказ не найден');
 }
 
 // Private chat with the bot: /start registers the waiter, /smena starts or ends the shift

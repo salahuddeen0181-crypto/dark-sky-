@@ -78,8 +78,17 @@ export async function endShift(staffId) {
 export async function onShift() {
   if (!staffReady()) return [];
   await closeStale();
-  return db()`select s.id, s.name, sh.started_at from shifts sh join staff s on s.id = sh.staff_id
+  return db()`select s.id, s.name, s.tg_id, sh.started_at from shifts sh join staff s on s.id = sh.staff_id
     where sh.ended_at is null and s.status = 'active' order by sh.started_at`;
+}
+
+// Who gets a new order in Telegram: approved waiters on shift; if nobody is on shift, every approved waiter
+// (so an order is never lost). Only those with Telegram, of course.
+export async function orderRecipients() {
+  if (!staffReady()) return [];
+  const on = (await onShift()).filter(w => w.tg_id);
+  if (on.length) return on;
+  return db()`select id, name, tg_id from staff where status = 'active' and tg_id is not null order by name`;
 }
 
 export async function shiftsSince(date) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { denyUnlessAdmin } from '@/lib/auth';
-import { tg, tgReady, staffChatId, webhookSecret } from '@/lib/telegram';
+import { tg, staffChatId, webhookSecret } from '@/lib/telegram';
 import { siteUrl } from '@/lib/site';
 
 // { action: 'webhook' } — point the bot at this site; { action: 'findChat' } — the staff group's id;
@@ -26,7 +26,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: true, chats: [...chats.values()] });
     }
     if (action === 'test') {
-      if (!tgReady()) return NextResponse.json({ error: 'TELEGRAM_CHAT_ID не задан' }, { status: 400 });
+      if (!staffChatId()) return NextResponse.json({ error: 'TELEGRAM_CHAT_ID не задан' }, { status: 400 });
       await tg('sendMessage', { chat_id: staffChatId(), text: '✅ DARKSKY: тестовое сообщение. Заказы будут приходить сюда.' });
       return NextResponse.json({ ok: true });
     }

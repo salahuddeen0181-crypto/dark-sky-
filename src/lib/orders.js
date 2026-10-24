@@ -1,6 +1,7 @@
 import 'server-only';
 import * as S from './order-store';
-import { tgReady, notifyNewOrder, refreshOrderMessage } from './telegram';
+import { tgReady, notifyNewOrder, refreshOrderMessage, refreshOrderMessages, notifyEdited } from './telegram';
+import { staffReady, getStaffById, orderRecipients } from './staff';
 
 export class OrderError extends Error {
   constructor(code, status = 400) { super(code); this.code = code; this.status = status; }
@@ -17,8 +18,15 @@ const sums = (lines, cash) => {
 };
 
 // Telegram is a second channel next to the staff page: if it is down the order still stands.
-// site: the address the staff link in the message points to.
-const tgRefresh = (o, site) => (o && o.tg_message_id ? refreshOrderMessage(o, site).catch(e => console.error('tg edit', e)) : null);
+// site: the address the staff link in the message points to. Older orders have one group message (tg_message_id).
+async function tgRefresh(o, site) {
+  if (!o || !tgReady()) return;
+  try {
+    const msgs = await S.orderMessages(o.id);
+    if (msgs.length) await refreshOrderMessages(o, msgs, site);
+    else if (o.tg_message_id) await refreshOrderMessage(o, site);
+  } catch (e) { console.error('tg edit', e); }
+}
 
 // [{ id, vi, qty }] → priced lines. Prices always come from the menu on the server, never from a phone.
 async function priceLines(lines, { allowHidden = false } = {}) {
@@ -47,8 +55,9 @@ export async function placeOrder({ token, lines, cash, lang, note, site }) {
     lang: String(lang || '').slice(0, 5), note: String(note || '').trim().slice(0, MAX_NOTE) || null,
   });
 
+  // privately to the waiters on shift (first to press «Взять» gets it) and to the owners' feed group
   if (tgReady()) {
-    try { await S.setTgMessage(o.id, await notifyNewOrder(o, site)); } catch (e) { console.error('order notify failed', o.id, e); }
+    try { await S.saveMessages(o.id, await notifyNewOrder(o, site, await orderRecipients())); } catch (e) { console.error('order notify failed', o.id, e); }
   }
   return { id: o.id, status: o.status };
 }
@@ -66,9 +75,31 @@ export async function serveOrder(id, staff, site) {
   return o;
 }
 
+// What changed between two versions of the lines: removed, quantity changed, added (by dish + variant)
+function diffLines(before, after) {
+  const key = l => `${l.id}:${l.vi ?? ''}`, was = new Map(before.map(l => [key(l), l])), now = new Map(after.map(l => [key(l), l]));
+  const out = [];
+  for (const [k, l] of was) {
+    const n = now.get(k);
+    if (!n) out.push({ kind: 'removed', name: l.name, variant: l.variant });
+    else if (n.qty !== l.qty) out.push({ kind: 'qty', name: l.name, variant: l.variant, from: l.qty, to: n.qty });
+  }
+  for (const [k, l] of now) if (!was.has(k)) out.push({ kind: 'added', name: l.name, variant: l.variant, to: l.qty });
+  return out;
+}
+
+// The waiter who took the order hears about changes made by someone else (a private message from the bot)
+async function tellWaiter(o, changes, editor, site) {
+  if (!changes.length || !o.accepted_by_id || o.accepted_by_id === editor?.id || !tgReady() || !staffReady()) return;
+  const w = await getStaffById(o.accepted_by_id);
+  if (!w || !w.tg_id) return; // a waiter without Telegram sees it in the staff app
+  await notifyEdited(o, w.tg_id, changes, editor?.name || 'персонал', site).catch(e => console.error('tg edit dm', e));
+}
+
 // Staff change the order: edits = [{ i: line index, qty }] (qty 0 removes the line), add = [{ id, vi, qty }] new dishes.
 // A dish added again with the same variant just raises the quantity of its line.
-export async function editOrder(id, edits = [], add = [], site) {
+// editor: { id, name } of who changed it (id 0 for the bar tablet or an admin).
+export async function editOrder(id, edits = [], add = [], site, editor = null) {
   const cur = await S.getOrder(id);
   if (!cur) throw new OrderError('not_found', 404);
   if (!Array.isArray(edits) || !Array.isArray(add) || add.length > MAX_LINES) throw new OrderError('bad_lines');
@@ -88,7 +119,7 @@ export async function editOrder(id, edits = [], add = [], site) {
   if (kept.length > MAX_LINES) throw new OrderError('bad_lines');
   const o = await S.replaceLines(id, { lines: kept, ...sums(kept, cur.cash) });
   if (!o) throw new OrderError('closed', 409);
-  await tgRefresh(o, site);
+  await Promise.all([tgRefresh(o, site), tellWaiter(o, diffLines(cur.lines, kept), editor, site)]);
   return o;
 }
 

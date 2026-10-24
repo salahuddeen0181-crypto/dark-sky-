@@ -47,11 +47,6 @@ export async function insertOrder(o) {
   return row;
 }
 
-export async function setTgMessage(id, mid) {
-  if (memMode()) { const o = memOrder(id); if (o) o.tg_message_id = mid; return; }
-  await db()`update orders set tg_message_id = ${mid} where id = ${id}`;
-}
-
 // Atomic transitions: two waiters tapping "Принять" at once → only the first wins, the other gets null.
 export async function markAccepted(id, by, byId = null) {
   if (memMode()) {
@@ -109,4 +104,31 @@ export async function listOrders() {
 export async function ordersSince(date) {
   if (memMode()) return mem().orders.filter(o => o.created_at >= +date).reverse();
   return db()`select * from orders where created_at >= ${date} order by created_at`;
+}
+
+// MARK: - Telegram messages of an order and reminders
+// msgs: [{ chat_id, message_id, staff_id, role: 'waiter' | 'feed' }]
+export async function saveMessages(orderId, msgs) {
+  if (!msgs.length) return;
+  if (memMode()) { const o = memOrder(orderId); if (o) o.messages = [...(o.messages || []), ...msgs]; return; }
+  const sql = db();
+  await sql`insert into order_messages ${sql(msgs.map(m => ({ order_id: orderId, chat_id: m.chat_id, message_id: m.message_id, staff_id: m.staff_id ?? null, role: m.role })))}
+    on conflict (order_id, chat_id) do update set message_id = excluded.message_id`;
+}
+export async function orderMessages(orderId) {
+  if (memMode()) return memOrder(orderId)?.messages || [];
+  return db()`select chat_id, message_id, staff_id, role from order_messages where order_id = ${orderId}`;
+}
+
+// New orders waiting longer than `minutes` × (reminders already sent + 1), while fewer than `times` were sent
+export async function dueReminders(minutes, times) {
+  if (memMode()) return mem().orders.filter(o => o.status === 'new' && (o.reminders || 0) < times && Date.now() - o.created_at > minutes * 60e3 * ((o.reminders || 0) + 1));
+  return db()`select * from orders where status = 'new' and reminders < ${times}
+    and created_at < now() - make_interval(secs => ${minutes * 60} * (reminders + 1)) and created_at > now() - interval '3 hours'`;
+}
+// Claims the next reminder of an order (null if another process already sent it)
+export async function claimReminder(id, sent) {
+  if (memMode()) { const o = memOrder(id); if (!o || (o.reminders || 0) !== sent) return null; o.reminders = sent + 1; o.reminded_at = Date.now(); return o; }
+  const [o] = await db()`update orders set reminders = reminders + 1, reminded_at = now() where id = ${id} and reminders = ${sent} and status = 'new' returning *`;
+  return o || null;
 }

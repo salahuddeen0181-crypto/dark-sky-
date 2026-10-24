@@ -35,7 +35,10 @@ export async function POST(req, { params }) {
       const who = await actor(me, body);
       if (body.action === 'accept') { o = await acceptOrder(id, who, site); if (o && who.id) await startShift(who.id); }
       else o = await serveOrder(id, who, site);
-    } else if (body.action === 'edit') o = await editOrder(id, body.edits || [], body.add || [], site);
+    } else if (body.action === 'edit') {
+      const editor = me.kind === 'waiter' ? { id: me.id, name: me.name } : { id: 0, name: me.kind === 'pin' ? 'Планшет у бара' : 'Администратор' };
+      o = await editOrder(id, body.edits || [], body.add || [], site, editor);
+    }
     if (o) return NextResponse.json({ order: o });
     // Lost a race (someone else already took it) or the order is gone
     const cur = await getOrder(id);

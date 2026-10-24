@@ -88,3 +88,16 @@ alter table orders add column if not exists served_by_id int references staff(id
 -- Waiters without Telegram (added in the admin) and personal PINs: an HMAC of the PIN, unique, so it finds the waiter
 alter table staff alter column tg_id drop not null;
 alter table staff add column if not exists pin_hmac text unique;
+
+-- Every Telegram message about an order (a waiter's private chat or the owners' feed group), to update them all later
+create table if not exists order_messages (
+  order_id   int not null references orders(id) on delete cascade,
+  chat_id    bigint not null,
+  message_id bigint not null,
+  staff_id   int references staff(id),
+  role       text not null,                  -- waiter | feed
+  primary key (order_id, chat_id)
+);
+-- "Nobody has taken it yet" reminders sent for an order
+alter table orders add column if not exists reminders int not null default 0;
+alter table orders add column if not exists reminded_at timestamptz;

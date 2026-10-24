@@ -355,7 +355,7 @@ export default class DarkskyMenu extends React.Component {
 
   segs(str) {
     return Array.from({ length: 10 }, (_, i) => {
-      const n = i + 1, on = n >= Math.max(1, str[0]) && n <= str[1];
+      const n = i + 1, on = n <= str[1]; // as many bars as the strength, always from the first
       return { bg: on ? `oklch(${0.8 - i * 0.025} 0.16 ${62 - i * 3.5})` : 'rgba(255,255,255,.1)' };
     });
   }
@@ -404,7 +404,7 @@ export default class DarkskyMenu extends React.Component {
       const pairs = (it.pair || D.PAIR[it.cat] || []).filter(id => id !== it.id).map(id => this.item(id)).filter(Boolean).map(p => this.miniVm(p));
       const variants = (it.v || []).map((v, i) => { const on = i === s.vi; return { name: this.tx(v.n), price: this.fmt(v.p), onPick: () => this.setState({ vi: i }), border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' }; });
       const sib = this.siblings(it), at = sib.findIndex(x => x.id === it.id);
-      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: (it.t || []).map(k => this.tx(D.TASTE[k])), strLabel: it.str ? `${it.str[0]}–${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, pairs };
+      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: (it.t || []).map(k => this.tx(D.TASTE[k])), strLabel: it.str ? `${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, pairs };
       const p = this.price(it, s.vi);
       addLabel = p == null ? t('add') : `${t('add')} · ${this.fmt(p * s.qty)}`;
     }
@@ -432,7 +432,7 @@ export default class DarkskyMenu extends React.Component {
       ],
       hits: this.props.items.filter(i => i.hit).map(i => this.miniVm(i)),
       rulesName: this.tx(SEC('rules').n),
-      hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[0]}–${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: (h.t || []).map(k => this.tx(D.TASTE[k])), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
+      hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: (h.t || []).map(k => this.tx(D.TASTE[k])), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
       listTitle: searching ? '“' + s.q.trim() + '”' : this.tx(cat.n), items: items.map(x => this.rowVm(x)),
       promos: this.C.PROMOS.map(p => ({ tag: this.tx(p.tag), title: this.tx(p.title), big: p.big, desc: this.tx(p.d), live: live(p.window) })),
       promoNote: this.tx(this.C.PROMO_NOTE),

@@ -98,9 +98,9 @@ const P = (k, p) => V(...PROT[k], p);
 
 export const ITEMS = [
   // HOOKAH
-  { id: 'h-classic', cat: 'hookah', name: 'Classic', d: T3('Mezcla suave para una sesión relajada.', 'A soft blend for an easy, mellow session.', 'Мягкий микс для спокойной долгой сессии.'), str: [0, 3], p: 34812, t: ['soft', 'fruity'] },
-  { id: 'h-premium', cat: 'hookah', name: 'Premium', d: T3('De media a fuerte — tabaco premium, humo denso.', 'Medium to strong — premium tobacco, dense smoke.', 'От средней до высокой крепости — премиальный табак, плотный дым.'), str: [4, 10], p: 48787, t: ['strong', 'fruity'], hit: true },
-  { id: 'h-cigar', cat: 'hookah', name: 'Cigar Line', d: T3('Línea con carácter de cigarro.', 'A cigar-character line for connoisseurs.', 'Линейка с характером сигары — для ценителей.'), p: 58951, t: ['strong', 'smoky'] },
+  { id: 'h-classic', cat: 'hookah', name: 'Classic', d: T3('Mezcla suave para una sesión relajada.', 'A soft blend for an easy, mellow session.', 'Мягкий микс для спокойной долгой сессии.'), str: [1, 3], p: 34812, t: ['soft', 'fruity'] },
+  { id: 'h-premium', cat: 'hookah', name: 'Premium', d: T3('De media a fuerte — tabaco premium, humo denso.', 'Medium to strong — premium tobacco, dense smoke.', 'От средней до высокой крепости — премиальный табак, плотный дым.'), str: [1, 7], p: 48787, t: ['strong', 'fruity'], hit: true },
+  { id: 'h-cigar', cat: 'hookah', name: 'Cigar Line', d: T3('Línea con carácter de cigarro.', 'A cigar-character line for connoisseurs.', 'Линейка с характером сигары — для ценителей.'), p: 58951, t: ['strong', 'smoky'], str: [1, 10] },
   // STARTERS
   { id: 'jerky', cat: 'starters', name: 'Jerky artesanal', m: '150 g', p: 22857, d: T3('Carne curada artesanal.', 'House-made cured jerky.', 'Вяленое мясо собственного приготовления.'), t: ['savory', 'smoky'], v: [V('Cerdo', 'Pork', 'Свинина', 22857), V('Pollo', 'Chicken', 'Курица', 22857), V('Carne', 'Beef', 'Говядина', 22857), V('Pescado', 'Fish', 'Рыба', 22857)], hit: true },
   { id: 'falafel', cat: 'starters', name: 'Falafel', m: '300 g', p: 16262, d: T3('Falafel (nuez, especias), pan árabe, pepinillos, pepino, tomate cherry, salsa cremosa de ajo.', 'Falafel (nuts, spices), pita, pickles, cucumber, cherry tomato, creamy garlic sauce.', 'Фалафель (орехи, специи), арабский хлеб, корнишоны, огурец, черри, сливочный чесночный соус.'), t: ['spicy', 'creamy'] },
