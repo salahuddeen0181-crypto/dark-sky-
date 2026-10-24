@@ -90,7 +90,7 @@ const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 export function isSoftwareGL(gl) {
   try { const ext = gl.getExtension('WEBGL_debug_renderer_info'); const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''; return /swiftshader|llvmpipe|software|basic render|mesa offscreen/i.test(r || ''); } catch (e) { return false; }
 }
-const STUB = { fallback: true, enter() {}, setDim() {}, setTopFree() { return Math.round(innerHeight * .4); }, logoBox() { return null; }, dispose() {} };
+const STUB = { fallback: true, enter() {}, setDim() {}, burst() {}, setTopFree() { return Math.round(innerHeight * .4); }, logoBox() { return null; }, dispose() {} };
 
 export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
   let renderer;
@@ -200,14 +200,18 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
   window.addEventListener('resize', resize);
 
   let enterT = 0, dim = 1, dimT = 1, t = 0, last = performance.now(), raf = 0, rotY = 0, rotX = 0, half = false;
+  let surgeT = -99; // a section change: the smoke thickens for a moment (see burst())
+  const SURGE = 1.6;
 
   function step(dt) {
     t += dt;
     const decay = Math.exp(-dt * 1.8);
     ptr.s *= decay; ptr.vx *= Math.exp(-dt * 5); ptr.vy *= Math.exp(-dt * 5);
     dim += (dimT - dim) * Math.min(1, dt * 2);
-    bgU.uTime.value = t; bgU.uPtrS.value = ptr.s; bgU.uDim.value = dim;
-    S.mat.uniforms.uOpacity.value = .15 + .6 * dim; bgU.uGlow.value = dim; bgU.uEdge.value += ((entered ? 1 : 0) - bgU.uEdge.value) * Math.min(1, dt * 1.5);
+    // surge: rises fast, then thins out over SURGE seconds
+    const age = t - surgeT, surge = age < 0 || age > SURGE ? 0 : Math.min(1, age / .18) * Math.pow(1 - age / SURGE, 1.6), d = dim + surge * .75;
+    bgU.uTime.value = t; bgU.uPtrS.value = ptr.s; bgU.uDim.value = d;
+    S.mat.uniforms.uOpacity.value = .15 + .6 * Math.min(1.15, d); bgU.uGlow.value = d; bgU.uEdge.value += ((entered ? 1 : 0) - bgU.uEdge.value) * Math.min(1, dt * 1.5);
 
     const R = 0.9, R2 = R * R, pxx = ptr.x, pyy = ptr.y, ps = .35 + ptr.s;
     // tilt
@@ -323,7 +327,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
     if (document.hidden) { last = now; return; }
     // in the menu (once the logo has blown away) the dimmed smoke behind the glass runs at half rate: it moves slowly,
     // and every frame it does change, each glass card has to re-blur what is behind it
-    if (entered && t - enterT > 3 && (half = !half)) return;
+    if (entered && t - enterT > 3 && t - surgeT > SURGE && (half = !half)) return;
     const rdt = (now - last) / 1000;
     const dt = Math.min(.05, rdt); last = now;
     if (++frames > 10 && frames < 200) { if (rdt > .09) slowN++; if (slowN > 25) { cancelAnimationFrame(raf); onSlow && onSlow(); return; } }
@@ -342,6 +346,14 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
       ptr.s = 1;
     },
     setDim(v) { dimT = v; },
+    // Moving between menu sections: a cloud bursts from where the guest tapped and the smoke behind the page thickens
+    burst(cx, cy) {
+      const w = window.innerWidth, h = window.innerHeight;
+      const x = (cx / w * 2 - 1) * VW / 2, y = -(cy / h * 2 - 1) * VH / 2;
+      puff(x, y, 120, 1.7);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; puff(x + Math.cos(a) * .7, y + Math.sin(a) * .5, 18, 1.1); }
+      surgeT = t; ptr.s = 1;
+    },
     setTopFree(px) { topFree = px; return layoutLogo(); },
     // where the logo picture sits on screen (CSS px), matching the particle lettering
     logoBox() {

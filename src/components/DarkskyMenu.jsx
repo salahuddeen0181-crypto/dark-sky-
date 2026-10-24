@@ -208,7 +208,7 @@ export default class DarkskyMenu extends React.Component {
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen) ? 'hidden' : '';
     if (document.documentElement.style.overflow !== lock) document.documentElement.style.overflow = document.body.style.overflow = lock;
   }
-  componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); }
+  componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); }
 
   loadTiles() {
     // three.js is only needed for sections without a clip; skip it while no 3D canvas is on the page
@@ -228,11 +228,20 @@ export default class DarkskyMenu extends React.Component {
     }
     return this._refs[key];
   }
-  nav(view, sec) {
-    const S = sec && this.C.SECTIONS.find(x => x.id === sec);
-    this.setState({ view, sec: sec || null, cat: (S && S.cats[0]) || 'hookah', q: '', searchOpen: false, contentOn: false });
-    window.scrollTo(0, 0);
-    clearTimeout(this._nt); this._nt = setTimeout(() => this.setState({ contentOn: true }), 40);
+  // Section change: a cloud of smoke bursts from the tap, the page dissolves into it and the next one condenses out
+  nav(view, sec, e) {
+    const go = () => {
+      const S = sec && this.C.SECTIONS.find(x => x.id === sec);
+      this.setState({ view, sec: sec || null, cat: (S && S.cats[0]) || 'hookah', q: '', searchOpen: false, contentOn: false, leaving: false });
+      window.scrollTo(0, 0);
+      clearTimeout(this._nt); this._nt = setTimeout(() => this.setState({ contentOn: true }), 60);
+    };
+    const calm = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!this.scene || this.state.phase !== 'menu' || calm) return go();
+    const p = e && 'clientX' in e && e.clientX ? e : { clientX: innerWidth / 2, clientY: innerHeight / 2 };
+    this.scene.burst(p.clientX, p.clientY);
+    this.setState({ leaving: true });
+    clearTimeout(this._lt); this._lt = setTimeout(go, 340);
   }
   layoutIntro() {
     const el = this.introRef.current, h = window.innerHeight;
@@ -325,7 +334,7 @@ export default class DarkskyMenu extends React.Component {
     const secVm = (S, extra) => {
       const its = this.props.items.filter(i => S.cats.includes(i.cat)), ps = its.map(i => this.price(i, 0)).filter(p => p != null);
       const from = ps.length ? this.fromFmt(Math.min(...ps)) : '';
-      return { id: S.id, name: this.tx(S.n), tag: this.tx(S.tag), from, count: its.length, big: '', row: 'auto', col: 'auto', border: 'rgba(255,255,255,.09)', ref: this.tileRef('tile-' + S.id, S.id), clip: S.clip, onOpen: () => this.nav('section', S.id), ...extra };
+      return { id: S.id, name: this.tx(S.n), tag: this.tx(S.tag), from, count: its.length, big: '', row: 'auto', col: 'auto', border: 'rgba(255,255,255,.09)', ref: this.tileRef('tile-' + S.id, S.id), clip: S.clip, onOpen: e => this.nav('section', S.id, e), ...extra };
     };
     const bizLive = live([14, 17]);
 
@@ -463,7 +472,7 @@ export default class DarkskyMenu extends React.Component {
           </div>
         </div>
 
-        <button onClick={() => this.nav('section', 'rules')} style={css('margin-top:10px;min-height:56px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;align-items:center;justify-content:space-between;gap:12px' + GLASS)}>
+        <button onClick={e => this.nav('section', 'rules', e)} style={css('margin-top:10px;min-height:56px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;align-items:center;justify-content:space-between;gap:12px' + GLASS)}>
           <span style={css('display:flex;flex-direction:column;gap:5px')}>
             <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.rulesName}</span>
             <span style={css('font:400 12.5px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.6)')}>{t('lasts')} · 18+</span>
@@ -478,7 +487,7 @@ export default class DarkskyMenu extends React.Component {
     const { t } = v;
     return (
       <div style={css('display:flex;flex-direction:column;gap:12px')}>
-        <button onClick={() => this.nav('section', 'promos')} style={css('position:relative;overflow:hidden;border-radius:18px;padding:16px 18px;border:1px solid rgba(232,121,60,.4);background:linear-gradient(120deg, rgba(232,121,60,.2), rgba(232,121,60,.04) 60%);display:flex;align-items:center;justify-content:space-between;gap:12px')}>
+        <button onClick={e => this.nav('section', 'promos', e)} style={css('position:relative;overflow:hidden;border-radius:18px;padding:16px 18px;border:1px solid rgba(232,121,60,.4);background:linear-gradient(120deg, rgba(232,121,60,.2), rgba(232,121,60,.04) 60%);display:flex;align-items:center;justify-content:space-between;gap:12px')}>
           <div style={css('display:flex;flex-direction:column;gap:7px')}>
             <div style={css('display:flex;align-items:center;gap:8px')}>
               <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>Business Hookah</span>
@@ -610,12 +619,12 @@ export default class DarkskyMenu extends React.Component {
         <div style={css('position:sticky;top:0;z-index:4;background:rgba(34,35,42,.5);border-bottom:1px solid rgba(255,255,255,.06);padding-top:env(safe-area-inset-top)' + GLASS)}>
           <div style={css('display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 18px')}>
             {!sec ? (
-              <button onClick={() => this.nav('home')} style={css('display:flex;flex-direction:column;gap:3px;align-items:flex-start')}>
+              <button onClick={e => this.nav('home', null, e)} style={css('display:flex;flex-direction:column;gap:3px;align-items:flex-start')}>
                 <span style={css('font:400 17px/1 Michroma,sans-serif;letter-spacing:.14em')}>DARKSKY</span>
                 <span style={css('font:300 10px/1 Manrope,sans-serif;letter-spacing:.2em;color:rgba(242,242,244,.62);text-transform:uppercase;padding-inline-start:2px')}>Hookah Lounge</span>
               </button>
             ) : (
-              <button onClick={() => this.nav('home')} style={css('height:44px;display:flex;align-items:center;gap:10px;padding-inline-end:10px')}>
+              <button onClick={e => this.nav('home', null, e)} style={css('height:44px;display:flex;align-items:center;gap:10px;padding-inline-end:10px')}>
                 <span style={css('width:40px;height:40px;border-radius:14px;border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center')}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ transform: v.flip }}><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </span>
@@ -646,7 +655,9 @@ export default class DarkskyMenu extends React.Component {
           )}
         </div>
 
-        <div style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;opacity:${s.contentOn ? 1 : 0};transform:translateY(${s.contentOn ? '0px' : '14px'});transition:opacity .45s ease, transform .55s cubic-bezier(.2,.8,.2,1)`)}>
+        <div style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;${s.leaving
+          ? 'opacity:0;transform:scale(1.035);filter:blur(7px);transition:opacity .34s ease-in, transform .34s ease-in, filter .34s ease-in'
+          : `opacity:${s.contentOn ? 1 : 0};transform:${s.contentOn ? 'none' : 'translateY(10px) scale(.985)'};filter:${s.contentOn ? 'none' : 'blur(8px)'};transition:opacity .6s ease, transform .7s cubic-bezier(.2,.8,.2,1), filter .6s ease`}`)}>
           {v.kind === 'home' && this.renderHome(v)}
           {!v.searching && sec && sec.id !== 'rules' && (
             <div style={css('position:relative;overflow:hidden;height:168px;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), ' + GLASS_TINT + GLASS)}>
