@@ -41,7 +41,7 @@
 @keyframes ds-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
 /* Choosing a section: the card lifts and lights up, the rest of the page steps back, then it all goes to smoke */
-.ds-page [data-tile] { transition: transform .26s cubic-bezier(.2,.8,.2,1), box-shadow .26s ease, opacity .26s ease, filter .26s ease; }
+.ds-page [data-tile] { transition: transform .17s cubic-bezier(.2,.8,.2,1), box-shadow .17s ease, opacity .17s ease, filter .17s ease; }
 .ds-page.ds-picking [data-tile]:not(.ds-picked) { opacity: .35; transform: scale(.97); filter: blur(1.5px); }
 .ds-page [data-tile].ds-picked { transform: scale(1.035); position: relative; z-index: 2;
   box-shadow: 0 0 0 1px rgba(232, 121, 60, .75), 0 0 34px rgba(232, 121, 60, .35), 0 18px 50px rgba(0, 0, 0, .55); }

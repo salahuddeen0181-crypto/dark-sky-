@@ -201,7 +201,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
 
   let enterT = 0, dim = 1, dimT = 1, t = 0, last = performance.now(), raf = 0, rotY = 0, rotX = 0, half = false;
   let surgeT = -99; // a section change: the smoke thickens for a moment (see burst())
-  const SURGE = 1.6;
+  const SURGE = 1.3;
 
   function step(dt) {
     t += dt;

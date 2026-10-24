@@ -247,13 +247,13 @@ export default class DarkskyMenu extends React.Component {
       else { const p = e && e.clientX ? e : { clientX: innerWidth / 2, clientY: innerHeight / 2 }; this.scene.burst(p.clientX, p.clientY); }
       this._picking = false;
       this.setState({ leaving: true });
-      clearTimeout(this._lt); this._lt = setTimeout(go, 340);
+      clearTimeout(this._lt); this._lt = setTimeout(go, 240);
     };
     if (!card) return smoke();
     this._picking = true;
     card.classList.add('ds-picked');
     card.closest('.ds-page')?.classList.add('ds-picking');
-    clearTimeout(this._lt); this._lt = setTimeout(smoke, 260);
+    clearTimeout(this._lt); this._lt = setTimeout(smoke, 170);
   }
   layoutIntro() {
     const el = this.introRef.current, h = window.innerHeight;
@@ -668,8 +668,8 @@ export default class DarkskyMenu extends React.Component {
         </div>
 
         <div className="ds-page" style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;${s.leaving
-          ? 'opacity:0;transform:scale(1.035);filter:blur(7px);transition:opacity .34s ease-in, transform .34s ease-in, filter .34s ease-in'
-          : `opacity:${s.contentOn ? 1 : 0};transform:${s.contentOn ? 'none' : 'translateY(10px) scale(.985)'};filter:${s.contentOn ? 'none' : 'blur(8px)'};transition:opacity .6s ease, transform .7s cubic-bezier(.2,.8,.2,1), filter .6s ease`}`)}>
+          ? 'opacity:0;transform:scale(1.035);filter:blur(7px);transition:opacity .24s ease-in, transform .24s ease-in, filter .24s ease-in'
+          : `opacity:${s.contentOn ? 1 : 0};transform:${s.contentOn ? 'none' : 'translateY(10px) scale(.985)'};filter:${s.contentOn ? 'none' : 'blur(8px)'};transition:opacity .45s ease, transform .5s cubic-bezier(.2,.8,.2,1), filter .45s ease`}`)}>
           {v.kind === 'home' && this.renderHome(v)}
           {!v.searching && sec && sec.id !== 'rules' && (
             <div style={css('position:relative;overflow:hidden;height:168px;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), ' + GLASS_TINT + GLASS)}>
