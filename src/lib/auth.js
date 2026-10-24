@@ -55,7 +55,8 @@ export function checkPin(pin) {
   return crypto.timingSafeEqual(a, b);
 }
 
-// A short PIN is easy to guess: at most 5 wrong tries per address in 10 minutes (per server instance).
+// A short PIN or password is easy to guess: at most 5 wrong tries per address in 10 minutes (per server instance).
+// Keys: the address for the staff PIN, 'admin:' + address for the admin password.
 const tries = (globalThis.__darkskyPinTries ||= new Map());
 export function pinLocked(ip) {
   const t = tries.get(ip);
