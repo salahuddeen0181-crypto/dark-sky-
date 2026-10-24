@@ -31,7 +31,8 @@ const W = 480, H = 854, FPS = 24;
 // plates that reflect the green screen solid instead of see-through
 const OPTS = {
   hookah: { feather: [.2, .14] }, 'tea-tropic': { feather: [.12, .12], sat: 1.7 }, cash: { feather: [.14, .1] },
-  udon: { feather: [.2, .12], shadow: 1.25 }, 'wok-rice': { feather: [.2, .12], shadow: 1.25 },
+  // only a slight softening where the dish meets the card edge (the menu shows clips zoomed 1.2×)
+  udon: { feather: [.1, .07], shadow: 1.25 }, 'wok-rice': { feather: [.1, .07], shadow: 1.25 },
 };
 const CLIPS = {
   'Chicken_teriyaki_sushi_roll': 'roll-horno',

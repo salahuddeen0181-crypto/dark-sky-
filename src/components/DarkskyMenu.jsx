@@ -84,7 +84,8 @@ const Smoke = ({ still }) => <div className={still ? 'ds-smoke still' : 'ds-smok
 const CLIP = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;transform:scale(1.2)');
 function ProductClip({ src, v, fit }) {
   const ref = React.useRef(null);
-  const [file, t] = src.split('#t='), stem = file.replace(/\.webm$/i, ''), still = stem + '.webp';
+  // small places (rows, mini cards, small tiles) get the 320 px still from scripts/make-thumbs.mjs
+  const [file, t] = src.split('#t='), stem = file.replace(/\.webm$/i, ''), still = stem + (v === 'still' || v === 'sm' ? '-th' : '') + '.webp';
   React.useEffect(() => {
     const el = ref.current;
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -114,7 +115,7 @@ const WIDE_FIT = { objectPosition: '88% 60%', transform: 'scale(1.3)', transform
 function Media({ m, label = true, v = 'full' }) {
   const fill = css('width:100%;height:100%;object-fit:cover;display:block');
   // cut-out product photo (scripts/cutout.swift, or background removed in the admin): on the same smoky stage as the clips
-  if (m.mImg && m.mCut) return <><Smoke still={v === 'still'} /><img src={m.mSrc} alt="" loading="lazy" style={CUT} /></>; // eslint-disable-line @next/next/no-img-element
+  if (m.mImg && m.mCut) return <><Smoke still={v === 'still'} /><img src={v !== 'full' && m.mSrc.startsWith('/media/cut/') ? m.mSrc.replace(/\.webp$/, '-th.webp') : m.mSrc} alt="" loading="lazy" style={CUT} /></>; // eslint-disable-line @next/next/no-img-element
   if (m.mImg) return <img src={m.mSrc} alt="" style={fill} />; // eslint-disable-line @next/next/no-img-element
   if (m.mVideo && /^\/media\/.+\.webm(#|$)/.test(m.mSrc)) return <><Smoke still={v === 'still'} /><ProductClip src={m.mSrc} v={v} /></>;
   if (m.mVideo) return <video src={m.mSrc} autoPlay muted loop playsInline style={fill} />;
