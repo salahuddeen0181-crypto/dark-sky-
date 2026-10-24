@@ -87,7 +87,7 @@ const isHevc = () => { const ua = navigator.userAgent; return /AppleWebKit/.test
 const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isHevc() ? '.mov' : '.webm');
 // Home tiles shown large play the full clip, the rest the small one (matches tiles in vm())
 const FULL_TILES = new Set(['hookah', 'kitchen']);
-const ORDER_KEEP_H = 4; // a saved cart / order untouched for longer than this is a past visit
+const ORDER_KEEP_MIN = 30; // a saved cart / order not opened or changed for longer than this is a past visit
 
 // While the guest is still on the intro, quietly fill the browser cache: the home tiles' stills and clips first
 // (seen right after entering), then every dish's small picture, so sections open with pictures already there.
@@ -231,6 +231,11 @@ export default class DarkskyMenu extends React.Component {
     let lang = null; try { lang = localStorage.getItem('darksky.lang'); } catch (e) {}
     if (!lang) { const n = (navigator.language || 'es').slice(0, 2); lang = D.LANGS.some(l => l.code === n) ? n : 'es'; }
     const saved = this.loadOrder();
+    // leaving or reloading the page counts as being here: the 30 minutes start again from that moment
+    // (iPhone may never fire pagehide when the guest just switches apps, hence visibilitychange too)
+    this._onHide = () => this.touchOrder();
+    window.addEventListener('pagehide', this._onHide);
+    document.addEventListener('visibilitychange', this._onHide);
     // a reload mid-order goes straight back to the menu, the cart and the order's status
     const skip = !!this.props.skipIntro || !!saved;
     this.setState({ ready: true, lang, phase: skip ? 'menu' : 'intro', ...saved }, () => saved && saved.orderId && this.pollOrder(saved.orderId));
@@ -257,7 +262,7 @@ export default class DarkskyMenu extends React.Component {
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen) ? 'hidden' : '';
     if (document.documentElement.style.overflow !== lock) document.documentElement.style.overflow = document.body.style.overflow = lock;
   }
-  componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); }
+  componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); window.removeEventListener('pagehide', this._onHide); document.removeEventListener('visibilitychange', this._onHide); }
 
   // What warmMedia() fetches in the background: tile clips with their stills, then every dish's small picture
   warm() {
@@ -989,7 +994,7 @@ export default class DarkskyMenu extends React.Component {
 
   // MARK: - Survives a reload
   // The cart and the sent order live in this phone's browser, so an accidental reload or a closed tab loses
-  // nothing. One entry, tied to the table's QR token: it lasts ORDER_KEEP_H hours from the last change, and
+  // nothing. One entry, tied to the table's QR token: it lasts ORDER_KEEP_MIN minutes from the last opening or change, and
   // scanning another table's QR drops what was kept for the previous one. Nothing is shared by network or IP.
   orderKey() { return 'darksky.order.' + (this.props.table ? this.props.table.token : '-'); }
   saveOrder() {
@@ -999,6 +1004,13 @@ export default class DarkskyMenu extends React.Component {
       localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent }));
     } catch (e) { /* private mode or storage full: works as before, just without the restore */ }
   }
+  // only pushes the deadline of what is already kept (changes are saved as they happen)
+  touchOrder() {
+    try {
+      const o = JSON.parse(localStorage.getItem(this.orderKey()) || 'null');
+      if (o) localStorage.setItem(this.orderKey(), JSON.stringify({ ...o, at: Date.now() }));
+    } catch (e) { /* nothing kept */ }
+  }
   loadOrder() {
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -1006,7 +1018,7 @@ export default class DarkskyMenu extends React.Component {
         if (k && k.startsWith('darksky.order.') && k !== this.orderKey()) localStorage.removeItem(k);
       }
       const o = JSON.parse(localStorage.getItem(this.orderKey()) || 'null');
-      if (!o || Date.now() - o.at > ORDER_KEEP_H * 3600e3) { localStorage.removeItem(this.orderKey()); return null; }
+      if (!o || Date.now() - o.at > ORDER_KEEP_MIN * 60e3) { localStorage.removeItem(this.orderKey()); return null; }
       const cart = (o.cart || []).filter(l => this.item(l.id) && l.qty > 0);
       const orderId = this.props.table && Number.isInteger(o.orderId) ? o.orderId : null;
       if (!cart.length && !orderId) return null;
