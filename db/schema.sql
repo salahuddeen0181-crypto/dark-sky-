@@ -84,3 +84,7 @@ create unique index if not exists shifts_one_open on shifts (staff_id) where end
 -- Who approved / served an order (the text name stays for history and Telegram)
 alter table orders add column if not exists accepted_by_id int references staff(id);
 alter table orders add column if not exists served_by_id int references staff(id);
+
+-- Waiters without Telegram (added in the admin) and personal PINs: an HMAC of the PIN, unique, so it finds the waiter
+alter table staff alter column tg_id drop not null;
+alter table staff add column if not exists pin_hmac text unique;

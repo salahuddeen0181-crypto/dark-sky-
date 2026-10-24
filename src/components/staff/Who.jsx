@@ -6,7 +6,7 @@ const hhmm = d => new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', min
 // Top strip: the signed-in waiter and their shift, or (bar tablet) who is on shift now
 export function ShiftBar({ s }) {
   if (!s.ready) return null;
-  if (s.me?.kind === 'tg') {
+  if (s.me?.kind === 'waiter') {
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
         <span>Вы: <b>{s.me.name}</b></span>
@@ -26,12 +26,12 @@ export function ShiftBar({ s }) {
   );
 }
 
-// Who approves / serves. A waiter signed in through Telegram is themselves; on the shared tablet a waiter on shift is
+// Who approves / serves. A waiter signed in as themselves (Telegram or a personal PIN) is themselves; on the shared tablet a waiter on shift is
 // picked; without a database (no accounts) — a typed name. ask() → extra body fields, or null if cancelled.
 export function useActor(s) {
   const [open, setOpen] = useState(false), [name, setName] = useState(''), done = useRef(null);
   function ask() {
-    if (s.me?.kind === 'tg') return Promise.resolve({});
+    if (s.me?.kind === 'waiter') return Promise.resolve({});
     return new Promise(res => { done.current = res; setOpen(true); });
   }
   const finish = v => { setOpen(false); done.current?.(v); };

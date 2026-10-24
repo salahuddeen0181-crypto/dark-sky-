@@ -12,10 +12,10 @@ export async function GET(req, { params }) {
   return o ? NextResponse.json({ order: o }, { headers: { 'cache-control': 'no-store' } }) : NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
 }
 
-// Who is acting: a waiter signed in through Telegram is themselves; the shared tablet (PIN) or an admin
+// Who is acting: a waiter signed in as themselves (Telegram or a personal PIN) is themselves; the shared tablet (PIN) or an admin
 // picks a waiter who is on shift (body.staffId). Without a database there are no accounts — a typed name (body.by).
 async function actor(me, body) {
-  if (me.kind === 'tg') return { id: me.id, name: me.name };
+  if (me.kind === 'waiter') return { id: me.id, name: me.name };
   if (!staffReady()) return { id: 0, name: String(body.by || '').trim() };
   const s = body.staffId ? await getStaffById(Number(body.staffId)) : null;
   if (!s || s.status !== 'active') throw new OrderError('who', 400);

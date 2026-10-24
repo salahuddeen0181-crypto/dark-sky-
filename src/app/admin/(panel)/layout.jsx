@@ -4,7 +4,7 @@ import LogoutButton from '@/components/admin/LogoutButton';
 
 export const dynamic = 'force-dynamic';
 
-const NAV = [['/admin', 'Меню'], ['/admin/content', 'Контент'], ['/admin/tables', 'Столы и QR'], ['/admin/stats', 'Статистика'], ['/admin/staff', 'Персонал'], ['/admin/orders', 'Заказы'], ['/admin/telegram', 'Telegram']];
+const NAV = [['/admin', 'Меню'], ['/admin/content', 'Контент'], ['/admin/tables', 'Столы и QR'], ['/admin/stats', 'Статистика'], ['/admin/staff', 'Персонал'], ['/admin/access', 'Доступ'], ['/admin/orders', 'Заказы'], ['/admin/telegram', 'Telegram']];
 
 export default async function Panel({ children }) {
   await requireAdmin();

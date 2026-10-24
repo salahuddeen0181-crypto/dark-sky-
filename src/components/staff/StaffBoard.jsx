@@ -69,7 +69,7 @@ export default function StaffBoard() {
         </nav>
         <div className="ml-auto flex flex-wrap items-center gap-2 text-sm">
           {!sound && <button onClick={async () => { await alerts.enable(); setSound(alerts.enabled()); }} className="h-10 rounded-lg bg-[#e8793c] px-3 font-semibold text-black">🔔 Включить звук</button>}
-          {s.me?.kind !== 'tg' && <button onClick={logout} className="h-10 rounded-lg border border-white/15 px-3 text-white/70">Выйти</button>}
+          {s.me?.via !== 'tg' && <button onClick={logout} className="h-10 rounded-lg border border-white/15 px-3 text-white/70">Выйти</button>}
         </div>
       </header>
 

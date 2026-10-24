@@ -6,7 +6,7 @@ import { staffReady, openShift, startShift, endShift, onShift } from '@/lib/staf
 async function state(me) {
   const db = staffReady();
   return {
-    me, shift: db && me.kind === 'tg' ? await openShift(me.id) : null,
+    me, shift: db && me.kind === 'waiter' ? await openShift(me.id) : null,
     onShift: db ? await onShift() : [], named: db,
   };
 }
@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(req) {
   const me = await getStaff();
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (me.kind !== 'tg') return NextResponse.json({ error: 'Смену отмечает сам официант со своего телефона' }, { status: 400 });
+  if (me.kind !== 'waiter') return NextResponse.json({ error: 'Смену отмечает сам официант — со своего телефона или войдя по личному PIN' }, { status: 400 });
   const { action } = await req.json().catch(() => ({}));
   if (action === 'start') await startShift(me.id); else if (action === 'end') await endShift(me.id);
   return NextResponse.json(await state(me));

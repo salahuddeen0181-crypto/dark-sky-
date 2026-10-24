@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from './api';
+import { StaffPin, AddStaff } from './StaffPin';
 
 const STATUS = { pending: ['Ждёт одобрения', 'bg-[#e8793c] text-black'], active: ['В команде', 'bg-white/15'], blocked: ['Заблокирован', 'bg-white/5 text-white/50'] };
 const dt = d => new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -22,7 +23,7 @@ export default function StaffAdmin({ staff, shifts }) {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="font-display text-lg uppercase tracking-[.08em]">Персонал</h1>
-        <p className="text-xs leading-relaxed text-white/45">Официант пишет боту /start или открывает приложение из бота — появляется здесь «Ждёт одобрения». После одобрения он входит под своим именем, отмечает смену и одобряет заказы.</p>
+        <p className="text-xs leading-relaxed text-white/45">Официант пишет боту /start или открывает приложение из бота — появляется здесь «Ждёт одобрения». После одобрения он входит под своим именем, отмечает смену и одобряет заказы. Без Telegram — добавьте сотрудника ниже и выдайте ему личный PIN: им он входит в приложение персонала.</p>
       </div>
       {err && <div className="rounded-xl border border-[#e8793c]/50 bg-[#e8793c]/10 px-4 py-3 text-sm text-[#f6c3a3]">{err}</div>}
 
@@ -32,7 +33,8 @@ export default function StaffAdmin({ staff, shifts }) {
       </section>
 
       <section className="flex flex-col gap-2">
-        {!staff.length && <div className="py-10 text-center text-white/45">Пока никто не писал боту</div>}
+        <AddStaff onChange={() => router.refresh()} />
+        {!staff.length && <div className="py-10 text-center text-white/45">Пока никого: официант может написать боту /start или добавьте его выше</div>}
         {staff.map(s => {
           const [label, cls] = STATUS[s.status];
           const name = names[s.id] ?? s.name;
@@ -40,7 +42,7 @@ export default function StaffAdmin({ staff, shifts }) {
             <div key={s.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#0e0e13] p-3">
               <input value={name} onChange={e => setNames({ ...names, [s.id]: e.target.value })} className="h-10 w-48 rounded-lg border border-white/15 bg-white/5 px-3 outline-none focus:border-[#e8793c]" />
               {name !== s.name && <button onClick={() => patch(s.id, { name })} className="h-10 rounded-lg border border-white/15 px-3 text-sm">Сохранить имя</button>}
-              <span className="text-xs text-white/45">{s.username ? '@' + s.username : `tg ${s.tg_id}`}</span>
+              <span className="text-xs text-white/45">{s.username ? '@' + s.username : s.tg_id ? `tg ${s.tg_id}` : 'без Telegram'}</span>
               <span className={`rounded-md px-2 py-1 text-xs font-semibold ${cls}`}>{label}</span>
               {s.shift_started && <span className="text-xs text-[#9fd8a8]">на смене с {dt(s.shift_started)}</span>}
               <div className="ml-auto flex gap-2">
@@ -48,6 +50,7 @@ export default function StaffAdmin({ staff, shifts }) {
                 {s.shift_started && <button onClick={() => patch(s.id, { endShift: true })} className="h-10 rounded-lg border border-white/15 px-3 text-sm text-white/75">Закрыть смену</button>}
                 {s.status !== 'blocked' && <button onClick={() => confirm(`Заблокировать ${s.name}?`) && patch(s.id, { status: 'blocked' })} className="h-10 rounded-lg border border-white/15 px-3 text-sm text-white/55 hover:text-[#f2a676]">Заблокировать</button>}
               </div>
+              {s.status !== 'pending' && <StaffPin s={s} onChange={() => router.refresh()} />}
             </div>
           );
         })}
