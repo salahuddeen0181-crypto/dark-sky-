@@ -3,6 +3,6 @@
 	encode zstd gzip
 	@media path /media/*
 	# fresh for an hour, then the browser shows its copy and fetches an updated clip in the background
-	header @media Cache-Control "public, max-age=3600, stale-while-revalidate=604800"
+	header @media >Cache-Control "public, max-age=3600, stale-while-revalidate=604800"
 	reverse_proxy app:3000
 }
