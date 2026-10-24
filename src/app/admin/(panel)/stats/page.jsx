@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { report, PERIODS } from '@/lib/stats';
+import { report, PERIODS, isDay } from '@/lib/stats';
 import { fmtPrice } from '@/lib/money';
 import { Card, Kpi, Columns, BarList, Stat } from '@/components/admin/stats/Charts';
 
@@ -9,8 +9,8 @@ const mins = v => (v == null ? '—' : v < 1 ? '<1 мин' : Math.round(v) + ' �
 const ddmm = key => key.slice(8, 10) + '.' + key.slice(5, 7);
 
 export default async function StatsPage({ searchParams }) {
-  const p = (await searchParams).p;
-  const r = await report(PERIODS[p] ? p : '7d');
+  const q = await searchParams, p = q.p;
+  const r = await report(isDay(q.from) && isDay(q.to) ? { from: q.from, to: q.to } : PERIODS[p] ? p : '7d');
   const { now, prev } = r;
 
   return (
@@ -22,11 +22,19 @@ export default async function StatsPage({ searchParams }) {
             <Link key={k} href={`/admin/stats?p=${k}`} className={`rounded-lg px-3 py-1.5 ${k === r.period ? 'bg-white/15 text-white' : 'text-white/60 hover:text-white'}`}>{LABELS[k]}</Link>
           ))}
         </nav>
+        {/* any period by hand: a plain GET form, so the link can be refreshed or shared */}
+        <form action="/admin/stats" className={`flex flex-wrap items-center gap-2 rounded-xl border p-1 pl-3 text-sm ${r.period === 'custom' ? 'border-[#e8793c]/60' : 'border-white/10'}`}>
+          <span className="text-white/55">с</span>
+          <input type="date" name="from" defaultValue={r.from} required className="h-8 rounded-lg border border-white/15 bg-white/5 px-2 text-white [color-scheme:dark]" />
+          <span className="text-white/55">по</span>
+          <input type="date" name="to" defaultValue={r.to} required className="h-8 rounded-lg border border-white/15 bg-white/5 px-2 text-white [color-scheme:dark]" />
+          <button className="h-8 rounded-lg bg-white/15 px-3 text-white hover:bg-white/25">Показать</button>
+        </form>
         <Link href="/staff" target="_blank" className="ml-auto rounded-xl border border-white/10 px-3 py-2 text-sm text-white/75 hover:text-white">
           Сейчас: <b className={r.open.fresh ? 'text-[#f2a676]' : ''}>{r.open.fresh} новых</b> · {r.open.accepted} в работе{r.onShift.length ? ` · на смене: ${r.onShift.map(x => x.name).join(', ')}` : ''} ↗
         </Link>
       </div>
-      <p className="-mt-2 text-xs text-white/40">День считается сменой 06:00–06:00 · сравнение с предыдущими {r.n === 1 ? 'сутками' : `${r.n} днями`}</p>
+      <p className="-mt-2 text-xs text-white/40">{ddmm(r.from)}{r.from !== r.to ? ` – ${ddmm(r.to)}` : ''} · день считается сменой 06:00–06:00 · сравнение с предыдущими {r.n === 1 ? 'сутками' : `${r.n} днями`}</p>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Выручка" value={fmtPrice(now.revenue)} now={now.revenue} prev={prev.revenue} />
@@ -37,7 +45,7 @@ export default async function StatsPage({ searchParams }) {
 
       {r.n > 1 && (
         <Card title="Выручка по дням">
-          <Columns every={r.n > 30 ? 14 : r.n > 7 ? 5 : 1} data={r.days.map(d => ({ label: ddmm(d.key), value: d.revenue, tip: `${ddmm(d.key)}: ${fmtPrice(d.revenue)} · заказов ${d.orders}` }))} />
+          <Columns every={r.n > 120 ? 30 : r.n > 30 ? 14 : r.n > 7 ? 5 : 1} data={r.days.map(d => ({ label: ddmm(d.key), value: d.revenue, tip: `${ddmm(d.key)}: ${fmtPrice(d.revenue)} · заказов ${d.orders}` }))} />
         </Card>
       )}
 

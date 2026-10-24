@@ -25,6 +25,13 @@ function shiftStart(t) {
   return startLocal - offset(startLocal);
 }
 const shiftKey = t => new Date(shiftStart(t) + offset(shiftStart(t))).toISOString().slice(0, 10);
+// 'YYYY-MM-DD' → when that day's shift starts (06:00 venue time)
+function shiftOf(day) {
+  const [y, m, d] = day.split('-').map(Number), local = Date.UTC(y, m - 1, d, SHIFT_START);
+  return local - offset(local);
+}
+export const isDay = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+export const MAX_DAYS = 366;
 
 // MARK: - Helpers
 const ms = d => (d == null ? null : +new Date(d));
@@ -39,12 +46,20 @@ function kpis(list) {
 }
 
 // MARK: - Report
+// period: one of PERIODS, or { from, to } — days 'YYYY-MM-DD' picked by hand (both included)
 export async function report(period = '7d') {
-  const n = PERIODS[period] || 7, now = Date.now();
-  const start = shiftStart(now) - (n - 1) * DAY, prevStart = start - n * DAY;
+  const now = Date.now(), custom = typeof period === 'object';
+  let start, end;
+  if (custom) {
+    const [a, b] = [period.from, period.to].sort();
+    start = shiftOf(a); end = Math.min(shiftOf(b) + DAY, start + MAX_DAYS * DAY);
+  } else {
+    end = shiftStart(now) + DAY; start = end - (PERIODS[period] || 7) * DAY;
+  }
+  const n = Math.max(1, Math.round((end - start) / DAY)), prevStart = start - n * DAY, upTo = Math.min(end, now);
   const [rows, menu, shifts, nowOn] = await Promise.all([S.ordersSince(new Date(prevStart)), getMenuItems({ includeHidden: true }), shiftsSince(new Date(start)), onShift()]);
   const valid = rows.filter(o => o.status !== 'failed');
-  const cur = valid.filter(o => ms(o.created_at) >= start), prev = valid.filter(o => ms(o.created_at) < start);
+  const cur = valid.filter(o => ms(o.created_at) >= start && ms(o.created_at) < end), prev = valid.filter(o => ms(o.created_at) < start);
   const catOf = Object.fromEntries(menu.map(i => [i.id, i.cat]));
   const catName = id => (D.CATS.find(c => c.id === id)?.n.ru) || id;
 
@@ -79,7 +94,7 @@ export async function report(period = '7d') {
   const k = kpis(cur), catTotal = sum([...cats.values()], c => c.revenue) || 1;
   const open = await S.listOrders();
   return {
-    period, n, from: start, now: k, prev: kpis(prev),
+    period: custom ? 'custom' : period, n, from: shiftKey(start + 12 * 3600e3), to: shiftKey(end - 12 * 3600e3), now: k, prev: kpis(prev),
     days, hours, weekdays,
     items: top(items, 10, 'qty'),
     cats: top(cats, 20, 'revenue').map(c => ({ ...c, share: c.revenue / catTotal })),
@@ -87,7 +102,7 @@ export async function report(period = '7d') {
     speed: { accept: median(toAccept), serve: median(toServe), total: median(total), late: toAccept.length ? toAccept.filter(m => m > 5).length / toAccept.length : null },
     waiters: top(waiters, 20, 'orders').map(({ waits, ...w }) => {
       // hours on shift inside the period
-      const h = w.id ? sum(shifts.filter(x => x.staff_id === w.id), x => (Math.min(now, ms(x.ended_at) ?? now) - Math.max(start, ms(x.started_at))) / 3600e3) : null;
+      const h = w.id ? sum(shifts.filter(x => x.staff_id === w.id), x => Math.max(0, Math.min(upTo, ms(x.ended_at) ?? now) - Math.max(start, ms(x.started_at))) / 3600e3) : null;
       return { ...w, accept: median(waits), hours: h, perHour: h ? w.orders / h : null };
     }),
     onShift: nowOn.map(x => ({ name: x.name, since: x.started_at })),
