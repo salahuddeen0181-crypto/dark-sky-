@@ -209,7 +209,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
     ptr.s *= decay; ptr.vx *= Math.exp(-dt * 5); ptr.vy *= Math.exp(-dt * 5);
     dim += (dimT - dim) * Math.min(1, dt * 2);
     // surge: rises fast, then thins out over SURGE seconds
-    const age = t - surgeT, surge = age < 0 || age > SURGE ? 0 : Math.min(1, age / .18) * Math.pow(1 - age / SURGE, 1.6), d = dim + surge * .75;
+    const age = t - surgeT, surge = age < 0 || age > SURGE ? 0 : Math.min(1, age / .18) * Math.pow(1 - age / SURGE, 1.6), d = dim + surge * .56;
     bgU.uTime.value = t; bgU.uPtrS.value = ptr.s; bgU.uDim.value = d;
     S.mat.uniforms.uOpacity.value = .15 + .6 * Math.min(1.15, d); bgU.uGlow.value = d; bgU.uEdge.value += ((entered ? 1 : 0) - bgU.uEdge.value) * Math.min(1, dt * 1.5);
 
@@ -346,13 +346,16 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
       ptr.s = 1;
     },
     setDim(v) { dimT = v; },
-    // Moving between menu sections: a cloud bursts from where the guest tapped and the smoke behind the page thickens
-    burst(cx, cy) {
-      const w = window.innerWidth, h = window.innerHeight;
+    // Moving between menu sections: the chosen card breaks up into smoke (puffs spread over its area, CSS px)
+    // and the smoke behind the page thickens for a moment
+    burst(cx, cy, rw = 0, rh = 0) {
+      const w = window.innerWidth, h = window.innerHeight, sx = VW / w, sy = VH / h;
       const x = (cx / w * 2 - 1) * VW / 2, y = -(cy / h * 2 - 1) * VH / 2;
-      puff(x, y, 120, 1.7);
-      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; puff(x + Math.cos(a) * .7, y + Math.sin(a) * .5, 18, 1.1); }
-      surgeT = t; ptr.s = 1;
+      puff(x, y, 60, 1.2);
+      // single wisps scattered over the whole card, so it reads as one cloud rather than separate blobs
+      const ex = Math.max(.5, rw * sx / 2), ey = Math.max(.35, rh * sy / 2);
+      for (let k = 0; k < 40; k++) puff(x + (Math.random() * 2 - 1) * ex, y + (Math.random() * 2 - 1) * ey, 1, .55);
+      surgeT = t; ptr.s = .75;
     },
     setTopFree(px) { topFree = px; return layoutLogo(); },
     // where the logo picture sits on screen (CSS px), matching the particle lettering

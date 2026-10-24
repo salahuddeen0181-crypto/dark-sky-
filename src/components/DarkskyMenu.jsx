@@ -231,17 +231,29 @@ export default class DarkskyMenu extends React.Component {
   // Section change: a cloud of smoke bursts from the tap, the page dissolves into it and the next one condenses out
   nav(view, sec, e) {
     const go = () => {
+      document.querySelector('.ds-page.ds-picking')?.classList.remove('ds-picking'); // the page element stays, the cards don't
       const S = sec && this.C.SECTIONS.find(x => x.id === sec);
       this.setState({ view, sec: sec || null, cat: (S && S.cats[0]) || 'hookah', q: '', searchOpen: false, contentOn: false, leaving: false });
       window.scrollTo(0, 0);
       clearTimeout(this._nt); this._nt = setTimeout(() => this.setState({ contentOn: true }), 60);
     };
     const calm = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!this.scene || this.state.phase !== 'menu' || calm) return go();
-    const p = e && 'clientX' in e && e.clientX ? e : { clientX: innerWidth / 2, clientY: innerHeight / 2 };
-    this.scene.burst(p.clientX, p.clientY);
-    this.setState({ leaving: true });
-    clearTimeout(this._lt); this._lt = setTimeout(go, 340);
+    if (!this.scene || this.state.phase !== 'menu' || calm || this.state.leaving || this._picking) return go();
+    // a section card first lifts and lights up while the rest of the page steps back, then breaks up into smoke
+    const card = e && e.currentTarget && e.currentTarget.closest && e.currentTarget.closest('[data-tile]');
+    const smoke = () => {
+      const r = card ? card.getBoundingClientRect() : null;
+      if (r) this.scene.burst(r.left + r.width / 2, r.top + r.height / 2, r.width, r.height);
+      else { const p = e && e.clientX ? e : { clientX: innerWidth / 2, clientY: innerHeight / 2 }; this.scene.burst(p.clientX, p.clientY); }
+      this._picking = false;
+      this.setState({ leaving: true });
+      clearTimeout(this._lt); this._lt = setTimeout(go, 340);
+    };
+    if (!card) return smoke();
+    this._picking = true;
+    card.classList.add('ds-picked');
+    card.closest('.ds-page')?.classList.add('ds-picking');
+    clearTimeout(this._lt); this._lt = setTimeout(smoke, 260);
   }
   layoutIntro() {
     const el = this.introRef.current, h = window.innerHeight;
@@ -427,7 +439,7 @@ export default class DarkskyMenu extends React.Component {
     const { t, hero } = v;
     return (
       <div style={css('display:flex;flex-direction:column;gap:10px')}>
-        <div className="ds-press-hero" onClick={hero.onOpen} style={css('position:relative;overflow:hidden;height:300px;border-radius:26px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 120% at 78% 40%, rgba(232,121,60,.16), rgba(10,10,14,0) 62%), ' + GLASS_TINT + ';cursor:pointer;transition:transform .2s' + GLASS)}>
+        <div className="ds-press-hero" data-tile onClick={hero.onOpen} style={css('position:relative;overflow:hidden;height:300px;border-radius:26px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 120% at 78% 40%, rgba(232,121,60,.16), rgba(10,10,14,0) 62%), ' + GLASS_TINT + ';cursor:pointer;transition:transform .2s' + GLASS)}>
           {hero.clip
             ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={hero.clip} v="full" fit={HERO_FIT} /></div>
             : <canvas ref={hero.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
@@ -449,7 +461,7 @@ export default class DarkskyMenu extends React.Component {
 
         <div style={css('display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:176px;gap:10px')}>
           {v.tiles.map(tl => (
-            <div key={tl.id} className="ds-press-tile" onClick={tl.onOpen} style={css(`position:relative;overflow:hidden;border-radius:22px;border:1px solid ${tl.border};background:radial-gradient(110% 80% at 60% 30%, rgba(232,121,60,.11), rgba(10,10,14,0) 65%), ${GLASS_TINT};grid-row:${tl.row};grid-column:${tl.col};cursor:pointer;transition:transform .2s${GLASS}`)}>
+            <div key={tl.id} className="ds-press-tile" data-tile onClick={tl.onOpen} style={css(`position:relative;overflow:hidden;border-radius:22px;border:1px solid ${tl.border};background:radial-gradient(110% 80% at 60% 30%, rgba(232,121,60,.11), rgba(10,10,14,0) 65%), ${GLASS_TINT};grid-row:${tl.row};grid-column:${tl.col};cursor:pointer;transition:transform .2s${GLASS}`)}>
               {tl.clip
                 ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={tl.clip} v={tl.row === 'auto' ? 'sm' : 'full'} fit={tl.col === 'auto' ? TILE_FIT : WIDE_FIT} /></div>
                 : <canvas ref={tl.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
@@ -472,7 +484,7 @@ export default class DarkskyMenu extends React.Component {
           </div>
         </div>
 
-        <button onClick={e => this.nav('section', 'rules', e)} style={css('margin-top:10px;min-height:56px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;align-items:center;justify-content:space-between;gap:12px' + GLASS)}>
+        <button data-tile onClick={e => this.nav('section', 'rules', e)} style={css('margin-top:10px;min-height:56px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;align-items:center;justify-content:space-between;gap:12px' + GLASS)}>
           <span style={css('display:flex;flex-direction:column;gap:5px')}>
             <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.rulesName}</span>
             <span style={css('font:400 12.5px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.6)')}>{t('lasts')} · 18+</span>
@@ -487,7 +499,7 @@ export default class DarkskyMenu extends React.Component {
     const { t } = v;
     return (
       <div style={css('display:flex;flex-direction:column;gap:12px')}>
-        <button onClick={e => this.nav('section', 'promos', e)} style={css('position:relative;overflow:hidden;border-radius:18px;padding:16px 18px;border:1px solid rgba(232,121,60,.4);background:linear-gradient(120deg, rgba(232,121,60,.2), rgba(232,121,60,.04) 60%);display:flex;align-items:center;justify-content:space-between;gap:12px')}>
+        <button data-tile onClick={e => this.nav('section', 'promos', e)} style={css('position:relative;overflow:hidden;border-radius:18px;padding:16px 18px;border:1px solid rgba(232,121,60,.4);background:linear-gradient(120deg, rgba(232,121,60,.2), rgba(232,121,60,.04) 60%);display:flex;align-items:center;justify-content:space-between;gap:12px')}>
           <div style={css('display:flex;flex-direction:column;gap:7px')}>
             <div style={css('display:flex;align-items:center;gap:8px')}>
               <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>Business Hookah</span>
@@ -655,7 +667,7 @@ export default class DarkskyMenu extends React.Component {
           )}
         </div>
 
-        <div style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;${s.leaving
+        <div className="ds-page" style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;${s.leaving
           ? 'opacity:0;transform:scale(1.035);filter:blur(7px);transition:opacity .34s ease-in, transform .34s ease-in, filter .34s ease-in'
           : `opacity:${s.contentOn ? 1 : 0};transform:${s.contentOn ? 'none' : 'translateY(10px) scale(.985)'};filter:${s.contentOn ? 'none' : 'blur(8px)'};transition:opacity .6s ease, transform .7s cubic-bezier(.2,.8,.2,1), filter .6s ease`}`)}>
           {v.kind === 'home' && this.renderHome(v)}
