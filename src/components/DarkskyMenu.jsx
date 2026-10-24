@@ -9,6 +9,7 @@ import { css, Arrow, Close, CLOSE_BTN, GLASS } from './menu-ui';
 // In the first bundle, not a lazy chunk: on a far server every extra round trip delays the intro by ~0.3–1 s
 import { createSmoke } from '@/lib/smoke-scene';
 import OrderReview from './OrderReview';
+import CatStrip from './CatStrip';
 
 const GREET = ['Hola', 'Hello', 'Привет', '你好', 'नमस्ते', 'مرحبا', 'Bonjour', 'Olá', 'Hallo', 'こんにちは'];
 const EN = { en: 'English', es: 'Spanish', ru: 'Russian', zh: 'Chinese', hi: 'Hindi', ar: 'Arabic', fr: 'French', pt: 'Portuguese', de: 'German', ja: 'Japanese' };
@@ -197,6 +198,24 @@ export default class DarkskyMenu extends React.Component {
   state = { gi: 0, gOn: true, ready: false, phase: 'intro', view: 'home', sec: null, contentOn: true, lang: 'es', cat: 'hookah', q: '', searchOpen: false, sheetId: null, vi: 0, qty: 1, cartOpen: false, langOpen: false, cart: [], cash: false, sent: false, sending: false, sendErr: '', orderId: null, orderStatus: null, toast: '', toastOn: false };
   canvasRef = React.createRef();
   introRef = React.createRef();
+  listRef = React.createRef();
+  // the categories in the section card: while they are on screen the header strip stays hidden
+  catGridRef = el => {
+    this._catIo?.disconnect();
+    if (!el) { if (this.state.catsPinned) this.setState({ catsPinned: false }); return; }
+    this._catIo = new IntersectionObserver(([e]) => {
+      const pinned = e.intersectionRatio < 0.5 && e.boundingClientRect.top < 70;
+      if (pinned !== this.state.catsPinned) this.setState({ catsPinned: pinned });
+    }, { rootMargin: '-70px 0px 0px 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
+    this._catIo.observe(el);
+  };
+  // a category picked in the card or the header strip: its list starts right under the header
+  pickCat(id) {
+    this.setState({ cat: id }, () => {
+      const el = this.listRef.current, gap = this.state.catsPinned ? 140 : 80;
+      if (el && el.getBoundingClientRect().top < gap) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - gap, behavior: 'smooth' });
+    });
+  }
   _els = {}; _kinds = {}; _refs = {}; _drag = {}; _dragOff = {};
   dragRef(key) {
     return (this._drag[key] ||= el => {
@@ -423,7 +442,7 @@ export default class DarkskyMenu extends React.Component {
     return {
       rtl, flip: rtl ? 'scaleX(-1)' : 'none', langCode: s.lang, t, searching, sec, cat, kind, bizLive, live,
       langs: D.LANGS.map((l, i) => { const on = l.code === s.lang; return { code: l.code, name: l.name, sub: EN[l.code], on, last: i === D.LANGS.length - 1, onPick: () => this.setLang(l.code) }; }),
-      cats: (sec ? sec.cats : []).map(id => this.C.CATS.find(c => c.id === id)).map(c => ({ id: c.id, name: this.tx(c.n), on: c.id === s.cat, onPick: () => this.setState({ cat: c.id }) })),
+      cats: (sec ? sec.cats : []).map(id => this.C.CATS.find(c => c.id === id)).map(c => ({ id: c.id, name: this.tx(c.n), count: this.props.items.filter(i => i.cat === c.id).length, on: c.id === s.cat, onPick: () => this.pickCat(c.id) })),
       hero: secVm(SEC('hookah')),
       tiles: [
         secVm(SEC('kitchen'), { row: 'span 2' }), secVm(SEC('cocktails')), secVm(SEC('tea')),
@@ -702,13 +721,7 @@ export default class DarkskyMenu extends React.Component {
               <input value={s.q} onChange={e => this.setState({ q: e.target.value })} placeholder={t('searchPh')} autoFocus style={css('width:100%;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);padding:0 16px;font-size:15px;outline:none')} />
             </div>
           )}
-          {!v.searching && sec && sec.cats.length > 1 && (
-            <div style={css('display:flex;gap:8px;overflow-x:auto;padding:2px 16px 12px;scrollbar-width:none')}>
-              {v.cats.map(c => (
-                <button key={c.id} onClick={c.onPick} style={css(`flex:none;height:38px;padding:0 15px;border-radius:19px;border:1px solid ${c.on ? '#f2f2f4' : 'rgba(255,255,255,.12)'};background:${c.on ? '#f2f2f4' : 'rgba(255,255,255,.08)'};color:${c.on ? '#050507' : '#f2f2f4'};font:500 13px/1 Manrope,sans-serif;white-space:nowrap;transition:background .2s,color .2s`)}>{c.name}</button>
-              ))}
-            </div>
-          )}
+          {!v.searching && sec && sec.cats.length > 1 && <CatStrip cats={v.cats} shown={s.catsPinned} flip={v.flip} />}
         </div>
 
         <div className="ds-page" style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;${s.leaving
@@ -716,19 +729,32 @@ export default class DarkskyMenu extends React.Component {
           : `opacity:${s.contentOn ? 1 : 0};transform:${s.contentOn ? 'none' : 'translateY(10px) scale(.985)'};filter:${s.contentOn ? 'none' : 'blur(8px)'};transition:opacity .45s ease, transform .5s cubic-bezier(.2,.8,.2,1), filter .45s ease`}`)}>
           {v.kind === 'home' && this.renderHome(v)}
           {!v.searching && sec && sec.id !== 'rules' && (
-            <div style={css('position:relative;overflow:hidden;height:168px;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), ' + GLASS_TINT + GLASS)}>
-              {sec.clip
-                ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={sec.clip} v="full" fit={HERO_FIT} /></div>
-                : <canvas ref={this.tileRef('banner-' + sec.id, sec.id)} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
-              <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.5) 0%, rgba(5,5,8,.2) 50%, rgba(5,5,8,0) 72%)')} />
-              <div style={css('position:absolute;left:18px;bottom:18px;max-width:62%;display:flex;flex-direction:column;gap:8px;pointer-events:none')}>
-                <span style={css('font:400 22px/1.1 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{this.tx(sec.n)}</span>
-                <span style={css('font:400 13px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.75)')}>{this.tx(sec.tag)}</span>
+            <div style={css('position:relative;overflow:hidden;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), ' + GLASS_TINT + GLASS)}>
+              <div style={css('position:relative;height:168px')}>
+                {sec.clip
+                  ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={sec.clip} v="full" fit={HERO_FIT} /></div>
+                  : <canvas ref={this.tileRef('banner-' + sec.id, sec.id)} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
+                <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.5) 0%, rgba(5,5,8,.2) 50%, rgba(5,5,8,0) 72%)')} />
+                <div style={css('position:absolute;left:18px;bottom:18px;max-width:62%;display:flex;flex-direction:column;gap:8px;pointer-events:none')}>
+                  <span style={css('font:400 22px/1.1 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{this.tx(sec.n)}</span>
+                  <span style={css('font:400 13px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.75)')}>{this.tx(sec.tag)}</span>
+                </div>
               </div>
+              {/* the section's categories, all in sight; once scrolled away the strip in the header takes over */}
+              {sec.cats.length > 1 && (
+                <div ref={this.catGridRef} style={css('position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:2px 12px 12px')}>
+                  {v.cats.map(c => (
+                    <button key={c.id} onClick={c.onPick} className="ds-press" style={css(`height:54px;padding:0 14px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:start;border:1px solid ${c.on ? '#f2f2f4' : 'rgba(255,255,255,.14)'};background:${c.on ? '#f2f2f4' : 'rgba(255,255,255,.07)'};color:${c.on ? '#050507' : '#f2f2f4'};transition:background .2s,color .2s`)}>
+                      <span style={css('font:600 15px/1.15 Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis')}>{c.name}</span>
+                      <span style={css(`flex:none;min-width:24px;height:24px;padding:0 7px;border-radius:12px;display:flex;align-items:center;justify-content:center;font:600 12px/1 Manrope,sans-serif;background:${c.on ? 'rgba(5,5,7,.1)' : 'rgba(255,255,255,.1)'}`)}>{c.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {v.kind === 'hookah' && this.renderHookahs(v)}
-          {v.kind === 'list' && this.renderList(v)}
+          {v.kind === 'list' && <div ref={this.listRef}>{this.renderList(v)}</div>}
           {v.kind === 'promos' && this.renderPromos(v)}
           {v.kind === 'rules' && this.renderRules(v)}
         </div>
@@ -978,7 +1004,7 @@ export default class DarkskyMenu extends React.Component {
     const v = s.ready ? this.vm() : null;
     const sheetWrap = y => css(`position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:center;pointer-events:none;transform:translateY(${y});transition:transform .45s cubic-bezier(.2,.8,.2,1)`);
     return (
-      <div dir={v && v.rtl ? 'rtl' : 'ltr'} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:hidden')}>
+      <div dir={v && v.rtl ? 'rtl' : 'ltr'} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:clip')}>
         <canvas ref={this.canvasRef} style={css('position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;background:radial-gradient(80% 50% at 50% 100%, rgba(232,121,60,.18), rgba(3,3,5,0) 70%), #030305')} />
 
         {/* Crisp logo at native resolution: fades in over the particle lettering once the smoke has condensed into it */}
