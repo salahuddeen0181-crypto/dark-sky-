@@ -82,6 +82,30 @@ const Smoke = ({ still }) => <div className={still ? 'ds-smoke still' : 'ds-smok
 // Keyed product clip from scripts/key-videos.mjs: the still first, the video only while it is on screen.
 // Safari and iOS get HEVC with alpha (.mov), everyone else VP9 with alpha (.webm); '#t=' starts it on the still's frame.
 const CLIP = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;transform:scale(1.2)');
+const isHevc = () => { const ua = navigator.userAgent; return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android|Firefox/.test(ua); };
+const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isHevc() ? '.mov' : '.webm');
+// Home tiles shown large play the full clip, the rest the small one (matches tiles in vm())
+const FULL_TILES = new Set(['hookah', 'kitchen']);
+
+// While the guest is still on the intro, quietly fill the browser cache: the home tiles' stills and clips first
+// (seen right after entering), then every dish's small picture, so sections open with pictures already there.
+// Four at a time, only when the browser is idle; nothing on Save-Data, no clips on 2G/3G.
+function warmMedia(clips, images) {
+  const c = navigator.connection || {};
+  if (c.saveData) return;
+  const queue = [...(/2g|3g/.test(c.effectiveType || '') ? [] : clips.map(u => ['clip', u])), ...images.map(u => ['img', u])];
+  let active = 0;
+  const next = () => {
+    while (active < 4 && queue.length) {
+      const [kind, url] = queue.shift(), done = () => { active--; next(); };
+      active++;
+      if (kind === 'img') { const i = new Image(); i.decoding = 'async'; i.onload = i.onerror = done; i.src = url; }
+      else fetch(url, { priority: 'low' }).then(r => r.blob()).catch(() => {}).finally(done);
+    }
+  };
+  (window.requestIdleCallback || (f => setTimeout(f, 800)))(next, { timeout: 2500 });
+}
+
 function ProductClip({ src, v, fit }) {
   const ref = React.useRef(null);
   // small places (rows, mini cards, small tiles) get the 320 px still from scripts/make-thumbs.mjs
@@ -89,8 +113,7 @@ function ProductClip({ src, v, fit }) {
   React.useEffect(() => {
     const el = ref.current;
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const ua = navigator.userAgent, hevc = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android|Firefox/.test(ua);
-    const url = stem + (v === 'sm' ? '-sm' : '') + (hevc ? '.mov' : '.webm') + (t ? '#t=' + t : '');
+    const url = clipFile(stem, v) + (t ? '#t=' + t : '');
     const io = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) return el.pause();
       if (!el.getAttribute('src')) el.src = url;
@@ -190,6 +213,7 @@ export default class DarkskyMenu extends React.Component {
     const skip = !!this.props.skipIntro;
     this.setState({ ready: true, lang, phase: skip ? 'menu' : 'intro' });
     alphaLogo(this.props.logoUrl).then(logoAlpha => this.setState({ logoAlpha })).catch(() => {});
+    this.warm();
     if (skip) setTimeout(() => this.loadTiles(), 300);
     requestAnimationFrame(() => this.layoutIntro());
     this._gt = setInterval(() => { if (this.state.phase !== 'intro') return; this.setState({ gOn: false }); setTimeout(() => this.setState(st => ({ gi: st.gi + 1, gOn: true })), 450); }, 2400);
@@ -210,6 +234,25 @@ export default class DarkskyMenu extends React.Component {
     if (document.documentElement.style.overflow !== lock) document.documentElement.style.overflow = document.body.style.overflow = lock;
   }
   componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); }
+
+  // What warmMedia() fetches in the background: tile clips with their stills, then every dish's small picture
+  warm() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const stem = src => src.split('#')[0].replace(/\.webm$/i, ''), clips = [], images = [];
+    for (const S of this.C.SECTIONS) {
+      if (!S.clip) continue;
+      const v = FULL_TILES.has(S.id) ? 'full' : 'sm';
+      images.push(stem(S.clip) + (v === 'sm' ? '-th' : '') + '.webp');
+      clips.push(clipFile(stem(S.clip), v));
+    }
+    for (const it of this.props.items) {
+      const src = it.media || (it.img ? '/api/img/' + it.img : '');
+      if (/^\/media\/.+\.webm(#|$)/.test(src)) images.push(stem(src) + '-th.webp');
+      else if (src.startsWith('/media/cut/')) images.push(src.replace(/\.webp$/, '-th.webp'));
+      else if (src && !/\.(mp4|webm|mov|glb|gltf)$/i.test(src)) images.push(src);
+    }
+    warmMedia([...new Set(clips)], [...new Set(images)]);
+  }
 
   loadTiles() {
     // three.js is only needed for sections without a clip; skip it while no 3D canvas is on the page
