@@ -30,6 +30,7 @@ services:
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
       SITE_HOST: ${SITE_HOST:?set SITE_HOST in deploy/.env}
+      SITE_OLD: ${SITE_OLD:?set SITE_OLD in deploy/.env (previous address, redirected)}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
