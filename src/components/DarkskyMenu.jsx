@@ -87,6 +87,7 @@ const isHevc = () => { const ua = navigator.userAgent; return /AppleWebKit/.test
 const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isHevc() ? '.mov' : '.webm');
 // Home tiles shown large play the full clip, the rest the small one (matches tiles in vm())
 const FULL_TILES = new Set(['hookah', 'kitchen']);
+const ORDER_KEEP_H = 4; // a saved cart / order untouched for longer than this is a past visit
 
 // While the guest is still on the intro, quietly fill the browser cache: the home tiles' stills and clips first
 // (seen right after entering), then every dish's small picture, so sections open with pictures already there.
@@ -229,8 +230,10 @@ export default class DarkskyMenu extends React.Component {
     this.D = D;
     let lang = null; try { lang = localStorage.getItem('darksky.lang'); } catch (e) {}
     if (!lang) { const n = (navigator.language || 'es').slice(0, 2); lang = D.LANGS.some(l => l.code === n) ? n : 'es'; }
-    const skip = !!this.props.skipIntro;
-    this.setState({ ready: true, lang, phase: skip ? 'menu' : 'intro' });
+    const saved = this.loadOrder();
+    // a reload mid-order goes straight back to the menu, the cart and the order's status
+    const skip = !!this.props.skipIntro || !!saved;
+    this.setState({ ready: true, lang, phase: skip ? 'menu' : 'intro', ...saved }, () => saved && saved.orderId && this.pollOrder(saved.orderId));
     alphaLogo(this.props.logoUrl).then(logoAlpha => this.setState({ logoAlpha })).catch(() => {});
     this.warm();
     if (skip) setTimeout(() => this.loadTiles(), 300);
@@ -246,7 +249,9 @@ export default class DarkskyMenu extends React.Component {
       window.addEventListener('resize', this._onResize);
     } catch (e) { console.error('smoke scene', e); }
   }
-  componentDidUpdate(pp) {
+  componentDidUpdate(pp, ps) {
+    const s = this.state;
+    if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent)) this.saveOrder();
     if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal());
     // the page behind an open sheet must not scroll
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen) ? 'hidden' : '';
@@ -966,16 +971,47 @@ export default class DarkskyMenu extends React.Component {
   pollOrder(id) {
     clearInterval(this._poll);
     const started = Date.now();
-    this._poll = setInterval(async () => {
+    const tick = async () => {
       if (this.state.orderId !== id || Date.now() - started > 45 * 60e3) return clearInterval(this._poll);
       try {
         const r = await fetch(`/api/orders/${id}?t=${encodeURIComponent(this.props.table.token)}`, { cache: 'no-store' });
+        // the order is gone (another table's link, the demo store restarted): forget it
+        if (r.status === 404) { clearInterval(this._poll); return this.setState({ sent: false, orderId: null, orderStatus: null, orderView: null }); }
         if (!r.ok) return;
         const o = await r.json();
         this.setState({ orderStatus: o.status, orderView: o });
         if (o.status === 'served') clearInterval(this._poll);
       } catch (e) { /* offline for a moment: try again next tick */ }
-    }, 4000);
+    };
+    this._poll = setInterval(tick, 4000);
+    tick();
+  }
+
+  // MARK: - Survives a reload
+  // The cart and the sent order live in this phone's browser, so an accidental reload or a closed tab loses
+  // nothing. One entry, tied to the table's QR token: it lasts ORDER_KEEP_H hours from the last change, and
+  // scanning another table's QR drops what was kept for the previous one. Nothing is shared by network or IP.
+  orderKey() { return 'darksky.order.' + (this.props.table ? this.props.table.token : '-'); }
+  saveOrder() {
+    const s = this.state;
+    try {
+      if (!s.cart.length && !s.orderId) return localStorage.removeItem(this.orderKey());
+      localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent }));
+    } catch (e) { /* private mode or storage full: works as before, just without the restore */ }
+  }
+  loadOrder() {
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('darksky.order.') && k !== this.orderKey()) localStorage.removeItem(k);
+      }
+      const o = JSON.parse(localStorage.getItem(this.orderKey()) || 'null');
+      if (!o || Date.now() - o.at > ORDER_KEEP_H * 3600e3) { localStorage.removeItem(this.orderKey()); return null; }
+      const cart = (o.cart || []).filter(l => this.item(l.id) && l.qty > 0);
+      const orderId = this.props.table && Number.isInteger(o.orderId) ? o.orderId : null;
+      if (!cart.length && !orderId) return null;
+      return { cart, cash: !!o.cash, note: String(o.note || ''), orderId, sent: !!(orderId && o.sent), orderStatus: orderId ? 'new' : null };
+    } catch (e) { return null; }
   }
   newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '' }); }
 
