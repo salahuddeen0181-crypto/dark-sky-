@@ -27,7 +27,12 @@ const W = 480, H = 854, FPS = 24;
 // feather fades everything out towards the frame edges (share of width / height) so nothing ends on a hard cut,
 // shadow: 'black' keeps only near-black pixels instead of every shaded patch of the screen; lift brightens what is
 // left of the screen colour (the shaded folds of smoke) to at least this grey, so they read as haze, not dirt.
-const OPTS = { hookah: { feather: [.2, .14] }, 'tea-tropic': { feather: [.12, .12], sat: 1.7 }, cash: { feather: [.14, .1] } };
+// feather: fade to transparent near the frame edges (dishes that grow past the frame); shadow > 1 keeps dark, glossy
+// plates that reflect the green screen solid instead of see-through
+const OPTS = {
+  hookah: { feather: [.2, .14] }, 'tea-tropic': { feather: [.12, .12], sat: 1.7 }, cash: { feather: [.14, .1] },
+  udon: { feather: [.2, .12], shadow: 1.25 }, 'wok-rice': { feather: [.2, .12], shadow: 1.25 },
+};
 const CLIPS = {
   'Chicken_teriyaki_sushi_roll': 'roll-horno',
   'Chocolate_brownie': 'brownie',
@@ -95,7 +100,7 @@ function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, shadow = 1
     let k = (1 - smooth(18 * tol, 34 * tol, dh)) * smooth(.22 * st * sk / tol, .5 * st * sk / tol, s); // screen-like → background
     if (smoke) k = Math.max(k, smooth(.45, .65, v) * (1 - smooth(.12, .3, s)));
     // ...but whatever is darker than the screen stays as a soft black shadow instead of a ragged cut-out
-    const sh = shadow === 'black' ? (1 - smooth(.06, .17, v)) * .95 : dark * .8 * shadow;
+    const sh = shadow === 'black' ? (1 - smooth(.06, .17, v)) * .95 : Math.min(.97, dark * .8 * shadow);
     tmp[p] = k * (1 - sh);                                    // transparency
     // despill, only for colours close to the screen hue: pull green down, then neutralise what is left
     // (smoke and glass over the screen would otherwise stay cyan)
