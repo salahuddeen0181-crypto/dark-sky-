@@ -28,7 +28,8 @@ async function tgRefresh(o, site) {
   } catch (e) { console.error('tg edit', e); }
 }
 
-// [{ id, vi, qty }] → priced lines. Prices always come from the menu on the server, never from a phone.
+// [{ id, vi, oi, qty }] → priced lines. Prices always come from the menu on the server, never from a phone.
+// oi: the free option picked (a dessert's topping), null for none; staff read it inside `variant`.
 async function priceLines(lines, { allowHidden = false } = {}) {
   const ids = [...new Set(lines.map(l => String(l.id)))];
   const byId = Object.fromEntries((await S.menuRows(ids)).map(r => [r.id, r]));
@@ -38,8 +39,11 @@ async function priceLines(lines, { allowHidden = false } = {}) {
     if (!(qty >= 1 && qty <= MAX_QTY)) throw new OrderError('bad_lines');
     const it = r.data, vi = Math.floor(Number(l.vi) || 0);
     if (it.v && !(vi >= 0 && vi < it.v.length)) throw new OrderError('bad_lines');
+    const oi = l.oi == null || !it.opt ? null : Math.floor(Number(l.oi));
+    if (oi != null && !(oi >= 0 && oi < it.opt.o.length)) throw new OrderError('bad_lines');
     const price = it.v ? it.v[vi].p : it.p;
-    return { id: r.id, vi: it.v ? vi : null, name: it.name, variant: it.v ? staffName(it.v[vi].n) : '', qty, price: price ?? null, total: price == null ? null : price * qty };
+    const variant = [it.v ? staffName(it.v[vi].n) : '', oi != null ? `${staffName(it.opt.n).toLowerCase()}: ${staffName(it.opt.o[oi])}` : ''].filter(Boolean).join(' · ');
+    return { id: r.id, vi: it.v ? vi : null, oi, name: it.name, variant, qty, price: price ?? null, total: price == null ? null : price * qty };
   });
 }
 
@@ -75,9 +79,10 @@ export async function serveOrder(id, staff, site) {
   return o;
 }
 
-// What changed between two versions of the lines: removed, quantity changed, added (by dish + variant)
+// What changed between two versions of the lines: removed, quantity changed, added (by dish + variant + topping)
+const lineKey = l => `${l.id}:${l.vi ?? ''}:${l.oi ?? ''}`;
 function diffLines(before, after) {
-  const key = l => `${l.id}:${l.vi ?? ''}`, was = new Map(before.map(l => [key(l), l])), now = new Map(after.map(l => [key(l), l]));
+  const key = lineKey, was = new Map(before.map(l => [key(l), l])), now = new Map(after.map(l => [key(l), l]));
   const out = [];
   for (const [k, l] of was) {
     const n = now.get(k);
@@ -111,7 +116,7 @@ export async function editOrder(id, edits = [], add = [], site, editor = null) {
   }
   const lines = cur.lines.map((l, i) => ({ ...l, qty: qty[i], total: l.price == null ? null : l.price * qty[i] }));
   for (const n of add.length ? await priceLines(add, { allowHidden: true }) : []) {
-    const same = lines.find(l => l.id === n.id && (l.vi ?? null) === n.vi);
+    const same = lines.find(l => lineKey(l) === lineKey(n));
     if (same) { same.qty = Math.min(MAX_QTY, same.qty + n.qty); same.total = same.price == null ? null : same.price * same.qty; } else lines.push(n);
   }
   const kept = lines.filter(l => l.qty > 0);
@@ -132,7 +137,7 @@ export async function getOrderForGuest(id, token) {
   if (!o) return null;
   return {
     status: o.status, by: o.accepted_by || null, edited: !!o.edited_at,
-    lines: o.lines.map(l => ({ id: l.id, vi: l.vi ?? null, variant: l.variant, qty: l.qty, total: l.total })),
+    lines: o.lines.map(l => ({ id: l.id, vi: l.vi ?? null, oi: l.oi ?? null, variant: l.variant, qty: l.qty, total: l.total })),
     subtotal: o.subtotal, discount: o.discount, total: o.total, onRequest: o.on_request,
   };
 }

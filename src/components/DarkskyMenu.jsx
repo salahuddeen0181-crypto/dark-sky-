@@ -110,8 +110,9 @@ function warmMedia(clips, images) {
 
 function ProductClip({ src, v, fit }) {
   const ref = React.useRef(null);
-  // small places (rows, mini cards, small tiles) get the 320 px still from scripts/make-thumbs.mjs
-  const [file, t] = src.split('#t='), stem = file.replace(/\.webm$/i, ''), still = stem + (v === 'still' || v === 'sm' ? '-th' : '') + '.webp';
+  // list rows show the cover (the finished dish, scripts/make-covers.mjs); mini cards and small tiles the 320 px
+  // still from scripts/make-thumbs.mjs as their poster
+  const [file, t] = src.split('#t='), stem = file.replace(/\.webm$/i, ''), still = stem + (v === 'still' ? '-cover' : v === 'sm' ? '-th' : '') + '.webp';
   React.useEffect(() => {
     const el = ref.current;
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -125,10 +126,12 @@ function ProductClip({ src, v, fit }) {
     return () => { io.disconnect(); el.pause(); };
   }, [stem, t, v]);
   const style = fit ? { ...CLIP, ...fit } : CLIP;
-  if (v === 'still') return <img src={still} alt="" loading="lazy" style={style} />; // eslint-disable-line @next/next/no-img-element
+  if (v === 'still') return <img src={still} alt="" loading="lazy" style={COVER} />; // eslint-disable-line @next/next/no-img-element
   return <video ref={ref} poster={still} muted loop playsInline preload="none" style={style} />;
 }
 
+// a list-row cover is already trimmed to the dish: fit it whole, a little air around
+const COVER = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;padding:6%;box-sizing:border-box');
 const CUT = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;padding:7% 6%;box-sizing:border-box;filter:drop-shadow(0 10px 16px rgba(0,0,0,.6))');
 
 // Section tiles on the home screen: the dish sits where the 3D scene was (right of the text / above it)
@@ -161,8 +164,9 @@ function Media({ m, label = true, v = 'full' }) {
   );
 }
 
-// Product stage: black with a soft light-grey glow behind the dish (and drifting smoke from <Media>)
-const MEDIA_BG = 'position:relative;overflow:hidden;background:radial-gradient(70% 62% at 50% 45%, rgba(196,199,208,.34), rgba(110,112,120,.12) 48%, rgba(0,0,0,0) 76%), #020203';
+// Product stage: plain black, or (smoke on the cards switched on in the admin) a soft light-grey glow behind the dish
+// and drifting smoke from <Media> — see .ds-nosmoke / --ds-stage in globals.css
+const MEDIA_BG = 'position:relative;overflow:hidden;background:var(--ds-stage)';
 const GLASS_TINT = 'rgba(160,165,180,.13)', GLASS_TINT_TEXT = 'rgba(150,155,170,.17)'; // light veil; a touch denser under running text
 
 function MiniCard({ p, w, mh, bg, btn }) {
@@ -181,6 +185,7 @@ function MiniCard({ p, w, mh, bg, btn }) {
   );
 }
 
+const SHOW_STRENGTH = false; // hookah strength bars hidden for now (str stays in the data and the admin)
 function StrengthBar({ segs, h, gap, r }) {
   return (
     <div style={css(`display:flex;gap:${gap}px`)}>
@@ -196,7 +201,7 @@ function Badge({ children, bg, color, size = 10, pad = '4px 7px', radius = 6 }) 
 export default class DarkskyMenu extends React.Component {
   // items: menu from the database (falls back to the bundled menu); table: { number, token } from the QR link, or null.
   static defaultProps = { smokeIntensity: 0.4, skipIntro: false, items: D.ITEMS, table: null, logoUrl: '/darksky-logo.jpg' };
-  state = { gi: 0, gOn: true, ready: false, phase: 'intro', view: 'home', sec: null, contentOn: true, lang: 'es', cat: 'hookah', q: '', searchOpen: false, sheetId: null, vi: 0, qty: 1, cartOpen: false, langOpen: false, cart: [], cash: false, sent: false, sending: false, sendErr: '', orderId: null, orderStatus: null, toast: '', toastOn: false };
+  state = { gi: 0, gOn: true, ready: false, phase: 'intro', view: 'home', sec: null, contentOn: true, lang: 'es', cat: 'hookah', q: '', searchOpen: false, sheetId: null, vi: 0, oi: null, qty: 1, cartOpen: false, langOpen: false, cart: [], cash: false, sent: false, sending: false, sendErr: '', orderId: null, orderStatus: null, toast: '', toastOn: false };
   canvasRef = React.createRef();
   introRef = React.createRef();
   listRef = React.createRef();
@@ -362,25 +367,28 @@ export default class DarkskyMenu extends React.Component {
     setTimeout(() => { this.setState({ phase: 'menu' }); this.scene && this.scene.setDim(this.dimVal()); setTimeout(() => this.loadTiles(), 120); }, 750);
   }
   showToast(msg) { this.setState({ toast: msg, toastOn: true }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toastOn: false }), 1600); }
-  addToCart(id, vi, qty) {
+  // oi: the free option picked (a dessert's topping) or null; the same dish with another topping is another line
+  addToCart(id, vi, qty, oi = null) {
     this.setState(s => {
-      const cart = s.cart.slice(); const k = cart.findIndex(l => l.id === id && l.vi === vi);
-      if (k >= 0) cart[k] = { ...cart[k], qty: cart[k].qty + qty }; else cart.push({ id, vi, qty });
+      const cart = s.cart.slice(); const k = cart.findIndex(l => l.id === id && l.vi === vi && (l.oi ?? null) === oi);
+      if (k >= 0) cart[k] = { ...cart[k], qty: cart[k].qty + qty }; else cart.push(oi == null ? { id, vi, qty } : { id, vi, oi, qty });
       return { cart, sent: false };
     });
     this.showToast(this.t('added') + ' · ' + this.nm(this.item(id)));
   }
   changeLine(i, d) { this.setState(s => { const cart = s.cart.slice(); const q = cart[i].qty + d; if (q <= 0) cart.splice(i, 1); else cart[i] = { ...cart[i], qty: q }; return { cart }; }); }
-  openItem(id) { this.setState({ sheetId: id, vi: 0, qty: 1, cartOpen: false, langOpen: false, slide: 0 }); }
+  openItem(id) { this.setState({ sheetId: id, vi: 0, oi: null, qty: 1, cartOpen: false, langOpen: false, slide: 0 }); }
   // dishes of the open one's category, in menu order: the sheet steps through them (wrapping round)
   siblings(it) { return this.props.items.filter(i => i.cat === it.cat && !i.hidden); }
   stepItem(dir) {
     const cur = this.state.sheetId && this.item(this.state.sheetId); if (!cur) return;
     const list = this.siblings(cur), i = list.findIndex(x => x.id === cur.id); if (list.length < 2 || i < 0) return;
-    this.setState({ sheetId: list[(i + dir + list.length) % list.length].id, vi: 0, qty: 1, slide: dir });
+    this.setState({ sheetId: list[(i + dir + list.length) % list.length].id, vi: 0, oi: null, qty: 1, slide: dir });
     if (this._sheetEl) this._sheetEl.scrollTop = 0;
   }
-  quickAdd(id, e) { e && e.stopPropagation && e.stopPropagation(); const it = this.item(id); if (it.v) return this.openItem(id); this.addToCart(id, 0, 1); }
+  // "Topping: Dulce de leche" in the guest's language, '' when none was picked
+  optLabel(it, oi) { return it && it.opt && oi != null && it.opt.o[oi] ? `${this.tx(it.opt.n)}: ${this.tx(it.opt.o[oi])}` : ''; }
+  quickAdd(id, e) { e && e.stopPropagation && e.stopPropagation(); const it = this.item(id); if (it.v || it.opt) return this.openItem(id); this.addToCart(id, 0, 1); }
 
   segs(str) {
     return Array.from({ length: 10 }, (_, i) => {
@@ -432,8 +440,10 @@ export default class DarkskyMenu extends React.Component {
     if (it) {
       const pairs = (it.pair || D.PAIR[it.cat] || []).filter(id => id !== it.id).map(id => this.item(id)).filter(Boolean).map(p => this.miniVm(p));
       const variants = (it.v || []).map((v, i) => { const on = i === s.vi; return { name: this.tx(v.n), price: this.fmt(v.p), onPick: () => this.setState({ vi: i }), border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' }; });
+      const pick = on => ({ border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' });
+      const opts = it.opt ? [null, ...it.opt.o.map((_, i) => i)].map(oi => ({ name: this.tx(oi == null ? it.opt.none : it.opt.o[oi]), price: '', onPick: () => this.setState({ oi }), ...pick(oi === s.oi) })) : [];
       const sib = this.siblings(it), at = sib.findIndex(x => x.id === it.id);
-      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: (it.t || []).map(k => this.tx(D.TASTE[k])), strLabel: it.str ? `${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, pairs };
+      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: (it.t || []).map(k => this.tx(D.TASTE[k])), strLabel: it.str ? `${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, optTitle: it.opt ? this.tx(it.opt.n) : '', opts, pairs };
       const p = this.price(it, s.vi);
       addLabel = p == null ? t('add') : `${t('add')} · ${this.fmt(p * s.qty)}`;
     }
@@ -441,7 +451,7 @@ export default class DarkskyMenu extends React.Component {
     let sub = 0, onReq = false, cnt = 0;
     const lines = s.cart.map((l, i) => {
       const ci = this.item(l.id), p = this.price(ci, l.vi); cnt += l.qty; if (p == null) onReq = true; else sub += p * l.qty;
-      return { key: l.id + ':' + l.vi, name: this.nm(ci), variant: ci.v ? this.tx(ci.v[l.vi].n) : '', qty: l.qty, total: this.fmt(p == null ? null : p * l.qty), onInc: () => this.changeLine(i, 1), onDec: () => this.changeLine(i, -1) };
+      return { key: l.id + ':' + l.vi + ':' + (l.oi ?? ''), name: this.nm(ci), variant: [ci.v ? this.tx(ci.v[l.vi].n) : '', this.optLabel(ci, l.oi)].filter(Boolean).join(' · '), qty: l.qty, total: this.fmt(p == null ? null : p * l.qty), onInc: () => this.changeLine(i, 1), onDec: () => this.changeLine(i, -1) };
     });
     const disc = s.cash ? Math.round(sub * 0.15) : 0;
     const inCart = new Set(s.cart.map(l => l.id)), seen = new Set(), suggest = [];
@@ -509,7 +519,7 @@ export default class DarkskyMenu extends React.Component {
   }
 
   renderHome(v) {
-    const { t, hero } = v;
+    const s = this.state, { t, hero } = v;
     return (
       <div style={css('display:flex;flex-direction:column;gap:10px')}>
         <div className="ds-press-hero" data-tile onClick={hero.onOpen} style={css('position:relative;overflow:hidden;height:300px;border-radius:26px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 120% at 78% 40%, rgba(232,121,60,.16), rgba(10,10,14,0) 62%), ' + GLASS_TINT + ';cursor:pointer;transition:transform .2s' + GLASS)}>
@@ -557,13 +567,19 @@ export default class DarkskyMenu extends React.Component {
           </div>
         </div>
 
-        <button data-tile onClick={e => this.nav('section', 'rules', e)} style={css('margin-top:10px;min-height:56px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;align-items:center;justify-content:space-between;gap:12px' + GLASS)}>
-          <span style={css('display:flex;flex-direction:column;gap:5px')}>
-            <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.rulesName}</span>
-            <span style={css('font:400 12.5px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.6)')}>{t('lasts')} · 18+</span>
-          </span>
-          <Arrow size={16} w={1.5} flip={v.flip} />
-        </button>
+        {/* house rules: just the title; a tap unfolds them in place (as on darkskyhookah.com) */}
+        <div style={css('margin-top:10px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + GLASS)}>
+          <button onClick={() => this.setState(st => ({ rulesOpen: !st.rulesOpen }))} aria-expanded={!!s.rulesOpen} style={css('width:100%;min-height:60px;padding:0 18px;display:flex;align-items:center;gap:14px;text-align:start')}>
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ flex: 'none' }}><circle cx="11" cy="11" r="9.25" stroke="#e8793c" strokeWidth="1.5" /><path d="M11 10v5.5M11 6.6v.1" stroke="#e8793c" strokeWidth="1.8" strokeLinecap="round" /></svg>
+            <span style={css('flex:1;font:400 12px/1.2 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.rulesName}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flex: 'none', transform: s.rulesOpen ? 'rotate(180deg)' : 'none', transition: 'transform .25s' }}><path d="M3.5 6l4.5 4.5L12.5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <div style={css(`display:grid;grid-template-rows:${s.rulesOpen ? '1fr' : '0fr'};transition:grid-template-rows .3s ease`)}>
+            <div style={css('overflow:hidden;min-height:0')}>
+              <div style={css('padding:4px 16px 18px;border-top:1px solid rgba(255,255,255,.06)')}><div style={css('padding-top:14px')}>{this.renderRules(v)}</div></div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -592,7 +608,7 @@ export default class DarkskyMenu extends React.Component {
               </div>
               <span style={css('font:400 13.5px/1.45 Manrope,sans-serif;color:rgba(242,242,244,.68);text-wrap:pretty')}>{h.desc}</span>
             </div>
-            {h.segs && (
+            {SHOW_STRENGTH && h.segs && (
               <div style={css('display:flex;flex-direction:column;gap:8px')}>
                 <div style={css('display:flex;justify-content:space-between;font:500 11px/1 Manrope,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(242,242,244,.6)')}><span>{t('strength')}</span><span>{h.strLabel}</span></div>
                 <StrengthBar segs={h.segs} h={5} gap={4} r={3} />
@@ -704,9 +720,8 @@ export default class DarkskyMenu extends React.Component {
         <div style={css('position:sticky;top:0;z-index:4;background:rgba(34,35,42,.5);border-bottom:1px solid rgba(255,255,255,.06);padding-top:env(safe-area-inset-top)' + GLASS)}>
           <div style={css('display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 18px')}>
             {!sec ? (
-              <button onClick={e => this.nav('home', null, e)} style={css('display:flex;flex-direction:column;gap:3px;align-items:flex-start')}>
-                <span style={css('font:400 17px/1 Michroma,sans-serif;letter-spacing:.14em')}>DARKSKY</span>
-                <span style={css('font:300 10px/1 Manrope,sans-serif;letter-spacing:.2em;color:rgba(242,242,244,.62);text-transform:uppercase;padding-inline-start:2px')}>Hookah Lounge</span>
+              <button onClick={e => this.nav('home', null, e)} aria-label="DARKSKY Hookah Lounge" style={css('display:flex;align-items:center;height:44px')}>
+                <img src={s.logoAlpha || this.props.logoUrl} alt="DARKSKY Hookah Lounge" style={css('height:46px;width:auto;display:block')} /> {/* eslint-disable-line @next/next/no-img-element */}
               </button>
             ) : (
               <button onClick={e => this.nav('home', null, e)} style={css('height:44px;display:flex;align-items:center;gap:10px;padding-inline-end:10px')}>
@@ -805,7 +820,7 @@ export default class DarkskyMenu extends React.Component {
         </div>
         {sh.desc && <p style={css('margin:0;font:400 15px/1.6 Manrope,sans-serif;color:rgba(242,242,244,.78);text-wrap:pretty')}>{sh.desc}</p>}
 
-        {sh.segs && (
+        {SHOW_STRENGTH && sh.segs && (
           <div style={css('display:flex;flex-direction:column;gap:10px')}>
             <div style={css('display:flex;justify-content:space-between;font:400 10px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.6)')}><span>{t('strength')}</span><span>{sh.strLabel}</span></div>
             <StrengthBar segs={sh.segs} h={8} gap={5} r={4} />
@@ -838,6 +853,20 @@ export default class DarkskyMenu extends React.Component {
           </div>
         )}
 
+        {sh.opts.length > 0 && (
+          <div style={css('display:flex;flex-direction:column;gap:10px')}>
+            <span style={css('font:400 10px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.6)')}>{sh.optTitle}</span>
+            <div style={css('display:flex;flex-direction:column;gap:6px')}>
+              {sh.opts.map((vr, i) => (
+                <button key={i} onClick={vr.onPick} style={css(`min-height:50px;padding:0 16px;border-radius:14px;border:1px solid ${vr.border};background:${vr.bg};display:flex;align-items:center;gap:12px;transition:background .2s,border-color .2s`)}>
+                  <span style={css(`width:18px;height:18px;border-radius:50%;border:1.5px solid ${vr.ring};display:flex;align-items:center;justify-content:center`)}><span style={css(`width:8px;height:8px;border-radius:50%;background:${vr.dot}`)} /></span>
+                  <span style={css('font:500 14.5px/1.2 Manrope,sans-serif')}>{vr.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {sh.pairs.length > 0 && (
           <div style={css('display:flex;flex-direction:column;gap:10px')}>
             <span style={css('font:400 10px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.6)')}>{t('pairs')}</span>
@@ -853,7 +882,7 @@ export default class DarkskyMenu extends React.Component {
             <span style={css('min-width:22px;text-align:center;font:600 16px/1 Manrope,sans-serif')}>{s.qty}</span>
             <button onClick={() => this.setState(st => ({ qty: Math.min(20, st.qty + 1) }))} aria-label="+" style={css('width:46px;height:58px;display:flex;align-items:center;justify-content:center;font:400 20px/1 Manrope,sans-serif')}>+</button>
           </div>
-          <button className="ds-press" onClick={() => { this.addToCart(sh.id, s.vi, s.qty); this.setState({ sheetId: null }); }} style={css('flex:1;height:58px;border-radius:16px;background:#f2f2f4;color:#050507;font:700 15px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums;text-align:center')}>{v.addLabel}</button>
+          <button className="ds-press" onClick={() => { this.addToCart(sh.id, s.vi, s.qty, s.oi); this.setState({ sheetId: null }); }} style={css('flex:1;height:58px;border-radius:16px;background:#f2f2f4;color:#050507;font:700 15px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums;text-align:center')}>{v.addLabel}</button>
         </div>
       </div>
     );
@@ -959,7 +988,7 @@ export default class DarkskyMenu extends React.Component {
     try {
       const r = await fetch('/api/orders', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, qty: l.qty })), cash: s.cash, lang: s.lang, note: s.note }),
+        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, oi: l.oi ?? null, qty: l.qty })), cash: s.cash, lang: s.lang, note: s.note }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -1032,7 +1061,9 @@ export default class DarkskyMenu extends React.Component {
     const s = this.state, o = s.sent && s.orderView;
     const lines = o ? o.lines.map((l, i) => {
       const ci = this.item(l.id);
-      return { key: i, name: ci ? this.nm(ci) : l.id, variant: ci && ci.v && l.vi != null && ci.v[l.vi] ? this.tx(ci.v[l.vi].n) : l.variant, qty: l.qty, total: this.fmt(l.total) };
+      const own = ci && (!ci.v || (l.vi != null && ci.v[l.vi])); // the guest's language when the dish is still on the menu as ordered
+      const variant = own ? [ci.v ? this.tx(ci.v[l.vi].n) : '', this.optLabel(ci, l.oi)].filter(Boolean).join(' · ') : l.variant;
+      return { key: i, name: ci ? this.nm(ci) : l.id, variant, qty: l.qty, total: this.fmt(l.total) };
     }) : v.lines;
     return {
       open: !!s.reviewOpen && lines.length > 0, t: v.t, tO: k => this.tO(k), flip: v.flip, table: this.props.table ? this.props.table.number : '',
@@ -1052,7 +1083,7 @@ export default class DarkskyMenu extends React.Component {
     const v = s.ready ? this.vm() : null;
     const sheetWrap = y => css(`position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:center;pointer-events:none;transform:translateY(${y});transition:transform .45s cubic-bezier(.2,.8,.2,1)`);
     return (
-      <div dir={v && v.rtl ? 'rtl' : 'ltr'} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:clip')}>
+      <div dir={v && v.rtl ? 'rtl' : 'ltr'} className={this.C.CARD_SMOKE ? undefined : 'ds-nosmoke'} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:clip')}>
         <canvas ref={this.canvasRef} style={css('position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;background:radial-gradient(80% 50% at 50% 100%, rgba(232,121,60,.18), rgba(3,3,5,0) 70%), #030305')} />
 
         {/* Crisp logo at native resolution: fades in over the particle lettering once the smoke has condensed into it */}

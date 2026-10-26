@@ -116,14 +116,14 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
   const L = makePoints(NL, 9), S = makePoints(NS, 2.2), NP = 260, PF = makePoints(NP, 2.2); // PF: puffs under the finger
   const logoGroup = new THREE.Group(); logoGroup.add(L.pts); scene.add(S.pts); scene.add(logoGroup);
   L.pts.renderOrder = 2; S.pts.renderOrder = 1; PF.pts.renderOrder = 3; scene.add(PF.pts);
-  const pv = new Float32Array(NP * 3), plife = new Float32Array(NP); let pnext = 0;
-  // a puff of smoke where the screen is touched (intro only): warm at first, then grey, spreading and fading
-  function puff(x, y, n, power) {
+  const pv = new Float32Array(NP * 3), plife = new Float32Array(NP), pwarm = new Float32Array(NP); let pnext = 0;
+  // a puff of smoke (section change): warm at first if asked, then grey, spreading and fading
+  function puff(x, y, n, power, warm = .55) {
     for (let k = 0; k < n; k++) {
       const i = pnext++ % NP, a = Math.random() * Math.PI * 2, sp = (.35 + Math.random() * 1.2) * power;
       PF.pos[i * 3] = x + gauss() * .06; PF.pos[i * 3 + 1] = y + gauss() * .06; PF.pos[i * 3 + 2] = gauss() * .4;
       pv[i * 3] = Math.cos(a) * sp; pv[i * 3 + 1] = Math.sin(a) * sp * .7 + .3; pv[i * 3 + 2] = 0;
-      plife[i] = 1; PF.size[i] = .3 + Math.random() * .35; PF.heat[i] = .55;
+      plife[i] = 1; PF.size[i] = .3 + Math.random() * .35; PF.heat[i] = pwarm[i] = warm;
     }
   }
 
@@ -191,8 +191,9 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
     ptr.nx = cx / w - .5; ptr.ny = cy / h - .5;
     bgU.uPtr.value.set((cx - w / 2) / h, (h / 2 - cy) / h);
   }
-  const pm = e => { onMove(e.clientX, e.clientY); if (!entered && Math.hypot(ptr.vx, ptr.vy) > 1.2) puff(ptr.x, ptr.y, 3, .5); };
-  const pd = e => { ptr.active = false; onMove(e.clientX, e.clientY); ptr.s = Math.min(1, ptr.s + .35); if (!entered) puff(ptr.x, ptr.y, 60, 1.15); };
+  // the finger stirs the smoke, but leaves no glowing puff where it touches
+  const pm = e => onMove(e.clientX, e.clientY);
+  const pd = e => { ptr.active = false; onMove(e.clientX, e.clientY); ptr.s = Math.min(1, ptr.s + .35); };
   const tm = e => { const t = e.touches[0]; if (t) onMove(t.clientX, t.clientY); };
   window.addEventListener('pointermove', pm, { passive: true });
   window.addEventListener('pointerdown', pd, { passive: true });
@@ -310,7 +311,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
       PF.pos[i3] += pv[i3] * dt + Math.sin(PF.pos[i3 + 1] * 1.4 + t + i) * .08 * dt; PF.pos[i3 + 1] += pv[i3 + 1] * dt;
       PF.size[i] += dt * (1.1 + (i % 7) * .12);
       PF.alpha[i] = .2 * Math.pow(Math.max(0, plife[i]), 1.4);
-      PF.heat[i] = .55 * plife[i] * plife[i];
+      PF.heat[i] = pwarm[i] * plife[i] * plife[i];
     }
     for (const o of [L, S, PF]) {
       o.geo.attributes.position.needsUpdate = true; o.geo.attributes.aSize.needsUpdate = true;
@@ -351,10 +352,9 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
     burst(cx, cy, rw = 0, rh = 0) {
       const w = window.innerWidth, h = window.innerHeight, sx = VW / w, sy = VH / h;
       const x = (cx / w * 2 - 1) * VW / 2, y = -(cy / h * 2 - 1) * VH / 2;
-      puff(x, y, 60, 1.2);
-      // single wisps scattered over the whole card, so it reads as one cloud rather than separate blobs
+      // grey wisps scattered over the whole card, so it reads as one cloud (no bright spot where the finger was)
       const ex = Math.max(.5, rw * sx / 2), ey = Math.max(.35, rh * sy / 2);
-      for (let k = 0; k < 40; k++) puff(x + (Math.random() * 2 - 1) * ex, y + (Math.random() * 2 - 1) * ey, 1, .55);
+      for (let k = 0; k < 70; k++) puff(x + (Math.random() * 2 - 1) * ex, y + (Math.random() * 2 - 1) * ey, 1, .6, 0);
       surgeT = t; ptr.s = .75;
     },
     setTopFree(px) { topFree = px; return layoutLogo(); },

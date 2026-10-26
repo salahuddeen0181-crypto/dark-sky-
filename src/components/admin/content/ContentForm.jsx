@@ -40,6 +40,10 @@ export default function ContentForm({ initial }) {
         </nav>
       </div>
       <p className="-mt-2 text-xs text-white/45">Тексты вводятся на каждом языке вручную. Если язык пустой, гость увидит английский или испанский вариант.</p>
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
+        <input type="checkbox" checked={!!c.cardSmoke} onChange={e => set({ cardSmoke: e.target.checked })} className="h-5 w-5 accent-[#e8793c]" />
+        <span>Дым на карточках блюд <span className="text-white/45">— выключено: блюда на чистом чёрном фоне</span></span>
+      </label>
       <LangBar />
 
       {tab === 'sections' && <SectionsEditor c={c} set={set} />}

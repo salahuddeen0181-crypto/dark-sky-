@@ -96,6 +96,17 @@ const PROT = {
 };
 const P = (k, p) => V(...PROT[k], p);
 
+// Desserts: one free topping, or none (opt: a free choice next to the variants; staff see it with the variant)
+const TOPPING = {
+  n: L('Topping', 'Topping', 'Топпинг', '淋酱', 'टॉपिंग', 'الصلصة', 'Nappage', 'Cobertura', 'Topping', 'トッピング'),
+  none: L('No topping', 'Sin topping', 'Без топпинга', '不加淋酱', 'बिना टॉपिंग', 'بدون صلصة', 'Sans nappage', 'Sem cobertura', 'Ohne Topping', 'なし'),
+  o: [
+    L('Chocolate', 'Chocolate', 'Шоколадный', '巧克力', 'चॉकलेट', 'شوكولاتة', 'Chocolat', 'Chocolate', 'Schokolade', 'チョコレート'),
+    L('Dulce de leche', 'Dulce de leche', 'Дульсе де лече', '牛奶焦糖酱', 'दुल्से दे लेचे', 'دولسي دي ليتشي', 'Dulce de leche', 'Doce de leite', 'Dulce de leche', 'ドゥルセ・デ・レチェ'),
+    L('Strawberry', 'Frutilla', 'Клубничный', '草莓', 'स्ट्रॉबेरी', 'فراولة', 'Fraise', 'Morango', 'Erdbeere', 'いちご'),
+  ],
+};
+
 export const ITEMS = [
   // HOOKAH
   { id: 'h-classic', cat: 'hookah', name: 'Classic', d: T3('Mezcla suave para una sesión relajada.', 'A soft blend for an easy, mellow session.', 'Мягкий микс для спокойной долгой сессии.'), str: [1, 3], p: 34812, t: ['soft', 'fruity'] },
@@ -103,32 +114,32 @@ export const ITEMS = [
   { id: 'h-cigar', cat: 'hookah', name: 'Cigar Line', d: T3('Línea con carácter de cigarro.', 'A cigar-character line for connoisseurs.', 'Линейка с характером сигары — для ценителей.'), p: 58951, t: ['strong', 'smoky'], str: [1, 10] },
   // STARTERS
   { id: 'jerky', cat: 'starters', name: 'Jerky artesanal', m: '150 g', p: 22857, d: T3('Carne curada artesanal.', 'House-made cured jerky.', 'Вяленое мясо собственного приготовления.'), t: ['savory', 'smoky'], v: [V('Cerdo', 'Pork', 'Свинина', 22857), V('Pollo', 'Chicken', 'Курица', 22857), V('Carne', 'Beef', 'Говядина', 22857), V('Pescado', 'Fish', 'Рыба', 22857)], hit: true },
-  { id: 'falafel', cat: 'starters', name: 'Falafel', m: '300 g', p: 16262, d: T3('Falafel (nuez, especias), pan árabe, pepinillos, pepino, tomate cherry, salsa cremosa de ajo.', 'Falafel (nuts, spices), pita, pickles, cucumber, cherry tomato, creamy garlic sauce.', 'Фалафель (орехи, специи), арабский хлеб, корнишоны, огурец, черри, сливочный чесночный соус.'), t: ['spicy', 'creamy'] },
+  { id: 'falafel', cat: 'starters', name: 'Falafel', m: '300 g', p: 16262, d: T3('Falafel (garbanzo, especias), pan árabe, pepinillos, pepino, tomate cherry, salsa cremosa de ajo.', 'Falafel (chickpeas, spices), pita, pickles, cucumber, cherry tomato, creamy garlic sauce.', 'Фалафель (нут, специи), арабский хлеб, корнишоны, огурец, черри, сливочный чесночный соус.'), t: ['spicy', 'creamy'] },
   { id: 'langostinos', cat: 'starters', name: 'Langostinos apanados', m: L('9 pcs', '9 u.', '9 шт.', '9只', '9 पीस', '9 قطع', '9 pièces', '9 un.', '9 Stück', '9尾'), p: 25941, d: T3('9 langostinos apanados con mayo Sweet Chili.', '9 breaded prawns with sweet chili mayo.', '9 креветок в панировке с майонезом sweet chili.'), t: ['savory', 'sweet'] },
   { id: 'panqueques', cat: 'starters', name: 'Crepes caseros (blinis)', m: T3('2 u.', '2 pcs.', '2 шт.'), p: 15540, d: T3('Panqueques finos y tiernos con un relleno abundante a elección. Se sirven con crema agria.', 'Thin, tender crepes with a generous filling of your choice. Served with sour cream.', 'Нежные тонкие блинчики с сытной начинкой на выбор. Подаются со сметаной.'), t: ['creamy', 'savory'], v: [V('Carne picada de vaca', 'Ground beef', 'Говяжий фарш', 15540), V('Julienne', 'Julienne', 'Жульен', 15540), V('Ricota', 'Ricotta', 'Творог', 15540)] },
   // ROLLS
-  { id: 'phila-ebi', cat: 'rolls', name: 'Philadelphia Ebi Ponzu', m: '310 g', p: 27180, d: T3('Salmón, arroz, nori, queso crema, langostinos fritos, salsa ponzu, salsa spicy tuna.', 'Salmon, rice, nori, cream cheese, fried prawns, ponzu, spicy tuna sauce.', 'Лосось, рис, нори, сливочный сыр, жареные креветки, соус понзу, спайси-тунец.'), t: ['savory', 'citrus'], hit: true },
-  { id: 'phila', cat: 'rolls', name: 'Philadelphia', m: '300–320 g', p: 24320, d: T3('Arroz, salmón, queso crema.', 'Rice, salmon, cream cheese.', 'Рис, лосось, сливочный сыр.'), t: ['creamy'], v: [V('Clásico', 'Classic', 'Классический', 24320), P('atun', 29090), P('lang', 27810), P('palta', 25710), P('pepino', 25020)] },
-  { id: 'newyork', cat: 'rolls', name: 'New York', m: '260 g', p: 22740, d: T3('Salmón, palta, queso crema, sésamo.', 'Salmon, avocado, cream cheese, sesame.', 'Лосось, авокадо, сливочный сыр, кунжут.'), t: ['creamy'] },
-  { id: 'maki', cat: 'rolls', name: 'Maki roll', m: '240 g', p: 16389, d: T3('Roll japonés clásico.', 'Classic Japanese roll.', 'Классический японский ролл.'), t: ['soft'], v: [P('pepino', 16389), P('palta', 17660), P('lang', 18295), P('salmon', 18930), P('atun', 21356)] },
-  { id: 'aburi', cat: 'rolls', name: 'Atún Aburi', m: '330 g', p: 28760, d: T3('Roll de autor con atún, queso crema, palta, salsa especial, ciboulette y atún flameado por encima.', 'Signature roll: tuna, cream cheese, avocado, special sauce, chives, flame-seared tuna on top.', 'Авторский ролл: тунец, сливочный сыр, авокадо, фирменный соус, шнитт-лук, тунец, обожжённый сверху.'), t: ['smoky', 'savory'], hit: true },
-  { id: 'kanikama', cat: 'rolls', name: 'Kanikama', m: '250 g', p: 17660, d: T3('Cangrejo, arroz, pepino, queso crema.', 'Crab, rice, cucumber, cream cheese.', 'Краб, рис, огурец, сливочный сыр.'), t: ['soft', 'creamy'] },
-  { id: 'unagi', cat: 'rolls', name: 'Unagi roll', m: '260 g', p: 29094, d: T3('Arroz, queso crema, pepino, anguila, salsa unagi.', 'Rice, cream cheese, cucumber, eel, unagi sauce.', 'Рис, сливочный сыр, огурец, угорь, соус унаги.'), t: ['sweet', 'smoky'] },
-  { id: 'horno', cat: 'rolls', name: 'Roll al horno', p: 22742, d: T3('Roll horneado con tapa picante.', 'Baked roll with a spicy topping.', 'Запечённый ролл с острой шапочкой.'), t: ['spicy', 'creamy'], v: [P('teri', 22742), P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('ang', 32910), P('atun', 26322)] },
+  { id: 'phila-ebi', cat: 'rolls', name: 'Philadelphia Ebi Ponzu', m: '310 g', p: 27180, d: T3('Salmón, arroz, nori, queso crema, langostinos fritos, salsa ponzu (soja y cítricos), salsa spicy tuna.', 'Salmon, rice, nori, cream cheese, fried prawns, ponzu (citrus soy sauce), spicy tuna sauce.', 'Лосось, рис, нори, сливочный сыр, жареные креветки, соус понзу (соевый с цитрусовыми), спайси-тунец.'), t: ['savory', 'citrus'], hit: true },
+  { id: 'phila', cat: 'rolls', name: 'Philadelphia', m: '300–320 g', p: 24320, d: T3('Arroz, nori, salmón, queso crema.', 'Rice, nori, salmon, cream cheese.', 'Рис, нори, лосось, сливочный сыр.'), t: ['creamy'], v: [V('Clásico', 'Classic', 'Классический', 24320), P('atun', 29090), P('lang', 27810), P('palta', 25710), P('pepino', 25020)] },
+  { id: 'newyork', cat: 'rolls', name: 'New York', m: '260 g', p: 22740, d: T3('Salmón, palta, queso crema, nori, sésamo.', 'Salmon, avocado, cream cheese, nori, sesame.', 'Лосось, авокадо, сливочный сыр, нори, кунжут.'), t: ['creamy'] },
+  { id: 'maki', cat: 'rolls', name: 'Maki roll', m: '240 g', p: 16389, d: T3('Roll japonés clásico: arroz y alga nori, relleno a elección.', 'Classic Japanese roll: rice and nori, filling of your choice.', 'Классический японский ролл: рис и нори, начинка на выбор.'), t: ['soft'], v: [P('pepino', 16389), P('palta', 17660), P('lang', 18295), P('salmon', 18930), P('atun', 21356)] },
+  { id: 'aburi', cat: 'rolls', name: 'Atún Aburi', m: '330 g', p: 28760, d: T3('Roll de autor con atún, nori, queso crema, palta, salsa especial, ciboulette y atún flameado por encima.', 'Signature roll: tuna, nori, cream cheese, avocado, special sauce, chives, flame-seared tuna on top.', 'Авторский ролл: тунец, нори, сливочный сыр, авокадо, фирменный соус, шнитт-лук, тунец, обожжённый сверху.'), t: ['smoky', 'savory'], hit: true },
+  { id: 'kanikama', cat: 'rolls', name: 'Kanikama', m: '250 g', p: 17660, d: T3('Cangrejo, arroz, nori, pepino, queso crema.', 'Crab, rice, nori, cucumber, cream cheese.', 'Краб, рис, нори, огурец, сливочный сыр.'), t: ['soft', 'creamy'] },
+  { id: 'unagi', cat: 'rolls', name: 'Unagi roll', m: '260 g', p: 29094, d: T3('Arroz, nori, queso crema, pepino, anguila, salsa unagi, sésamo.', 'Rice, nori, cream cheese, cucumber, eel, unagi sauce, sesame.', 'Рис, нори, сливочный сыр, огурец, угорь, соус унаги, кунжут.'), t: ['sweet', 'smoky'] },
+  { id: 'horno', cat: 'rolls', name: 'Roll al horno', p: 22742, d: T3('Roll de arroz y nori horneado con tapa picante.', 'Rice and nori roll, baked with a spicy topping.', 'Запечённый ролл из риса и нори с острой шапочкой.'), t: ['spicy', 'creamy'], v: [P('teri', 22742), P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('ang', 32910), P('atun', 26322)] },
   // HOT ROLLS
-  { id: 'tempura', cat: 'hotrolls', name: 'Tempura roll', m: '320 g', p: 24012, d: T3('Frito en tempura y panko. Arroz, queso crema, pepino.', 'Fried in tempura & panko. Rice, cream cheese, cucumber.', 'Обжарен в темпуре и панко. Рис, сливочный сыр, огурец.'), t: ['creamy', 'savory'], v: [P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('atun', 27477)] },
-  { id: 'tempura-teri', cat: 'hotrolls', name: 'Tempura teriyaki roll', m: '320 g', p: 25179, d: T3('Frito en tempura y panko con teriyaki. Arroz, queso crema, pepino.', 'Tempura & panko with teriyaki. Rice, cream cheese, cucumber.', 'Темпура и панко с терияки. Рис, сливочный сыр, огурец.'), t: ['sweet', 'savory'], v: [P('pollo', 25179), P('salmon', 26438), P('lang', 26438), P('ang', 33137)] },
+  { id: 'tempura', cat: 'hotrolls', name: 'Tempura roll', m: '320 g', p: 24012, d: T3('Frito en tempura y panko. Arroz, nori, queso crema, pepino.', 'Fried in tempura & panko. Rice, nori, cream cheese, cucumber.', 'Обжарен в темпуре и панко. Рис, нори, сливочный сыр, огурец.'), t: ['creamy', 'savory'], v: [P('salmon', 24012), P('lang', 24012), P('cang', 21471), P('atun', 27477)] },
+  { id: 'tempura-teri', cat: 'hotrolls', name: 'Tempura teriyaki roll', m: '320 g', p: 25179, d: T3('Frito en tempura y panko con teriyaki. Arroz, nori, queso crema, pepino.', 'Tempura & panko with teriyaki. Rice, nori, cream cheese, cucumber.', 'Темпура и панко с терияки. Рис, нори, сливочный сыр, огурец.'), t: ['sweet', 'savory'], v: [P('pollo', 25179), P('salmon', 26438), P('lang', 26438), P('ang', 33137)] },
   // WOK
-  { id: 'wok-rice', cat: 'wok', name: 'Wok de arroz', p: 16389, d: T3('Arroz salteado al wok.', 'Wok-fried rice.', 'Рис, обжаренный в воке.'), t: ['savory'], v: [P('veg', 16389), P('pollo', 19566), P('lang', 22742), P('salmon', 24012)] },
+  { id: 'wok-rice', cat: 'wok', name: 'Wok de arroz', p: 16389, d: T3('Arroz salteado al wok con mix de verduras: zanahoria, apio y morrón.', 'Wok-fried rice with a vegetable mix: carrot, celery and bell pepper.', 'Рис, обжаренный в воке, с овощным миксом: морковь, сельдерей, болгарский перец.'), t: ['savory'], v: [P('veg', 16389), P('pollo', 19566), P('lang', 22742), P('salmon', 24012)] },
   { id: 'udon', cat: 'wok', name: 'Udon de fideos', p: 15754, d: T3('Fideos udon salteados.', 'Stir-fried udon noodles.', 'Лапша удон из вока.'), t: ['savory'], v: [P('veg', 15754), P('pollo', 20201), P('lang', 22742), P('salmon', 24012)] },
   // SALADS
   { id: 'cesar', cat: 'salads', name: 'Ensalada César', m: '340 g', p: 21471, d: T3('Clásica César a elección.', 'Classic Caesar, your choice of protein.', 'Классический «Цезарь» на выбор.'), t: ['creamy', 'savory'], v: [P('pollo', 21471), P('salmon', 23380), P('lang', 22740)] },
-  { id: 'griega', cat: 'salads', name: 'Ensalada griega', m: '340 g', p: 22615, d: T3('Queso feta, tomate cherry, pepino, morrón, aceitunas.', 'Feta, cherry tomato, cucumber, bell pepper, olives.', 'Фета, черри, огурец, перец, оливки.'), t: ['fresh'] },
+  { id: 'griega', cat: 'salads', name: 'Ensalada griega', m: '340 g', p: 22615, d: T3('Queso feta, tomate cherry, pepino, morrón, cebolla morada, aceitunas. Aliño: aceite de oliva.', 'Feta, cherry tomato, cucumber, bell pepper, red onion, olives. Dressing: olive oil.', 'Фета, черри, огурец, перец, красный лук, оливки. Заправка — оливковое масло.'), t: ['fresh'] },
   // DESSERTS
-  { id: 'trufa', cat: 'desserts', name: 'Trufa Deluxe', p: 11040, d: T3('Chocolate belga 54,5%.', 'Belgian chocolate 54.5%.', 'Бельгийский шоколад 54,5%.'), t: ['sweet', 'bitter'] },
-  { id: 'brownie', cat: 'desserts', name: 'Brownie', p: 16010, d: T3('Bizcocho de chocolate.', 'Chocolate sponge.', 'Шоколадный бисквит.'), t: ['sweet'] },
-  { id: 'noche', cat: 'desserts', name: 'Noche Blanca Pistacho', p: 13560, d: T3('Mousse de leche, pistachos, pasta de pistacho.', 'Milk mousse, pistachios, pistachio paste.', 'Молочный мусс, фисташки, фисташковая паста.'), t: ['creamy', 'sweet'] },
-  { id: 'cinnabon', cat: 'desserts', name: 'Cinnabon roll', p: 11260, d: T3('Rol de canela a elección.', 'Cinnamon roll, your choice.', 'Синнабон на выбор.'), t: ['sweet', 'spicy'], new: true, v: [V('Pistacho', 'Pistachio', 'Фисташка', 11260), V('Nutella', 'Nutella', 'Нутелла', 11260), V('Doble chocolate', 'Double chocolate', 'Двойной шоколад', 11260)] },
+  { id: 'trufa', cat: 'desserts', opt: TOPPING, name: 'Trufa Deluxe', p: 11040, d: T3('Chocolate belga 54,5%.', 'Belgian chocolate 54.5%.', 'Бельгийский шоколад 54,5%.'), t: ['sweet', 'bitter'] },
+  { id: 'brownie', cat: 'desserts', opt: TOPPING, name: 'Brownie', p: 16010, d: T3('Bizcocho de chocolate.', 'Chocolate sponge.', 'Шоколадный бисквит.'), t: ['sweet'] },
+  { id: 'noche', cat: 'desserts', opt: TOPPING, name: 'Noche Blanca Pistacho', p: 13560, d: T3('Mousse de leche, pistachos, pasta de pistacho.', 'Milk mousse, pistachios, pistachio paste.', 'Молочный мусс, фисташки, фисташковая паста.'), t: ['creamy', 'sweet'] },
+  { id: 'cinnabon', cat: 'desserts', opt: TOPPING, name: 'Cinnabon roll', p: 11260, d: T3('Rol de canela a elección.', 'Cinnamon roll, your choice.', 'Синнабон на выбор.'), t: ['sweet', 'spicy'], new: true, v: [V('Pistacho', 'Pistachio', 'Фисташка', 11260), V('Nutella', 'Nutella', 'Нутелла', 11260), V('Doble chocolate', 'Double chocolate', 'Двойной шоколад', 11260)] },
   // SOFT
   { id: 'agua', cat: 'soft', name: 'Agua c/s gas', m: 'Smartwater · 591 ml', p: 5460, d: T3('Con o sin gas.', 'Still or sparkling.', 'С газом или без.'), t: ['fresh'], v: [V('Sin gas', 'Still', 'Без газа', 5460), V('Con gas', 'Sparkling', 'С газом', 5460)] },
   { id: 'limonada', cat: 'soft', name: 'Limonada · Pomelada', m: '800 ml', p: 10400, d: T3('Menta, exprimido de limón o pomelo.', 'Mint, fresh-squeezed lemon or grapefruit.', 'Мята, свежевыжатый лимон или грейпфрут.'), t: ['citrus', 'fresh'], v: [V('Limonada', 'Lemonade', 'Лимонад', 10400), V('Pomelada', 'Grapefruit', 'Грейпфрут', 10400)], hit: true },
@@ -160,8 +171,8 @@ export const ITEMS = [
   ].map(([name, d, t], i) => ({ id: 'at' + i, cat: 'authortea', name, d, t, p: 13721, m: '800 ml · + Ice tea', hit: i === 4 })),
   // CLASSICS
   ...[
-    ['Negroni', 'Gin Heráclito, Campari, Vermouth Rosso, piel de naranja', '28,7%', ['bitter', 'strong']],
-    ['Long Island', 'Gin, ron blanco, tequila, vodka, limón, simple syrup, Coca-Cola', '22%', ['strong', 'citrus']],
+    ['Negroni', 'Gin Gordon’s, Campari, Vermouth Rosso, piel de naranja', '28,7%', ['bitter', 'strong']],
+    ['Long Island', 'Gin, ron blanco, tequila, vodka, Triple Sec (licor de naranja), limón, simple syrup, Coca-Cola', '22%', ['strong', 'citrus']],
     ['Mojito', 'Ron Havana, jugo de lima, almíbar, soda, menta', '13,4%', ['fresh', 'citrus'], true],
     ['Aperol Spritz', 'Espumante Gambei, Aperol, soda, piel de naranja', '10,4%', ['bitter', 'citrus'], true],
     ['Black Russian', 'Vodka Sernova, licor de café', '33,3%', ['strong']],
@@ -170,26 +181,26 @@ export const ITEMS = [
     ['Margarita', 'Tequila, Triple Sec, lima, simple syrup', '24%', ['citrus']],
     ['Old Fashioned', 'Jim Beam, Angostura, almíbar simple', '26,7%', ['strong', 'bitter']],
     ['Manhattan', 'Jim Beam, Vermouth Rosso, Angostura, cereza, piel de naranja', '32,2%', ['strong']],
-    ['Dry Martini', 'Gin Heráclito, Vermouth Dry, aceituna', '33,3%', ['strong', 'herbal']],
+    ['Dry Martini', 'Gin Gordon’s, Vermouth Dry, aceituna', '33,3%', ['strong', 'herbal']],
     ['Cuba Libre', 'Ron especial, Coca-Cola', '12%', ['sweet']],
     ['Garibaldi', 'Campari, jugo de naranja, piel de naranja', '8,1%', ['bitter', 'citrus']],
-    ['New York Sour', 'Johnnie Walker, jugo de limón, vino tinto, piel de limón', '24,4%', ['citrus', 'strong']],
-    ['Cynar Julep', 'Cynar, limón, almíbar, jugo de pomelo, menta', '7,6%', ['herbal', 'fresh']],
-    ['Penicillin', 'Johnnie Walker, limón, almíbar de miel, jengibre, piel de limón', '20%', ['spicy', 'smoky']],
+    ['New York Sour', 'Bourbon Jim Beam, jugo de limón, azúcar, vino tinto, piel de limón', '24,4%', ['citrus', 'strong']],
+    ['Cynar Julep', 'Cynar, pomelo, jugo de pomelo, menta', '7,6%', ['herbal', 'fresh']],
+    ['Penicillin', 'Johnnie Walker Red Label, limón, almíbar de jengibre', '20%', ['spicy', 'smoky']],
     ['Pisco Sour', 'Capel Pisco, exprimido de lima, almíbar de azúcar', '35%', ['citrus']],
-    ['Daiquiri', 'Ron blanco, lima, simple syrup', '22%', ['citrus', 'fresh']],
-    ['Mint Julep', 'Jim Beam, almíbar, menta', null, ['fresh', 'strong']],
+    ['Daiquiri', 'Ron blanco, Triple Sec, lima, simple syrup', '22%', ['citrus', 'fresh']],
+    null, // Mint Julep — no longer served
     ['Fernet Cola', 'Fernet Branca, Coca-Cola', null, ['bitter', 'sweet']],
-    ['Hanky Panky', 'Gin Heráclito, Vermouth Rosso, Fernet Branca, piel de naranja', null, ['bitter', 'strong']],
-    ['Gimlet', 'Gin Heráclito, almíbar, lima', null, ['citrus', 'fresh']],
-    ['Gin Tonic', 'Gin Heráclito, tónica, garnish a elección', null, ['fresh', 'bitter']],
+    null, // Hanky Panky — no longer served
+    null, // Gimlet — no longer served
+    ['Gin Tonic', 'Gin Gordon’s, tónica, garnish a elección', null, ['fresh', 'bitter']],
   ].map((r, i) => r && { id: 'cl' + i, cat: 'classics', name: r[0], d: { es: r[1] }, m: r[2] || undefined, t: r[3], p: 14610, hit: !!r[4] }).filter(Boolean),
   // SIGNATURE
   ...[
     ['Piña Colada', 'Ron, licor Malibu, jugo y almíbar de ananá, Amarula', ['creamy', 'sweet']],
-    ['Tropic Sin', 'Ron, Cointreau, maracuyá, limón, almíbar de azúcar, semillas', ['fruity', 'citrus']],
+    ['Tropic Sin', 'Ron, Triple Sec, maracuyá, limón, almíbar de azúcar', ['fruity', 'citrus']],
     ['Apricot Sunshine', 'Ron, apricot brandy, jugo de naranja y durazno, limón, almíbar, pulpa', ['fruity', 'sweet']],
-    ['Cosmoflower', 'Licor de grosella negra, Aperol, vodka Absolut', ['fruity', 'bitter']],
+    ['Cosmoflower', 'Licor de grosella negra, Aperol, vodka Sernova', ['fruity', 'bitter']],
     ['Bramble Shock', 'Gin, jugo de limón, almíbar de azúcar, licor de cassis', ['fruity', 'citrus']],
     ['Mai Tai', 'Ron blanco, ron negro, amaretto, limón, almíbar, jugo de naranja, Aperol', ['strong', 'fruity']],
     ['Sweet Dreams', 'Amaretto, bourbon vainilla, licor de café, limón, almíbar de azúcar', ['sweet', 'creamy']],
@@ -290,13 +301,13 @@ export const MEDIA = {
   ...Object.fromEntries(['assam', 'earlgrey', 'sencha', 'puer', 'krishna', 'joie', 'kospi', 'akasha', 'mudanwan', 'karkade', 'dahongpao', 'at0', 'at1', 'at2', 'at3', 'at4'].map(id => [id, '/media/cut/tea.webp'])),
   'tempura-teri': '/media/cut/tempura-teri.webp', trufa: '/media/cut/trufa.webp', limonada: '/media/cut/limonada.webp',
   corona: '/media/cut/beer-corona.webp', coronazero: '/media/cut/beer-corona.webp',
-  // keyed product clips (scripts/key-videos.mjs)
+  // keyed product clips (scripts/key-videos.mjs); list rows show their cover instead: the finished dish (scripts/make-covers.mjs)
   'h-classic': '/media/hookah.webm#t=0.04', 'h-premium': '/media/hookah.webm#t=0.04', 'h-cigar': '/media/hookah.webm#t=0.04',
   jerky: '/media/jerky.webm#t=2.21',
   falafel: '/media/falafel.webm#t=2.46',
   langostinos: '/media/langostinos.webm#t=3.54',
   panqueques: '/media/panqueques.webm#t=5.63',
-  'phila-ebi': '/media/roll-phila-ebi.webm#t=4.08',
+  'phila-ebi': '/media/cut/phila-ebi.webp', // photo of the finished plate: the clip shows avocado, which this roll has not
   phila: '/media/roll-phila.webm#t=1.08',
   maki: '/media/roll-maki.webm#t=2.71',
   aburi: '/media/roll-aburi.webm#t=5.38',

@@ -36,6 +36,7 @@ export function cleanItem(b, existing) {
     const a = Math.max(0, Math.min(10, Math.round(+b.str[0]))), z = Math.max(a, Math.min(10, Math.round(+b.str[1])));
     if (z > 0) data.str = [a, z];
   }
+  if (existing?.opt) data.opt = existing.opt; // free choice (a dessert's topping): not in the form yet, kept as it is
   if (b.hit) data.hit = true;
   if (b.new) data.new = true;
   if (Array.isArray(b.pair)) { const p = b.pair.map(x => str(x, 60)).filter(Boolean).slice(0, 6); if (p.length) data.pair = p; }
