@@ -33,6 +33,7 @@ export async function getContent() {
   });
   const r = o.rules || {};
   return {
+    TASTE: o.tastes || D.TASTE, // taste tags { key: { es, en, … } }, edited in the admin as a whole list
     CARD_STAGE: stageOf(o), // what is behind the dishes on their cards: 'black' | 'smoke' | 'glass'
     SECTIONS, CATS, PROMOS: o.promos || D.PROMOS, PROMO_NOTE: o.promoNote || D.PROMO_NOTE, PREP: o.prep || PREP,
     RULES: { ...D.RULES, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v != null)) },
@@ -57,6 +58,21 @@ const clean = (v, max = 300) => {
   return !keys.length ? null : keys.length === 1 && keys[0] === 'es' ? o.es : o;
 };
 
+// [{ k, n }] from the editor → { key: names }; a new tag gets a key from its name, a nameless one is dropped
+const TASTE_KEY = /^[a-z0-9-]{1,24}$/;
+function cleanTastes(list) {
+  const out = {};
+  for (const t of list.slice(0, 40)) {
+    const n = clean(t?.n, 30);
+    if (!n) continue;
+    let k = TASTE_KEY.test(t.k) ? t.k : String((typeof n === 'string' ? n : n.en || n.es || Object.values(n)[0]) || 'taste')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 20) || 'taste';
+    while (out[k]) k = k.slice(0, 20) + '-' + Math.floor(Math.random() * 90 + 10);
+    out[k] = typeof n === 'string' ? { es: n } : n;
+  }
+  return out;
+}
+
 export async function saveContent(input) {
   // keep only known fields; texts in the languages the admin filled
   const ids = new Set(D.SECTIONS.map(s => s.id)), catIds = new Set(D.CATS.map(c => c.id));
@@ -64,6 +80,7 @@ export async function saveContent(input) {
     sections: Object.fromEntries(Object.entries(input.sections || {}).filter(([id]) => ids.has(id)).map(([id, s]) => [id, { n: clean(s.n, 40), tag: clean(s.tag, 120) }])),
     cats: Object.fromEntries(Object.entries(input.cats || {}).filter(([id]) => catIds.has(id)).map(([id, x]) => [id, { n: clean(x.n, 40), hidden: !!x.hidden }])),
     order: Object.fromEntries(Object.entries(input.order || {}).filter(([id]) => ids.has(id)).map(([id, l]) => [id, (Array.isArray(l) ? l : []).filter(x => catIds.has(x))])),
+    tastes: Array.isArray(input.tastes) ? cleanTastes(input.tastes) : undefined,
     prep: clean(input.prep, 60), promoNote: clean(input.promoNote, 200), cardStage: STAGES.includes(input.cardStage) ? input.cardStage : 'black',
     promos: Array.isArray(input.promos) ? input.promos.slice(0, 12).map(p => ({
       tag: clean(p.tag, 60), title: clean(p.title, 60), big: String(p.big || '').trim().slice(0, 20), d: clean(p.d, 200),
@@ -90,6 +107,7 @@ export async function getContentForm() {
   return {
     sections: D.SECTIONS.map(s => { const c = cur.SECTIONS.find(x => x.id === s.id); return { id: s.id, n: f(c.n), tag: f(c.tag), cats: catsOf(s) }; }),
     cats: Object.fromEntries(cur.CATS.map(c => [c.id, { n: f(c.n), hidden: c.hidden }])),
+    tastes: Object.entries(cur.TASTE).map(([k, n]) => ({ k, n: f(n) })),
     prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardStage: cur.CARD_STAGE,
     promos: cur.PROMOS.map(p => ({ tag: f(p.tag), title: f(p.title), big: p.big || '', d: f(p.d), window: p.window || null })),
     rules: {

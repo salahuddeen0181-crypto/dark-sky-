@@ -352,6 +352,8 @@ export default class DarkskyMenu extends React.Component {
   tX(k) { const X = D.UI_X; return (X[this.state.lang] || X.en)[k]; }
   // Tiles, categories, promotions and rules as edited in the admin (src/lib/content.js), else the bundled ones
   get C() { return this.props.content || D; }
+  // taste tags as named in the admin (a tag removed there just disappears from the dishes)
+  tastes(it) { const T = this.C.TASTE || D.TASTE; return (it.t || []).filter(k => T[k]).map(k => this.tx(T[k])); }
   tx(o) { if (o == null) return ''; if (typeof o === 'string') return o; const l = this.state.lang; return o[l] ?? o.en ?? o.es ?? ''; }
   nm(it) { return (it.nm && this.tx(it.nm)) || it.name; } // guest-facing name in the current language
   fmt(n) { return n == null ? this.t('onRequest') : '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
@@ -445,7 +447,7 @@ export default class DarkskyMenu extends React.Component {
       const pick = on => ({ border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' });
       const opts = it.opt ? [null, ...it.opt.o.map((_, i) => i)].map(oi => ({ name: this.tx(oi == null ? it.opt.none : it.opt.o[oi]), price: '', onPick: () => this.setState({ oi }), ...pick(oi === s.oi) })) : [];
       const sib = this.siblings(it), at = sib.findIndex(x => x.id === it.id);
-      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: (it.t || []).map(k => this.tx(D.TASTE[k])), strLabel: it.str ? `${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, optTitle: it.opt ? this.tx(it.opt.n) : '', opts, pairs };
+      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: this.tastes(it), strLabel: it.str ? `${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, optTitle: it.opt ? this.tx(it.opt.n) : '', opts, pairs };
       const p = this.price(it, s.vi);
       addLabel = p == null ? t('add') : `${t('add')} · ${this.fmt(p * s.qty)}`;
     }
@@ -473,7 +475,7 @@ export default class DarkskyMenu extends React.Component {
       ],
       hits: this.props.items.filter(i => i.hit).map(i => this.miniVm(i)),
       rulesName: this.tx(SEC('rules').n),
-      hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: (h.t || []).map(k => this.tx(D.TASTE[k])), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
+      hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: this.tastes(h), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
       listTitle: searching ? '“' + s.q.trim() + '”' : this.tx(cat.n), items: items.map(x => this.rowVm(x)),
       promos: this.C.PROMOS.map(p => ({ tag: this.tx(p.tag), title: this.tx(p.title), big: p.big, desc: this.tx(p.d), live: live(p.window) })),
       promoNote: this.tx(this.C.PROMO_NOTE),

@@ -5,7 +5,7 @@ import * as D from './darksky-data';
 const LANGS = D.LANGS.map(l => l.code);
 
 // Admin item form → the item shape the menu renders. Unknown fields are dropped.
-export const EDITABLE_CATS = D.CATS.filter(c => c.kind !== 'promos').map(c => c.id);
+export const EDITABLE_CATS = D.CATS.filter(c => c.kind !== 'promos' && c.kind !== 'rules').map(c => c.id); // dish categories only
 
 const str = (v, max = 400) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 // { es, en, ru, … } with empty languages removed — the admin types every language by hand.
@@ -30,7 +30,7 @@ export function cleanItem(b, existing) {
   const m = l3(b.m, 40); if (m) data.m = typeof m === 'object' && Object.keys(m).length === 1 ? Object.values(m)[0] : m;
   const variants = Array.isArray(b.v) ? b.v.map(v => ({ n: l3(v?.n, 60), p: price(v?.p) })).filter(v => v.n) : [];
   if (variants.length) { data.v = variants.slice(0, 12); data.p = data.v[0].p; } else data.p = price(b.p);
-  const tags = Array.isArray(b.t) ? b.t.filter(k => k in D.TASTE) : [];
+  const tags = Array.isArray(b.t) ? b.t.filter(k => typeof k === 'string' && /^[a-z0-9-]{1,24}$/.test(k)) : []; // keys from Контент → Вкусы
   if (tags.length) data.t = [...new Set(tags)].slice(0, 4);
   if (Array.isArray(b.str) && b.str.length === 2) {
     const a = Math.max(0, Math.min(10, Math.round(+b.str[0]))), z = Math.max(a, Math.min(10, Math.round(+b.str[1])));

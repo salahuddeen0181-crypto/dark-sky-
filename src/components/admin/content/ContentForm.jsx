@@ -5,12 +5,13 @@ import { api } from '../api';
 import SectionsEditor from './SectionsEditor';
 import PromosEditor from './PromosEditor';
 import RulesEditor from './RulesEditor';
+import TastesEditor from './TastesEditor';
 import { LangProvider, LangBar } from '../L3';
 
 const STAGES = [['black', 'Тёмный дым'], ['smoke', 'Дым'], ['glass', 'Стекло, как плитки главной']];
-const TABS = [['sections', 'Разделы и категории'], ['promos', 'Акции'], ['rules', 'Правила']];
+const TABS = [['sections', 'Разделы и категории'], ['promos', 'Акции'], ['rules', 'Правила'], ['tastes', 'Вкусы']];
 
-// Menu texts outside the dishes, typed in every language; one save for everything.
+// Menu texts outside the dishes (sections, promotions, rules, taste tags), typed in every language; one save for everything.
 export default function ContentForm({ initial }) {
   const router = useRouter();
   const [c, setC] = useState(initial), [tab, setTab] = useState('sections');
@@ -52,6 +53,7 @@ export default function ContentForm({ initial }) {
       {tab === 'sections' && <SectionsEditor c={c} set={set} />}
       {tab === 'promos' && <PromosEditor c={c} set={set} />}
       {tab === 'rules' && <RulesEditor c={c} set={set} />}
+      {tab === 'tastes' && <TastesEditor c={c} set={set} />}
 
       <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#0a0a0d]/95 px-4 py-3 backdrop-blur">
         <button disabled={busy || !dirty} onClick={save} className="h-12 rounded-xl bg-[#f2f2f4] px-6 font-semibold text-[#050507] disabled:opacity-50">{busy ? 'Сохраняем…' : 'Сохранить'}</button>
