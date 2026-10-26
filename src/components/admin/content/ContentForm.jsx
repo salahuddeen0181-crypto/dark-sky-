@@ -7,7 +7,7 @@ import PromosEditor from './PromosEditor';
 import RulesEditor from './RulesEditor';
 import { LangProvider, LangBar } from '../L3';
 
-const STAGES = [['black', 'Чёрный'], ['smoke', 'Дым'], ['glass', 'Стекло, как плитки главной']];
+const STAGES = [['black', 'Тёмный дым'], ['smoke', 'Дым'], ['glass', 'Стекло, как плитки главной']];
 const TABS = [['sections', 'Разделы и категории'], ['promos', 'Акции'], ['rules', 'Правила']];
 
 // Menu texts outside the dishes, typed in every language; one save for everything.

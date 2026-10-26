@@ -82,6 +82,8 @@ const Smoke = ({ still }) => <div className={still ? 'ds-smoke still' : 'ds-smok
 
 // Keyed product clip from scripts/key-videos.mjs: the still first, the video only while it is on screen.
 // Safari and iOS get HEVC with alpha (.mov), everyone else VP9 with alpha (.webm); '#t=' starts it on the still's frame.
+// clips filmed landscape and kept whole (scripts/key-videos.mjs, wide): shown without the 1.2× zoom, edges included
+const WIDE_CLIPS = new Set(['/media/salad-cesar']);
 const CLIP = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;transform:scale(1.2)');
 const isHevc = () => { const ua = navigator.userAgent; return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android|Firefox/.test(ua); };
 const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isHevc() ? '.mov' : '.webm');
@@ -125,7 +127,7 @@ function ProductClip({ src, v, fit }) {
     io.observe(el);
     return () => { io.disconnect(); el.pause(); };
   }, [stem, t, v]);
-  const style = fit ? { ...CLIP, ...fit } : CLIP;
+  const style = fit ? { ...CLIP, ...fit } : WIDE_CLIPS.has(stem) ? { ...CLIP, transform: 'none' } : CLIP;
   if (v === 'still') return <img src={still} alt="" loading="lazy" style={COVER} />; // eslint-disable-line @next/next/no-img-element
   return <video ref={ref} poster={still} muted loop playsInline preload="none" style={style} />;
 }
@@ -172,7 +174,7 @@ const GLASS_TINT = 'rgba(160,165,180,.13)', GLASS_TINT_TEXT = 'rgba(150,155,170,
 function MiniCard({ p, w, mh, bg, btn }) {
   return (
     <div onClick={p.onOpen} style={css(`flex:none;width:${w}px;padding:0 14px 14px;overflow:hidden;border-radius:${w > 160 ? 18 : 16}px;border:1px solid rgba(255,255,255,.1);background:${bg};display:flex;flex-direction:column;justify-content:space-between;gap:${w > 160 ? 16 : 12}px;cursor:${p.onOpen ? 'pointer' : 'default'}`)}>
-      <div style={css(`height:${mh}px;margin:0 -14px;${MEDIA_BG}`)}><Media m={p} v="sm" /></div>
+      <div className="ds-stage" style={css(`height:${mh}px;margin:0 -14px;${MEDIA_BG}`)}><Media m={p} v="sm" /></div>
       <div style={css(`display:flex;flex-direction:column;gap:${w > 160 ? 6 : 5}px`)}>
         <span style={css(`font:500 10px/1 Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,242,244,${w > 160 ? '.55' : '.5'})`)}>{p.cat}</span>
         <span style={css(`font:600 ${w > 160 ? '14.5px' : '14px'}/1.3 Manrope,sans-serif`)}>{p.name}</span>
@@ -600,7 +602,7 @@ export default class DarkskyMenu extends React.Component {
         </button>
         {v.hookahs.map(h => (
           <div key={h.id} onClick={h.onOpen} style={css('position:relative;overflow:hidden;cursor:pointer;padding:0 20px 20px;border-radius:22px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;flex-direction:column;gap:14px' + GLASS)}>
-            <div style={css(`height:190px;margin:0 -20px;border-bottom:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}><Media m={h} /></div>
+            <div className="ds-stage" style={css(`height:190px;margin:0 -20px;border-bottom:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}><Media m={h} /></div>
             <div style={css('display:flex;flex-direction:column;gap:8px')}>
               <div style={css('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
                 <span style={css('font:400 20px/1.15 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{h.name}</span>
@@ -645,7 +647,7 @@ export default class DarkskyMenu extends React.Component {
         {v.searching && v.items.length === 0 && <div style={css('padding:40px 0;text-align:center;font:400 14px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.6)')}>{t('noResults')}</div>}
         {v.items.map(it => (
           <div key={it.id} onClick={it.onOpen} style={css('display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer')}>
-            <div style={css(`width:76px;height:76px;border-radius:16px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}><Media m={it} label={false} v="still" /></div>
+            <div className="ds-stage" style={css(`width:76px;height:76px;border-radius:16px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}><Media m={it} label={false} v="still" /></div>
             <div style={css('display:flex;flex-direction:column;gap:5px;min-width:0')}>
               <div style={css('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
                 <span style={css('font:600 15px/1.3 Manrope,sans-serif;letter-spacing:.01em')}>{it.name}</span>
@@ -797,7 +799,7 @@ export default class DarkskyMenu extends React.Component {
           <button onClick={() => this.closeAll()} aria-label="Close" style={css('position:absolute;top:12px;right:-6px;' + CLOSE_BTN)}><Close /></button>
         </div>
         <Grip />
-        <div style={css(`height:min(42vh,72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}>
+        <div className="ds-stage" style={css(`height:min(42vh,72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}>
           <Media m={sh} />
           {sh.pos && <>
             <button onClick={() => this.stepItem(-1)} aria-label="Previous" style={css('left:10px;' + STEP_BTN)}><Arrow size={16} flip="scaleX(-1)" /></button>

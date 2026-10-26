@@ -31,9 +31,14 @@
 .ds-smoke.still i { animation: none; }
 /* the dish stage on cards, picked in the admin: black / a grey glow with the smoke / frosted glass like the home tiles */
 :root { --ds-stage: radial-gradient(70% 62% at 50% 45%, rgba(196, 199, 208, .34), rgba(110, 112, 120, .12) 48%, rgba(0, 0, 0, 0) 76%), #020203; --ds-stage-blur: none; }
-.ds-stage-black { --ds-stage: #000; }
+/* black: dark grey in the middle fading to black, dark smoke drifting over it, and a vignette over the clip itself so
+   where a clip is cut off at the frame it melts into the dark instead of ending on a hard line */
+.ds-stage-black { --ds-stage: radial-gradient(62% 58% at 50% 46%, #26272c 0%, #141418 42%, #050506 72%, #000 100%); }
+.ds-stage-black .ds-smoke { opacity: .2; }
+.ds-stage-black .ds-stage::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(75% 72% at 50% 48%, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, .55) 82%, rgba(0, 0, 0, .9) 100%); }
 .ds-stage-glass { --ds-stage: radial-gradient(110% 80% at 60% 30%, rgba(232, 121, 60, .11), rgba(10, 10, 14, 0) 65%), rgba(160, 165, 180, .13); --ds-stage-blur: blur(10px) saturate(1.25); }
-.ds-stage-black .ds-smoke, .ds-stage-glass .ds-smoke { display: none; }
+.ds-stage-glass .ds-smoke { display: none; }
 @media (prefers-reduced-motion: reduce) { .ds-smoke i { animation: none; } }
 
 /* Item sheet: the next / previous dish slides in from the side it was swiped from */

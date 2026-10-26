@@ -5,6 +5,7 @@
 // For every source in CLIPS it writes to public/media/:
 //   <slug>.webm / <slug>.mov        480×854 — VP9 + alpha (Chrome, Firefox, Android) / HEVC + alpha (Safari, iOS)
 //   <slug>-sm.webm / <slug>-sm.mov  240×426 for the small cards
+//   (wide: true in OPTS — a landscape source kept whole at 854×480 / 426×240 instead of cut down to 9:16)
 //   <slug>.webp                     still of the fullest frame, shown until the video plays
 // and prints the MEDIA entry: '/media/<slug>.webm#t=<still time>' — the video starts on that frame, so the swap
 // from still to video does not jump (most clips begin empty and assemble the dish).
@@ -19,7 +20,8 @@ import os from 'node:os';
 
 const FF = process.env.FFMPEG || 'ffmpeg';
 const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'public', 'media');
-const W = 480, H = 854, FPS = 24;
+const FPS = 24;
+const SIZE = { tall: [480, 854], wide: [854, 480] };
 
 // source file name prefix → output slug
 // Per-clip tweaks: sat lowers the saturation a colour needs to count as screen (greenish smoke), smoke also drops
@@ -33,6 +35,8 @@ const OPTS = {
   hookah: { feather: [.2, .14] }, 'tea-tropic': { feather: [.12, .12], sat: 1.7 }, cash: { feather: [.14, .1] },
   // only a slight softening where the dish meets the card edge (the menu shows clips zoomed 1.2×)
   udon: { feather: [.1, .07], shadow: 1.25 }, 'wok-rice': { feather: [.1, .07], shadow: 1.25 },
+  // filmed landscape with the camera following a wide bowl and the croutons falling at its side: keep the whole frame
+  'salad-cesar': { wide: true },
 };
 const CLIPS = {
   'Chicken_teriyaki_sushi_roll': 'roll-horno',
@@ -74,7 +78,7 @@ function hsv(r, g, b) {
 }
 
 // The screen colour: the most common saturated green hue along the frame border.
-function sampleKey(px) {
+function sampleKey(px, W, H) {
   const bins = new Float64Array(360), sats = [];
   const take = (x, y) => {
     const i = (y * W + x) * 3, [h, s, v] = hsv(px[i], px[i + 1], px[i + 2]);
@@ -89,7 +93,7 @@ function sampleKey(px) {
   return { hk, sk: mid(.6, 1), vk: mid(.5, 2), lk: mid(.4, 3) };
 }
 
-function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, shadow = 1, feather = null, lift = 0 } = {}) {
+function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, shadow = 1, feather = null, lift = 0 } = {}, W, H) {
   const { hk, sk, vk, lk } = key, n = W * H;
   for (let p = 0; p < n; p++) {
     const i = p * 3, r = px[i], g = px[i + 1], b = px[i + 2];
@@ -136,10 +140,11 @@ function run(args, input) {
 
 async function keyClip(src, slug) {
   const tmp = path.join(os.tmpdir(), `key-${slug}-${process.pid}.mkv`);
-  const frame = W * H * 3;
-  // decode → crop to 9:16 (one clip is landscape) → 540×960 RGB frames on stdout
+  const wide = !!OPTS[slug]?.wide, [W, H] = wide ? SIZE.wide : SIZE.tall, frame = W * H * 3;
+  // decode → crop to 9:16 (or 16:9 for a wide clip) → W×H RGB frames on stdout
+  const crop = wide ? "crop='min(iw,ih*16/9)':'min(ih,iw*9/16)'" : "crop='min(iw,ih*9/16)':'min(ih,iw*16/9)'";
   const dec = spawn(FF, ['-hide_banner', '-loglevel', 'error', '-i', src, '-vf',
-    `crop='min(iw,ih*9/16)':'min(ih,iw*16/9)',scale=${W}:${H}:flags=lanczos,fps=${FPS},format=rgb24`, '-f', 'rawvideo', '-'], { stdio: ['ignore', 'pipe', 'inherit'] });
+    `${crop},scale=${W}:${H}:flags=lanczos,fps=${FPS},format=rgb24`, '-f', 'rawvideo', '-'], { stdio: ['ignore', 'pipe', 'inherit'] });
   const enc = spawn(FF, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${W}x${H}`, '-r', String(FPS), '-i', '-',
     '-c:v', 'ffv1', '-pix_fmt', 'bgra', tmp], { stdio: ['pipe', 'ignore', 'inherit'] });
   const encDone = new Promise((res, rej) => enc.on('close', c => (c ? rej(new Error('ffv1 encode failed')) : res())));
@@ -149,8 +154,8 @@ async function keyClip(src, slug) {
     buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
     while (buf.length >= frame) {
       const px = buf.subarray(0, frame);
-      key ||= sampleKey(px);
-      keyFrame(px, out, alpha, m, key, OPTS[slug]);
+      key ||= sampleKey(px, W, H);
+      keyFrame(px, out, alpha, m, key, OPTS[slug], W, H);
       let cover = 0; for (let i = 0; i < alpha.length; i += 7) cover += alpha[i];
       if (cover > bestCover * 1.002) { bestCover = cover; best = frames; } // earliest frame of (nearly) full coverage
       if (!enc.stdin.write(Buffer.from(out))) await new Promise(r => enc.stdin.once('drain', r));
@@ -166,7 +171,7 @@ async function keyClip(src, slug) {
   // Colour is premultiplied by alpha — with straight alpha iOS blends thin smoke into grey, unnatural haze.
   const hevc = (vf, rate, aq, file) => run(['-i', tmp, '-vf', [...vf.slice(1), 'format=rgba', 'premultiply=inplace=1'].join(','), '-c:v', 'hevc_videotoolbox', '-pix_fmt', 'bgra', '-alpha_quality', aq, '-b:v', rate, '-prio_speed', '0',
     '-tag:v', 'hvc1', '-movflags', '+faststart', '-an', file]);
-  const small = ['-vf', 'scale=240:-2:flags=lanczos'];
+  const small = ['-vf', `scale=${wide ? 426 : 240}:-2:flags=lanczos`];
   await Promise.all([
     vp9([], '37', base + '.webm'), hevc([], '1400k', '0.75', base + '.mov'),
     vp9(small, '36', base + '-sm.webm'), hevc(small, '500k', '0.7', base + '-sm.mov'),

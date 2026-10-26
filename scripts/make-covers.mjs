@@ -16,7 +16,7 @@ const COVERS = {
   brownie: 0, cinnabon: 0, falafel: 0, jerky: 0, langostinos: 0, panqueques: 0, 'pistachio-mousse': 0,
   'roll-kanikama': 0, 'roll-maki': 0, 'roll-phila': 0, 'roll-tempura': 0, 'roll-unagi': 0,
   'salad-greek': 0, udon: 0, 'wok-rice': 0,
-  'roll-aburi': 5.9, 'roll-horno': 5.9, 'roll-newyork': 5.9, 'salad-cesar': 9.9,
+  'roll-aburi': 5.9, 'roll-horno': 5.9, 'roll-newyork': 5.9, 'salad-cesar': 9.5,
   // drinks and the hookah: their usual frame already shows them whole
   'cocktail-amber': 5.92, 'tea-tropic': 1.54, 'passion-lemonade': 0.83, hookah: 0.04,
 };
