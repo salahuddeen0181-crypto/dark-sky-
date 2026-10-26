@@ -90,7 +90,7 @@ const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 export function isSoftwareGL(gl) {
   try { const ext = gl.getExtension('WEBGL_debug_renderer_info'); const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''; return /swiftshader|llvmpipe|software|basic render|mesa offscreen/i.test(r || ''); } catch (e) { return false; }
 }
-const STUB = { fallback: true, enter() {}, setDim() {}, burst() {}, setTopFree() { return Math.round(innerHeight * .4); }, logoBox() { return null; }, dispose() {} };
+const STUB = { fallback: true, enter() {}, setDim() {}, pause() {}, burst() {}, setTopFree() { return Math.round(innerHeight * .4); }, logoBox() { return null; }, dispose() {} };
 
 export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
   let renderer;
@@ -200,7 +200,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
   window.addEventListener('touchmove', tm, { passive: true });
   window.addEventListener('resize', resize);
 
-  let enterT = 0, dim = 1, dimT = 1, t = 0, last = performance.now(), raf = 0, rotY = 0, rotX = 0, half = false;
+  let enterT = 0, dim = 1, dimT = 1, t = 0, last = performance.now(), raf = 0, rotY = 0, rotX = 0, half = false, paused = false;
   let surgeT = -99; // a section change: the smoke thickens for a moment (see burst())
   const SURGE = 1.3;
 
@@ -325,7 +325,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
   let slowN = 0, frames = 0;
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    if (document.hidden) { last = now; return; }
+    if (document.hidden || paused) { last = now; return; }
     // in the menu (once the logo has blown away) the dimmed smoke behind the glass runs at half rate: it moves slowly,
     // and every frame it does change, each glass card has to re-blur what is behind it
     if (entered && t - enterT > 3 && t - surgeT > SURGE && (half = !half)) return;
@@ -347,6 +347,9 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
       ptr.s = 1;
     },
     setDim(v) { dimT = v; },
+    // frozen on its last frame: under a dish card or the cart (nothing of it shows), and while the page scrolls — then
+    // the glass cards need not re-blur a moving background every frame and the phone has its GPU for the clips
+    pause(on) { paused = !!on; },
     // Moving between menu sections: the chosen card breaks up into smoke (puffs spread over its area, CSS px)
     // and the smoke behind the page thickens for a moment
     burst(cx, cy, rw = 0, rh = 0) {

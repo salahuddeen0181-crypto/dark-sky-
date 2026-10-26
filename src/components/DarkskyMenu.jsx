@@ -94,6 +94,9 @@ const ORDER_KEEP_MIN = 30; // a saved cart / order not opened or changed for lon
 // While the guest is still on the intro, quietly fill the browser cache: the home tiles' stills and clips first
 // (seen right after entering), then every dish's small picture, so sections open with pictures already there.
 // Four at a time, only when the browser is idle; nothing on Save-Data, no clips on 2G/3G.
+// Clips fetched ahead are handed to the player from memory: a <video> asks for byte ranges, which Safari does not
+// always serve from the HTTP cache, so without this the same clip could be downloaded twice.
+const CLIP_BLOBS = new Map();
 function warmMedia(clips, images) {
   const c = navigator.connection || {};
   if (c.saveData) return;
@@ -104,7 +107,7 @@ function warmMedia(clips, images) {
       const [kind, url] = queue.shift(), done = () => { active--; next(); };
       active++;
       if (kind === 'img') { const i = new Image(); i.decoding = 'async'; i.onload = i.onerror = done; i.src = url; }
-      else fetch(url, { priority: 'low' }).then(r => r.blob()).catch(() => {}).finally(done);
+      else fetch(url, { priority: 'low' }).then(r => (r.ok ? r.blob() : null)).then(b => { if (b) CLIP_BLOBS.set(url, URL.createObjectURL(b)); }).catch(() => {}).finally(done);
     }
   };
   (window.requestIdleCallback || (f => setTimeout(f, 800)))(next, { timeout: 2500 });
@@ -118,10 +121,12 @@ function ProductClip({ src, v, fit }) {
   React.useEffect(() => {
     const el = ref.current;
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const url = clipFile(stem, v) + (t ? '#t=' + t : '');
+    const file = clipFile(stem, v), blob = CLIP_BLOBS.get(file);
+    // a blob URL takes no media fragment: start on the frame by hand
+    if (blob && t) el.addEventListener('loadedmetadata', () => { el.currentTime = +t; }, { once: true });
     const io = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) return el.pause();
-      if (!el.getAttribute('src')) el.src = url;
+      if (!el.getAttribute('src')) el.src = blob || file + (t ? '#t=' + t : '');
       el.play().catch(() => {});
     }, { rootMargin: '120px' });
     io.observe(el);
@@ -248,6 +253,7 @@ export default class DarkskyMenu extends React.Component {
     this.setState({ ready: true, lang, phase: skip ? 'menu' : 'intro', ...saved }, () => saved && saved.orderId && this.pollOrder(saved.orderId));
     alphaLogo(this.props.logoUrl).then(logoAlpha => this.setState({ logoAlpha })).catch(() => {});
     this.warm();
+    window.addEventListener('scroll', this.onScroll, { passive: true });
     if (skip) setTimeout(() => this.loadTiles(), 300);
     requestAnimationFrame(() => this.layoutIntro());
     this._gt = setInterval(() => { if (this.state.phase !== 'intro') return; this.setState({ gOn: false }); setTimeout(() => this.setState(st => ({ gi: st.gi + 1, gOn: true })), 450); }, 2400);
@@ -267,9 +273,16 @@ export default class DarkskyMenu extends React.Component {
     if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal());
     // the page behind an open sheet must not scroll
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen) ? 'hidden' : '';
+    if (this.scene && !!lock !== this._sheetPause) { this._sheetPause = !!lock; this.pauseSmoke(); }
     if (document.documentElement.style.overflow !== lock) document.documentElement.style.overflow = document.body.style.overflow = lock;
   }
-  componentWillUnmount() { clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); window.removeEventListener('pagehide', this._onHide); document.removeEventListener('visibilitychange', this._onHide); }
+  // the background smoke stands still while a sheet covers it or the page is being scrolled
+  pauseSmoke() { this.scene && this.scene.pause(this._sheetPause || this._scrolling); }
+  onScroll = () => {
+    if (!this._scrolling) { this._scrolling = true; this.pauseSmoke(); }
+    clearTimeout(this._st); this._st = setTimeout(() => { this._scrolling = false; this.pauseSmoke(); }, 250);
+  };
+  componentWillUnmount() { window.removeEventListener('scroll', this.onScroll); clearTimeout(this._st); clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); window.removeEventListener('pagehide', this._onHide); document.removeEventListener('visibilitychange', this._onHide); }
 
   // What warmMedia() fetches in the background: tile clips with their stills, then every dish's small picture
   warm() {
@@ -283,7 +296,7 @@ export default class DarkskyMenu extends React.Component {
     }
     for (const it of this.props.items) {
       const src = it.media || (it.img ? '/api/img/' + it.img : '');
-      if (/^\/media\/.+\.webm(#|$)/.test(src)) images.push(stem(src) + '-th.webp');
+      if (/^\/media\/.+\.webm(#|$)/.test(src)) images.push(stem(src) + '-cover.webp', ...(it.hit ? [stem(src) + '-th.webp'] : [])); // rows show the cover; the house favourites' cards the clip's poster
       else if (src.startsWith('/media/cut/')) images.push(src.replace(/\.webp$/, '-th.webp'));
       else if (src && !/\.(mp4|webm|mov|glb|gltf)$/i.test(src)) images.push(src);
     }
