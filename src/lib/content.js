@@ -16,6 +16,11 @@ export async function getOverrides() {
   return r ? r.value : {};
 }
 
+// Dish card background: plain black (default), the grey glow with drifting smoke, or frosted glass like the home tiles.
+// (Saved before as cardSmoke: true.)
+export const STAGES = ['black', 'smoke', 'glass'];
+const stageOf = o => (STAGES.includes(o.cardStage) ? o.cardStage : o.cardSmoke ? 'smoke' : 'black');
+
 // The shapes DarkskyMenu reads: { SECTIONS, CATS, PROMOS, PROMO_NOTE, RULES, PREP }
 export async function getContent() {
   const o = await getOverrides().catch(e => { console.error('content', e); return {}; });
@@ -28,7 +33,7 @@ export async function getContent() {
   });
   const r = o.rules || {};
   return {
-    CARD_SMOKE: !!o.cardSmoke, // smoke behind the dishes on their cards (off: plain black)
+    CARD_STAGE: stageOf(o), // what is behind the dishes on their cards: 'black' | 'smoke' | 'glass'
     SECTIONS, CATS, PROMOS: o.promos || D.PROMOS, PROMO_NOTE: o.promoNote || D.PROMO_NOTE, PREP: o.prep || PREP,
     RULES: { ...D.RULES, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v != null)) },
   };
@@ -59,7 +64,7 @@ export async function saveContent(input) {
     sections: Object.fromEntries(Object.entries(input.sections || {}).filter(([id]) => ids.has(id)).map(([id, s]) => [id, { n: clean(s.n, 40), tag: clean(s.tag, 120) }])),
     cats: Object.fromEntries(Object.entries(input.cats || {}).filter(([id]) => catIds.has(id)).map(([id, x]) => [id, { n: clean(x.n, 40), hidden: !!x.hidden }])),
     order: Object.fromEntries(Object.entries(input.order || {}).filter(([id]) => ids.has(id)).map(([id, l]) => [id, (Array.isArray(l) ? l : []).filter(x => catIds.has(x))])),
-    prep: clean(input.prep, 60), promoNote: clean(input.promoNote, 200), cardSmoke: !!input.cardSmoke,
+    prep: clean(input.prep, 60), promoNote: clean(input.promoNote, 200), cardStage: STAGES.includes(input.cardStage) ? input.cardStage : 'black',
     promos: Array.isArray(input.promos) ? input.promos.slice(0, 12).map(p => ({
       tag: clean(p.tag, 60), title: clean(p.title, 60), big: String(p.big || '').trim().slice(0, 20), d: clean(p.d, 200),
       window: Array.isArray(p.window) && p.window.length === 2 ? p.window.map(h => Math.max(0, Math.min(24, Math.round(+h) || 0))) : null,
@@ -85,7 +90,7 @@ export async function getContentForm() {
   return {
     sections: D.SECTIONS.map(s => { const c = cur.SECTIONS.find(x => x.id === s.id); return { id: s.id, n: f(c.n), tag: f(c.tag), cats: catsOf(s) }; }),
     cats: Object.fromEntries(cur.CATS.map(c => [c.id, { n: f(c.n), hidden: c.hidden }])),
-    prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardSmoke: cur.CARD_SMOKE,
+    prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardStage: cur.CARD_STAGE,
     promos: cur.PROMOS.map(p => ({ tag: f(p.tag), title: f(p.title), big: p.big || '', d: f(p.d), window: p.window || null })),
     rules: {
       peopleTitle: f(R.peopleTitle), peopleUnit: f(R.peopleUnit), noTitle: f(R.noTitle), liability: f(R.liability),

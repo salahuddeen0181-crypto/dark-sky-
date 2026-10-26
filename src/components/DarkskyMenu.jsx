@@ -164,9 +164,9 @@ function Media({ m, label = true, v = 'full' }) {
   );
 }
 
-// Product stage: plain black, or (smoke on the cards switched on in the admin) a soft light-grey glow behind the dish
-// and drifting smoke from <Media> — see .ds-nosmoke / --ds-stage in globals.css
-const MEDIA_BG = 'position:relative;overflow:hidden;background:var(--ds-stage)';
+// Product stage, chosen in the admin: plain black, a soft light-grey glow with drifting smoke from <Media>, or frosted
+// glass like the home tiles — see .ds-stage-* / --ds-stage in globals.css
+const MEDIA_BG = 'position:relative;overflow:hidden;background:var(--ds-stage);backdrop-filter:var(--ds-stage-blur);-webkit-backdrop-filter:var(--ds-stage-blur)';
 const GLASS_TINT = 'rgba(160,165,180,.13)', GLASS_TINT_TEXT = 'rgba(150,155,170,.17)'; // light veil; a touch denser under running text
 
 function MiniCard({ p, w, mh, bg, btn }) {
@@ -1083,7 +1083,7 @@ export default class DarkskyMenu extends React.Component {
     const v = s.ready ? this.vm() : null;
     const sheetWrap = y => css(`position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:center;pointer-events:none;transform:translateY(${y});transition:transform .45s cubic-bezier(.2,.8,.2,1)`);
     return (
-      <div dir={v && v.rtl ? 'rtl' : 'ltr'} className={this.C.CARD_SMOKE ? undefined : 'ds-nosmoke'} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:clip')}>
+      <div dir={v && v.rtl ? 'rtl' : 'ltr'} className={'ds-stage-' + (this.C.CARD_STAGE || 'black')} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:clip')}>
         <canvas ref={this.canvasRef} style={css('position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;background:radial-gradient(80% 50% at 50% 100%, rgba(232,121,60,.18), rgba(3,3,5,0) 70%), #030305')} />
 
         {/* Crisp logo at native resolution: fades in over the particle lettering once the smoke has condensed into it */}

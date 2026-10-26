@@ -7,6 +7,7 @@ import PromosEditor from './PromosEditor';
 import RulesEditor from './RulesEditor';
 import { LangProvider, LangBar } from '../L3';
 
+const STAGES = [['black', 'Чёрный'], ['smoke', 'Дым'], ['glass', 'Стекло, как плитки главной']];
 const TABS = [['sections', 'Разделы и категории'], ['promos', 'Акции'], ['rules', 'Правила']];
 
 // Menu texts outside the dishes, typed in every language; one save for everything.
@@ -40,10 +41,12 @@ export default function ContentForm({ initial }) {
         </nav>
       </div>
       <p className="-mt-2 text-xs text-white/45">Тексты вводятся на каждом языке вручную. Если язык пустой, гость увидит английский или испанский вариант.</p>
-      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
-        <input type="checkbox" checked={!!c.cardSmoke} onChange={e => set({ cardSmoke: e.target.checked })} className="h-5 w-5 accent-[#e8793c]" />
-        <span>Дым на карточках блюд <span className="text-white/45">— выключено: блюда на чистом чёрном фоне</span></span>
-      </label>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
+        <span>Фон за блюдами на карточках:</span>
+        <div className="flex gap-1 rounded-lg border border-white/10 p-1">
+          {STAGES.map(([k, l]) => <button key={k} onClick={() => set({ cardStage: k })} className={`rounded-md px-3 py-1.5 ${(c.cardStage || 'black') === k ? 'bg-[#f2f2f4] text-[#050507]' : 'text-white/70'}`}>{l}</button>)}
+        </div>
+      </div>
       <LangBar />
 
       {tab === 'sections' && <SectionsEditor c={c} set={set} />}
