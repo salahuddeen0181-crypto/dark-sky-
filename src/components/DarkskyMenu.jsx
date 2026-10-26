@@ -96,18 +96,24 @@ const ORDER_KEEP_MIN = 30; // a saved cart / order not opened or changed for lon
 // Four at a time, only when the browser is idle; nothing on Save-Data, no clips on 2G/3G.
 // Clips fetched ahead are handed to the player from memory: a <video> asks for byte ranges, which Safari does not
 // always serve from the HTTP cache, so without this the same clip could be downloaded twice.
-const CLIP_BLOBS = new Map();
+// A clip already queued here is waited for rather than fetched a second time by its player (CLIP_WAIT).
+const CLIP_BLOBS = new Map(), CLIP_WAIT = new Map();
 function warmMedia(clips, images) {
   const c = navigator.connection || {};
   if (c.saveData) return;
   const queue = [...(/2g|3g/.test(c.effectiveType || '') ? [] : clips.map(u => ['clip', u])), ...images.map(u => ['img', u])];
+  const ready = new Map(); // clip url → resolve(blob url | null)
+  for (const [kind, url] of queue) if (kind === 'clip') CLIP_WAIT.set(url, new Promise(r => ready.set(url, r)));
   let active = 0;
   const next = () => {
     while (active < 4 && queue.length) {
       const [kind, url] = queue.shift(), done = () => { active--; next(); };
       active++;
       if (kind === 'img') { const i = new Image(); i.decoding = 'async'; i.onload = i.onerror = done; i.src = url; }
-      else fetch(url, { priority: 'low' }).then(r => (r.ok ? r.blob() : null)).then(b => { if (b) CLIP_BLOBS.set(url, URL.createObjectURL(b)); }).catch(() => {}).finally(done);
+      else {
+        fetch(url, { priority: 'low' }).then(r => (r.ok ? r.blob() : null)).then(b => b && URL.createObjectURL(b)).catch(() => null)
+          .then(blob => { if (blob) CLIP_BLOBS.set(url, blob); CLIP_WAIT.delete(url); ready.get(url)(blob); done(); });
+      }
     }
   };
   (window.requestIdleCallback || (f => setTimeout(f, 800)))(next, { timeout: 2500 });
@@ -121,16 +127,24 @@ function ProductClip({ src, v, fit }) {
   React.useEffect(() => {
     const el = ref.current;
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const file = clipFile(stem, v), blob = CLIP_BLOBS.get(file);
-    // a blob URL takes no media fragment: start on the frame by hand
-    if (blob && t) el.addEventListener('loadedmetadata', () => { el.currentTime = +t; }, { once: true });
+    const file = clipFile(stem, v);
+    let seen = false, gone = false;
+    const start = blob => {
+      if (gone || el.getAttribute('src')) return;
+      // a blob URL takes no media fragment: start on the frame by hand
+      if (blob && t) el.addEventListener('loadedmetadata', () => { el.currentTime = +t; }, { once: true });
+      el.src = blob || file + (t ? '#t=' + t : '');
+      if (seen) el.play().catch(() => {});
+    };
     const io = new IntersectionObserver(([e]) => {
-      if (!e.isIntersecting) return el.pause();
-      if (!el.getAttribute('src')) el.src = blob || file + (t ? '#t=' + t : '');
-      el.play().catch(() => {});
+      seen = e.isIntersecting;
+      if (!seen) return el.pause();
+      if (el.getAttribute('src')) return void el.play().catch(() => {});
+      const wait = !CLIP_BLOBS.has(file) && CLIP_WAIT.get(file);
+      if (wait) wait.then(start); else start(CLIP_BLOBS.get(file));
     }, { rootMargin: '120px' });
     io.observe(el);
-    return () => { io.disconnect(); el.pause(); };
+    return () => { gone = true; io.disconnect(); el.pause(); };
   }, [stem, t, v]);
   const style = fit ? { ...CLIP, ...fit } : WIDE_CLIPS.has(stem) ? { ...CLIP, transform: 'none' } : CLIP;
   if (v === 'still') return <img src={still} alt="" loading="lazy" style={COVER} />; // eslint-disable-line @next/next/no-img-element
