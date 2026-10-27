@@ -78,6 +78,12 @@ function sheetDrag(el, close, swipe) {
 
 // Drifting smoke behind the products (texture: scripts/make-smoke.mjs, motion: .ds-smoke in globals.css)
 // still: no drift (list rows, where dozens of them would all animate at once)
+const Shield = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flex: 'none' }} aria-hidden="true">
+    <path d="M10 2.2 3.6 4.6v4.8c0 4 2.7 7.2 6.4 8.4 3.7-1.2 6.4-4.4 6.4-8.4V4.6L10 2.2Z" stroke="#e8793c" strokeWidth="1.5" strokeLinejoin="round" />
+    <path d="m7.2 10.1 2 2 3.6-3.8" stroke="#e8793c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 const Smoke = ({ still }) => <div className={still ? 'ds-smoke still' : 'ds-smoke'} aria-hidden="true"><i /><i /></div>;
 
 // Keyed product clip from scripts/key-videos.mjs: the still first, the video only while it is on screen.
@@ -286,7 +292,7 @@ export default class DarkskyMenu extends React.Component {
     if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent)) this.saveOrder();
     if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal());
     // the page behind an open sheet must not scroll
-    const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen) ? 'hidden' : '';
+    const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen || this.state.rulesOpen) ? 'hidden' : '';
     if (this.scene && !!lock !== this._sheetPause) { this._sheetPause = !!lock; this.pauseSmoke(); }
     if (document.documentElement.style.overflow !== lock) document.documentElement.style.overflow = document.body.style.overflow = lock;
   }
@@ -487,7 +493,7 @@ export default class DarkskyMenu extends React.Component {
     const disc = s.cash ? Math.round(sub * 0.15) : 0;
     const inCart = new Set(s.cart.map(l => l.id)), seen = new Set(), suggest = [];
     s.cart.forEach(l => (D.PAIR[this.item(l.id).cat] || []).forEach(id => { if (!inCart.has(id) && !seen.has(id) && suggest.length < 5) { seen.add(id); const x = this.item(id); x && suggest.push(this.miniVm(x)); } }));
-    const anySheet = !!it || s.cartOpen || s.langOpen;
+    const anySheet = !!it || s.cartOpen || s.langOpen || !!s.rulesOpen;
     const R = this.C.RULES;
 
     return {
@@ -501,12 +507,11 @@ export default class DarkskyMenu extends React.Component {
         secVm(SEC('promos'), { col: 'span 2', big: bizLive ? '−20%' : '−15%', border: 'rgba(232,121,60,.4)' }),
       ],
       hits: this.props.items.filter(i => i.hit).map(i => this.miniVm(i)),
-      rulesName: this.tx(SEC('rules').n),
       hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: this.tastes(h), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
       listTitle: searching ? '“' + s.q.trim() + '”' : this.tx(cat.n), items: items.map(x => this.rowVm(x)),
       promos: this.C.PROMOS.map(p => ({ tag: this.tx(p.tag), title: this.tx(p.title), big: p.big, desc: this.tx(p.d), live: live(p.window) })),
       promoNote: this.tx(this.C.PROMO_NOTE),
-      rules: { peopleTitle: this.tx(R.peopleTitle), people: R.people.map(([g, n]) => ({ n, label: g + ' ' + this.tx(R.peopleUnit) })), info: R.info.map(x => this.tx(x)), noTitle: this.tx(R.noTitle), no: R.no.map(x => this.tx(x)), liability: this.tx(R.liability) },
+      rules: { title: this.tx(R.title), noTitle: this.tx(R.noTitle), generalTitle: this.tx(R.generalTitle), ok: this.tx(R.ok), no: R.no.map(x => this.tx(x)), general: R.general.map(x => this.tx(x)) },
       sh, addLabel, lines, suggest, cnt, onReq, anySheet,
       subtotal: this.fmt(sub), discount: '−' + this.fmt(disc), cartTotal: this.fmt(sub - disc),
     };
@@ -598,19 +603,12 @@ export default class DarkskyMenu extends React.Component {
           </div>
         </div>
 
-        {/* house rules: just the title; a tap unfolds them in place (as on darkskyhookah.com) */}
-        <div style={css('margin-top:10px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + GLASS)}>
-          <button onClick={() => this.setState(st => ({ rulesOpen: !st.rulesOpen }))} aria-expanded={!!s.rulesOpen} style={css('width:100%;min-height:60px;padding:0 18px;display:flex;align-items:center;gap:14px;text-align:start')}>
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ flex: 'none' }}><circle cx="11" cy="11" r="9.25" stroke="#e8793c" strokeWidth="1.5" /><path d="M11 10v5.5M11 6.6v.1" stroke="#e8793c" strokeWidth="1.8" strokeLinecap="round" /></svg>
-            <span style={css('flex:1;font:400 12px/1.2 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.rulesName}</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flex: 'none', transform: s.rulesOpen ? 'rotate(180deg)' : 'none', transition: 'transform .25s' }}><path d="M3.5 6l4.5 4.5L12.5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
-          <div style={css(`display:grid;grid-template-rows:${s.rulesOpen ? '1fr' : '0fr'};transition:grid-template-rows .3s ease`)}>
-            <div style={css('overflow:hidden;min-height:0')}>
-              <div style={css('padding:4px 16px 18px;border-top:1px solid rgba(255,255,255,.06)')}><div style={css('padding-top:14px')}>{this.renderRules(v)}</div></div>
-            </div>
-          </div>
-        </div>
+        {/* house rules: just the title; a tap opens them in a sheet (as on darkskyhookah.com) */}
+        <button onClick={() => this.setState({ rulesOpen: true, rulesTab: 'no' })} style={css('margin-top:10px;min-height:60px;padding:0 18px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;align-items:center;gap:14px;text-align:start' + GLASS)}>
+          <Shield />
+          <span style={css('flex:1;font:400 12px/1.2 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.rules.title}</span>
+          <Arrow size={16} w={1.5} flip={v.flip} />
+        </button>
       </div>
     );
   }
@@ -717,32 +715,31 @@ export default class DarkskyMenu extends React.Component {
     );
   }
 
+  // House rules as on darkskyhookah.com: «Prohibited» / «General» tabs, one card per rule
   renderRules(v) {
-    const r = v.rules;
+    const r = v.rules, tab = this.state.rulesTab || 'no', list = tab === 'no' ? r.no : r.general;
+    const seg = (k, mark, label) => {
+      const on = tab === k, red = k === 'no';
+      return (
+        <button onClick={() => this.setState({ rulesTab: k })} style={css(`flex:1;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font:400 10.5px/1 Michroma,sans-serif;letter-spacing:.16em;text-transform:uppercase;transition:background .2s,border-color .2s,color .2s;border:1px solid ${on ? (red ? 'rgba(226,84,74,.7)' : 'rgba(232,121,60,.75)') : 'transparent'};background:${on ? (red ? 'rgba(226,84,74,.18)' : 'rgba(232,121,60,.16)') : 'transparent'};color:${on ? (red ? '#f08a80' : '#f2a676') : 'rgba(242,242,244,.6)'}`)}>
+          <span style={css(`color:${red ? '#e2544a' : '#e8793c'};font:600 13px/1 Manrope,sans-serif`)}>{mark}</span>{label}
+        </button>
+      );
+    };
     return (
-      <div style={css('display:flex;flex-direction:column;gap:22px')}>
-        <div style={css('display:flex;flex-direction:column;gap:12px')}>
-          <h3 style={css('margin:0;font:400 12px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(242,242,244,.75)')}>{r.peopleTitle}</h3>
-          <div style={css('display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px')}>
-            {r.people.map((p, i) => (
-              <div key={i} style={css('padding:16px 8px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + ';display:flex;flex-direction:column;align-items:center;gap:8px' + GLASS)}>
-                <span style={css('font:400 26px/1 Michroma,sans-serif')}>{p.n}</span>
-                <span style={css('font:500 11px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.65);text-align:center')}>{p.label}</span>
-              </div>
-            ))}
+      <div style={css('display:flex;flex-direction:column;gap:12px')}>
+        <div style={css('display:flex;gap:6px;padding:5px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)')}>
+          {seg('no', '×', r.noTitle)}{seg('general', '✓', r.generalTitle)}
+        </div>
+        {list.map((x, i) => (
+          <div key={tab + i} style={css('display:flex;gap:14px;padding:15px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.035);font:400 13.5px/1.5 Manrope,sans-serif;color:rgba(242,242,244,.85)')}>
+            <span style={css(`flex:none;width:12px;text-align:center;font:600 13px/1.5 Manrope,sans-serif;color:${tab === 'no' ? '#e2544a' : '#e8793c'}`)}>{tab === 'no' ? '×' : '✓'}</span><span>{x}</span>
           </div>
-        </div>
-        <div style={css('display:flex;flex-direction:column;gap:10px')}>
-          {r.info.map((x, i) => <div key={i} style={css('display:flex;gap:12px;font:400 14px/1.5 Manrope,sans-serif;color:rgba(242,242,244,.82)')}><span style={css('flex:none;width:6px;height:6px;border-radius:50%;background:#e8793c;margin-top:8px')} /><span>{x}</span></div>)}
-        </div>
-        <div style={css('display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:' + GLASS_TINT_TEXT + GLASS)}>
-          <h3 style={css('margin:0;font:400 12px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#f2a676')}>{r.noTitle}</h3>
-          {r.no.map((x, i) => <div key={i} style={css('display:flex;gap:12px;font:400 14px/1.45 Manrope,sans-serif;color:rgba(242,242,244,.82)')}><span style={css('flex:none;color:#f2a676;font-weight:600')}>×</span><span>{x}</span></div>)}
-        </div>
-        <p style={css('margin:0;font:400 12.5px/1.5 Manrope,sans-serif;color:rgba(242,242,244,.55)')}>{r.liability}</p>
+        ))}
       </div>
     );
   }
+
 
   renderMenu(v) {
     const s = this.state, { t, sec } = v;
@@ -1009,7 +1006,7 @@ export default class DarkskyMenu extends React.Component {
     );
   }
 
-  closeAll() { this.setState({ sheetId: null, cartOpen: false, langOpen: false }); }
+  closeAll() { this.setState({ sheetId: null, cartOpen: false, langOpen: false, rulesOpen: false }); }
   tO(k) { const U = D.UI_ORDER; return (U[this.state.lang] || U.en)[k]; }
 
   async sendOrder() {
@@ -1158,6 +1155,26 @@ export default class DarkskyMenu extends React.Component {
             <div style={sheetWrap(s.cartOpen ? '0%' : '110%')}>
               <div ref={this.dragRef('cart')} style={css('pointer-events:auto;width:100%;max-width:540px;max-height:90dvh;overflow-y:auto;overscroll-behavior:contain;border-radius:26px 26px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;background:#0d0d12')}>
                 {this.renderCart(v)}
+              </div>
+            </div>
+
+            <div style={sheetWrap(s.rulesOpen ? '0%' : '110%')}>
+              {/* the sheet itself scrolls (so pulling it down closes it only from the top); title and button stay put */}
+              <div ref={this.dragRef('rules')} style={css('pointer-events:auto;width:100%;max-width:540px;max-height:86dvh;overflow-y:auto;overscroll-behavior:contain;border-radius:26px 26px 0 0;border:1px solid rgba(232,121,60,.28);border-bottom:0;background:#0d0d12;box-shadow:0 -12px 40px rgba(232,121,60,.08)')}>
+                <div style={css('position:sticky;top:0;z-index:1;background:#0d0d12;padding:10px 20px 0;border-bottom:1px solid rgba(255,255,255,.07)')}>
+                <Grip />
+                <div style={css('display:flex;align-items:center;gap:12px;padding:10px 0 16px')}>
+                  <Shield />
+                  <span style={css('flex:1;font:400 12.5px/1.3 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>
+                    {v.rules.title.split(' ')[0]} <span style={css('color:#e8793c')}>{v.rules.title.split(' ').slice(1).join(' ')}</span>
+                  </span>
+                  <button onClick={() => this.closeAll()} aria-label="Close" style={css('flex:none;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#f2f2f4;display:flex;align-items:center;justify-content:center')}><Close /></button>
+                </div>
+                </div>
+                <div style={css('padding:16px 20px')}>{this.renderRules(v)}</div>
+                <div style={css('position:sticky;bottom:0;background:#0d0d12;padding:12px 20px calc(18px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.06)')}>
+                  <button className="ds-press" onClick={() => this.closeAll()} style={css('width:100%;height:56px;border-radius:16px;border:1px solid rgba(232,121,60,.75);background:rgba(232,121,60,.12);box-shadow:0 0 24px rgba(232,121,60,.18);color:#f2a676;font:400 11px/1 Michroma,sans-serif;letter-spacing:.2em;text-transform:uppercase')}>{v.rules.ok}</button>
+                </div>
               </div>
             </div>
 

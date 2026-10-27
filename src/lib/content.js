@@ -31,7 +31,8 @@ export async function getContent() {
     const cats = [...order, ...s.cats.filter(id => !order.includes(id))].filter(id => !hidden.has(id));
     return { ...s, n: o.sections?.[s.id]?.n || s.n, tag: o.sections?.[s.id]?.tag || s.tag, cats };
   });
-  const r = o.rules || {};
+  // rules2: the house rules in their 2026-10 shape (tabs «Prohibited» / «General»); older saved rules are ignored
+  const r = o.rules2 || {};
   return {
     TASTE: o.tastes || D.TASTE, // taste tags { key: { es, en, … } }, edited in the admin as a whole list
     CARD_STAGE: stageOf(o), // what is behind the dishes on their cards: 'black' | 'smoke' | 'glass'
@@ -86,11 +87,10 @@ export async function saveContent(input) {
       tag: clean(p.tag, 60), title: clean(p.title, 60), big: String(p.big || '').trim().slice(0, 20), d: clean(p.d, 200),
       window: Array.isArray(p.window) && p.window.length === 2 ? p.window.map(h => Math.max(0, Math.min(24, Math.round(+h) || 0))) : null,
     })).filter(p => p.title) : undefined,
-    rules: input.rules ? {
-      peopleTitle: clean(input.rules.peopleTitle, 60), peopleUnit: clean(input.rules.peopleUnit, 30), noTitle: clean(input.rules.noTitle, 40), liability: clean(input.rules.liability, 400),
-      people: (input.rules.people || []).slice(0, 8).map(([g, n]) => [String(g).slice(0, 10), Math.max(1, Math.min(9, Math.round(+n) || 1))]),
-      info: (input.rules.info || []).map(x => clean(x)).filter(Boolean).slice(0, 12),
-      no: (input.rules.no || []).map(x => clean(x)).filter(Boolean).slice(0, 12),
+    rules2: input.rules ? {
+      title: clean(input.rules.title, 40), noTitle: clean(input.rules.noTitle, 40), generalTitle: clean(input.rules.generalTitle, 40), ok: clean(input.rules.ok, 30),
+      no: (input.rules.no || []).map(x => clean(x)).filter(Boolean).slice(0, 15),
+      general: (input.rules.general || []).map(x => clean(x)).filter(Boolean).slice(0, 15),
     } : undefined,
   };
 
@@ -110,9 +110,6 @@ export async function getContentForm() {
     tastes: Object.entries(cur.TASTE).map(([k, n]) => ({ k, n: f(n) })),
     prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardStage: cur.CARD_STAGE,
     promos: cur.PROMOS.map(p => ({ tag: f(p.tag), title: f(p.title), big: p.big || '', d: f(p.d), window: p.window || null })),
-    rules: {
-      peopleTitle: f(R.peopleTitle), peopleUnit: f(R.peopleUnit), noTitle: f(R.noTitle), liability: f(R.liability),
-      people: R.people.map(([g, n]) => [g, n]), info: R.info.map(f), no: R.no.map(f),
-    },
+    rules: { title: f(R.title), noTitle: f(R.noTitle), generalTitle: f(R.generalTitle), ok: f(R.ok), no: R.no.map(f), general: R.general.map(f) },
   };
 }
