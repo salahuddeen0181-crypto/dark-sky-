@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ru, fmt, thumb } from './api';
@@ -35,13 +35,41 @@ export default function MenuAdmin({ items: initial, cats }) {
     try { await api(`/api/admin/items/${id}`, 'PATCH', change); router.refresh(); }
     catch (e) { setErr(e.message); setItems(initial); }
   }
-  async function move(cat, id, dir) {
-    const list = items.filter(x => x.cat === cat), i = list.findIndex(x => x.id === id), j = i + dir;
-    if (j < 0 || j >= list.length) return;
-    [list[i], list[j]] = [list[j], list[i]];
-    const order = new Map(list.map((x, k) => [x.id, k]));
-    setItems(xs => [...xs].sort((a, b) => (a.cat === cat && b.cat === cat ? order.get(a.id) - order.get(b.id) : 0)));
-    try { await api('/api/admin/items/reorder', 'POST', { ids: list.map(x => x.id) }); router.refresh(); } catch (e) { setErr(e.message); }
+  // MARK: - Drag to reorder (mouse or finger) by the ⋮⋮ handle; saved when the dish is let go.
+  // Only on the full list: with a search or the stop-list filter some dishes are out of sight.
+  const [drag, setDrag] = useState(null); // { cat, id } — for the look of the row being dragged
+  const dragging = useRef(null), order = useRef(null); // the same, read by the pointer handlers between renders
+  const lists = useRef({}); // category → its <ul>
+  const filtered = !!q || onlyStop;
+  function startDrag(e, cat, id) {
+    if (filtered || e.button > 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragging.current = { cat, id }; order.current = null;
+    setDrag({ cat, id });
+  }
+  const latest = useRef(items); latest.current = items; // the list as the last move left it
+  function dragMove(e) {
+    const drag = dragging.current;
+    if (!drag) return;
+    // the dish goes after every other row whose middle is above the pointer
+    const rows = [...(lists.current[drag.cat]?.children || [])].filter(r => r.dataset.id !== drag.id);
+    const to = rows.filter(r => { const b = r.getBoundingClientRect(); return b.top + b.height / 2 < e.clientY; }).length;
+    const xs = latest.current, list = xs.filter(x => x.cat === drag.cat), from = list.findIndex(x => x.id === drag.id);
+    if (from === to) return;
+    const [it] = list.splice(from, 1); list.splice(to, 0, it);
+    let k = 0;
+    latest.current = xs.map(x => (x.cat === drag.cat ? list[k++] : x));
+    order.current = list.map(x => x.id);
+    setItems(latest.current);
+  }
+  async function endDrag(e) {
+    if (!dragging.current) return;
+    dragMove(e); // a quick drag may end without a move event
+    dragging.current = null; setDrag(null);
+    const ids = order.current; order.current = null;
+    if (!ids) return; // let go where it was
+    try { await api('/api/admin/items/reorder', 'POST', { ids }); router.refresh(); } catch (err) { setErr(err.message); setItems(initial); }
   }
 
   const stopCount = items.filter(x => x.hidden).length;
@@ -54,6 +82,7 @@ export default function MenuAdmin({ items: initial, cats }) {
         <Link href="/admin/items/new" className="flex h-10 items-center rounded-xl bg-[#f2f2f4] px-4 text-sm font-semibold text-[#050507]">+ Добавить блюдо</Link>
       </div>
       {err && <div className="rounded-xl border border-[#e8793c]/50 bg-[#e8793c]/10 px-4 py-3 text-sm text-[#f6c3a3]">{err}</div>}
+      <p className="-mt-3 text-xs text-white/45">{filtered ? 'Чтобы менять порядок, очистите поиск и снимите «Стоп-лист».' : 'Порядок блюд — перетащите за ⋮⋮ слева.'}</p>
 
       {cats.map(c => {
         const list = visible.filter(x => x.cat === c.id);
@@ -63,9 +92,12 @@ export default function MenuAdmin({ items: initial, cats }) {
             <h2 className="flex items-baseline justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold uppercase tracking-[.12em]">
               {c.name}<span className="text-xs font-medium text-white/40">{list.length}</span>
             </h2>
-            <ul>
-              {list.map((it, i) => (
-                <li key={it.id} className={`flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-0 ${it.hidden ? 'opacity-55' : ''}`}>
+            <ul ref={el => { lists.current[c.id] = el; }}>
+              {list.map(it => (
+                <li key={it.id} data-id={it.id} className={`flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-0 ${it.hidden ? 'opacity-55' : ''} ${drag?.id === it.id ? 'relative z-10 rounded-xl bg-[#1d1d26] shadow-[0_8px_24px_rgba(0,0,0,.5)] outline outline-1 outline-[#e8793c]/60' : ''}`}>
+                  <button type="button" aria-label="Перетащить" title={filtered ? '' : 'Перетащить'} disabled={filtered}
+                    onPointerDown={e => startDrag(e, c.id, it.id)} onPointerMove={dragMove} onPointerUp={endDrag} onPointerCancel={endDrag}
+                    className={`-ml-2 flex h-10 w-6 flex-none touch-none select-none items-center justify-center rounded text-lg leading-none text-white/35 hover:text-white/80 disabled:opacity-0 ${drag?.id === it.id ? 'cursor-grabbing text-[#f2a676]' : 'cursor-grab'}`}>⋮⋮</button>
                   <div className="h-12 w-12 flex-none overflow-hidden rounded-lg bg-[radial-gradient(circle_at_50%_35%,rgba(232,121,60,.18),#0c0c10_70%)]">
                     {(it.img || it.media) && <img alt="" src={thumb(it.img, it.media)} className="h-full w-full object-cover" />}
                   </div>
@@ -77,10 +109,6 @@ export default function MenuAdmin({ items: initial, cats }) {
                       {it.hidden && <span className="rounded border border-[#e8793c]/60 px-1.5 py-0.5 text-[10px] font-bold uppercase text-[#f2a676]">стоп</span>}
                     </div>
                     <div className="truncate text-xs text-white/50">{priceLabel(it)}{ru(it.d) ? ' · ' + ru(it.d) : ''}</div>
-                  </div>
-                  <div className="flex flex-none items-center gap-1 text-white/60">
-                    <button disabled={i === 0} onClick={() => move(c.id, it.id, -1)} className="h-8 w-8 rounded-lg hover:bg-white/10 disabled:opacity-20" aria-label="Выше">↑</button>
-                    <button disabled={i === list.length - 1} onClick={() => move(c.id, it.id, 1)} className="h-8 w-8 rounded-lg hover:bg-white/10 disabled:opacity-20" aria-label="Ниже">↓</button>
                   </div>
                   <label className="flex flex-none items-center gap-2 text-xs text-white/60">
                     <span className="hidden sm:inline">{it.hidden ? 'Нет в наличии' : 'В наличии'}</span>
