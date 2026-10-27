@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ru, fmt, thumb } from './api';
@@ -36,37 +36,73 @@ export default function MenuAdmin({ items: initial, cats }) {
     catch (e) { setErr(e.message); setItems(initial); }
   }
   // MARK: - Drag to reorder (mouse or finger) by the ⋮⋮ handle; saved when the dish is let go.
-  // Only on the full list: with a search or the stop-list filter some dishes are out of sight.
+  // The dragged row follows the pointer; the others glide out of its way (FLIP: the layout jumps, a transform
+  // takes each row from where it was to its new place). Only on the full list: with a search or the stop-list
+  // filter some dishes are out of sight.
   const [drag, setDrag] = useState(null); // { cat, id } — for the look of the row being dragged
-  const dragging = useRef(null), order = useRef(null); // the same, read by the pointer handlers between renders
+  const dragging = useRef(null), order = useRef(null); // read by the pointer handlers between renders
   const lists = useRef({}); // category → its <ul>
+  const before = useRef(null); // row id → its top on screen just before a reorder
+  const latest = useRef(items); latest.current = items; // the list as the last move left it
   const filtered = !!q || onlyStop;
+  const rowsOf = cat => [...(lists.current[cat]?.children || [])];
+
+  // the dragged row sits under the pointer, wherever its slot in the layout is now
+  function follow() {
+    const d = dragging.current, el = d && rowsOf(d.cat).find(r => r.dataset.id === d.id);
+    if (!el) return;
+    el.style.transition = 'none';
+    el.style.transform = `translateY(${d.y - d.grab - el.offsetTop}px)`;
+  }
+  useLayoutEffect(() => {
+    const d = dragging.current, prev = before.current;
+    before.current = null;
+    if (!d || !prev) return;
+    for (const el of rowsOf(d.cat)) {
+      if (el.dataset.id === d.id || prev[el.dataset.id] == null) continue;
+      const dy = prev[el.dataset.id] - el.getBoundingClientRect().top;
+      if (!dy) continue;
+      el.style.transition = 'none'; el.style.transform = `translateY(${dy}px)`;
+      el.getBoundingClientRect(); // commit the start position before animating from it
+      el.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)'; el.style.transform = '';
+    }
+    follow();
+  }, [items]);
+
   function startDrag(e, cat, id) {
     if (filtered || e.button > 0) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragging.current = { cat, id }; order.current = null;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not a live pointer: moves still reach the handle */ }
+    const el = e.currentTarget.closest('li'), ul = lists.current[cat];
+    const y = e.clientY - ul.getBoundingClientRect().top; // pointer within the list
+    dragging.current = { cat, id, y, grab: y - el.offsetTop, h: el.offsetHeight }; order.current = null;
     setDrag({ cat, id });
   }
-  const latest = useRef(items); latest.current = items; // the list as the last move left it
   function dragMove(e) {
-    const drag = dragging.current;
-    if (!drag) return;
-    // the dish goes after every other row whose middle is above the pointer
-    const rows = [...(lists.current[drag.cat]?.children || [])].filter(r => r.dataset.id !== drag.id);
-    const to = rows.filter(r => { const b = r.getBoundingClientRect(); return b.top + b.height / 2 < e.clientY; }).length;
-    const xs = latest.current, list = xs.filter(x => x.cat === drag.cat), from = list.findIndex(x => x.id === drag.id);
+    const d = dragging.current;
+    if (!d) return;
+    d.y = e.clientY - lists.current[d.cat].getBoundingClientRect().top;
+    follow();
+    // the dragged row's middle passes the middle of a neighbour → they swap (layout positions, steady while gliding)
+    const mid = d.y - d.grab + d.h / 2, rows = rowsOf(d.cat);
+    const to = rows.filter(r => r.dataset.id !== d.id && r.offsetTop + r.offsetHeight / 2 < mid).length;
+    const xs = latest.current, list = xs.filter(x => x.cat === d.cat), from = list.findIndex(x => x.id === d.id);
     if (from === to) return;
+    before.current = Object.fromEntries(rows.map(r => [r.dataset.id, r.getBoundingClientRect().top]));
     const [it] = list.splice(from, 1); list.splice(to, 0, it);
     let k = 0;
-    latest.current = xs.map(x => (x.cat === drag.cat ? list[k++] : x));
+    latest.current = xs.map(x => (x.cat === d.cat ? list[k++] : x));
     order.current = list.map(x => x.id);
     setItems(latest.current);
   }
   async function endDrag(e) {
-    if (!dragging.current) return;
+    const d = dragging.current;
+    if (!d) return;
     dragMove(e); // a quick drag may end without a move event
     dragging.current = null; setDrag(null);
+    // the row settles into its slot
+    const el = rowsOf(d.cat).find(r => r.dataset.id === d.id);
+    if (el) { el.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)'; el.style.transform = ''; }
     const ids = order.current; order.current = null;
     if (!ids) return; // let go where it was
     try { await api('/api/admin/items/reorder', 'POST', { ids }); router.refresh(); } catch (err) { setErr(err.message); setItems(initial); }
@@ -92,7 +128,7 @@ export default function MenuAdmin({ items: initial, cats }) {
             <h2 className="flex items-baseline justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold uppercase tracking-[.12em]">
               {c.name}<span className="text-xs font-medium text-white/40">{list.length}</span>
             </h2>
-            <ul ref={el => { lists.current[c.id] = el; }}>
+            <ul ref={el => { lists.current[c.id] = el; }} className="relative">
               {list.map(it => (
                 <li key={it.id} data-id={it.id} className={`flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-0 ${it.hidden ? 'opacity-55' : ''} ${drag?.id === it.id ? 'relative z-10 rounded-xl bg-[#1d1d26] shadow-[0_8px_24px_rgba(0,0,0,.5)] outline outline-1 outline-[#e8793c]/60' : ''}`}>
                   <button type="button" aria-label="Перетащить" title={filtered ? '' : 'Перетащить'} disabled={filtered}
