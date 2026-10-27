@@ -13,7 +13,14 @@
 	@media path /media/*
 	# fresh for an hour, then the browser shows its copy and fetches an updated clip in the background
 	header @media >Cache-Control "public, max-age=3600, stale-while-revalidate=604800"
-	reverse_proxy app:3000
+	# no request is bigger than a photo upload (≤1.5 MB)
+	request_body {
+		max_size 2MB
+	}
+	# the real visitor address for the login limits (client_ip: CF-Connecting-IP, see above); replaces any sent by the client
+	reverse_proxy app:3000 {
+		header_up X-Real-IP {client_ip}
+	}
 }
 
 www.{$SITE_HOST} {

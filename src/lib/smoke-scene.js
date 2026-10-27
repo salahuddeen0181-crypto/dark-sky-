@@ -202,7 +202,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
 
   let enterT = 0, dim = 1, dimT = 1, t = 0, last = performance.now(), raf = 0, rotY = 0, rotX = 0, half = false, paused = false;
   let surgeT = -99; // a section change: the smoke thickens for a moment (see burst())
-  const SURGE = 1.3;
+  const SURGE = 0.7;
 
   function step(dt) {
     t += dt;
@@ -210,7 +210,7 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
     ptr.s *= decay; ptr.vx *= Math.exp(-dt * 5); ptr.vy *= Math.exp(-dt * 5);
     dim += (dimT - dim) * Math.min(1, dt * 2);
     // surge: rises fast, then thins out over SURGE seconds
-    const age = t - surgeT, surge = age < 0 || age > SURGE ? 0 : Math.min(1, age / .18) * Math.pow(1 - age / SURGE, 1.6), d = dim + surge * .56;
+    const age = t - surgeT, surge = age < 0 || age > SURGE ? 0 : Math.min(1, age / .18) * Math.pow(1 - age / SURGE, 1.6), d = dim + surge * .12;
     bgU.uTime.value = t; bgU.uPtrS.value = ptr.s; bgU.uDim.value = d;
     S.mat.uniforms.uOpacity.value = .15 + .6 * Math.min(1.15, d); bgU.uGlow.value = d; bgU.uEdge.value += ((entered ? 1 : 0) - bgU.uEdge.value) * Math.min(1, dt * 1.5);
 
@@ -350,15 +350,15 @@ export async function createSmoke(canvas, { logoUrl, onSlow, onLanded } = {}) {
     // frozen on its last frame: under a dish card or the cart (nothing of it shows), and while the page scrolls — then
     // the glass cards need not re-blur a moving background every frame and the phone has its GPU for the clips
     pause(on) { paused = !!on; },
-    // Moving between menu sections: the chosen card breaks up into smoke (puffs spread over its area, CSS px)
-    // and the smoke behind the page thickens for a moment
+    // Moving between menu sections: a few wisps over the chosen card (CSS px)
+    // and the smoke behind the page sways a little
     burst(cx, cy, rw = 0, rh = 0) {
       const w = window.innerWidth, h = window.innerHeight, sx = VW / w, sy = VH / h;
       const x = (cx / w * 2 - 1) * VW / 2, y = -(cy / h * 2 - 1) * VH / 2;
-      // grey wisps scattered over the whole card, so it reads as one cloud (no bright spot where the finger was)
+      // a few faint grey wisps over the card: the smoke only sways a little (no thick cloud, no bright spot)
       const ex = Math.max(.5, rw * sx / 2), ey = Math.max(.35, rh * sy / 2);
-      for (let k = 0; k < 70; k++) puff(x + (Math.random() * 2 - 1) * ex, y + (Math.random() * 2 - 1) * ey, 1, .6, 0);
-      surgeT = t; ptr.s = .75;
+      for (let k = 0; k < 10; k++) puff(x + (Math.random() * 2 - 1) * ex, y + (Math.random() * 2 - 1) * ey, 1, .25, 0);
+      surgeT = t; ptr.s = .3;
     },
     setTopFree(px) { topFree = px; return layoutLogo(); },
     // where the logo picture sits on screen (CSS px), matching the particle lettering

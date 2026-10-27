@@ -46,16 +46,25 @@ const staffMac = async (exp, who) => crypto.createHmac('sha256', await staffKey(
 export const pinConfigured = tabletConfigured;
 export const checkPin = checkTabletPin;
 
-// A short PIN or password is easy to guess: at most 5 wrong tries per address in 10 minutes (per server instance).
+// The visitor's address: Caddy sets X-Real-IP from Cloudflare's CF-Connecting-IP (trusted only from Cloudflare's
+// ranges) and overwrites whatever the client sent. X-Forwarded-For is not used: its first entry is the client's own.
+export const clientIp = req => (req.headers.get('x-real-ip') || '').trim() || 'local';
+
+// A short PIN or password is easy to guess: at most 5 wrong tries per address in 10 minutes (per server instance),
+// and at most 30 wrong staff PINs in 10 minutes from everyone together (guessing from many addresses).
 // Keys: the address for staff PINs, 'admin:' + address for the admin password.
+const WINDOW = 10 * 60e3, ALL = '*pin';
 const tries = (globalThis.__darkskyPinTries ||= new Map());
+const live = t => !!t && Date.now() - t.at < WINDOW;
 export function pinLocked(ip) {
-  const t = tries.get(ip);
-  return !!t && t.n >= 5 && Date.now() - t.at < 10 * 60e3;
+  const t = tries.get(ip), all = tries.get(ALL);
+  return (live(t) && t.n >= 5) || (!ip.startsWith('admin:') && live(all) && all.n >= 30);
 }
 export function pinFailed(ip) {
-  const t = tries.get(ip);
-  tries.set(ip, t && Date.now() - t.at < 10 * 60e3 ? { n: t.n + 1, at: t.at } : { n: 1, at: Date.now() });
+  const bump = k => { const t = tries.get(k); tries.set(k, live(t) ? { n: t.n + 1, at: t.at } : { n: 1, at: Date.now() }); };
+  bump(ip);
+  if (!ip.startsWith('admin:')) bump(ALL);
+  if (tries.size > 500) for (const [k, t] of tries) if (!live(t)) tries.delete(k); // old entries go
 }
 
 // who: 'pin', a staff id, or 'p' + staff id → the session value (also returned to the Mini App for the header)
@@ -70,7 +79,11 @@ export async function endStaffSession() { (await cookies()).delete(STAFF); }
 // Who is using the staff app: { id, name, kind: 'waiter' | 'pin' | 'admin', via: 'tg' | 'pin' } or null.
 // A waiter blocked or not yet approved in the admin is out at once.
 export async function getStaff() {
-  const v = (await headers()).get('x-staff-session') || (await cookies()).get(STAFF)?.value || '';
+  // the cookie counts only for this site's own requests: a form on another site posting here (the cookie is
+  // SameSite=None for the Telegram iframe) carries a foreign Origin. Page navigations send no Origin.
+  const h = await headers(), origin = h.get('origin'), host = h.get('x-forwarded-host') || h.get('host');
+  const own = !origin || (() => { try { return new URL(origin).host === host; } catch { return false; } })();
+  const v = h.get('x-staff-session') || (own && (await cookies()).get(STAFF)?.value) || '';
   const [exp, who, sig] = v.split('.');
   if (exp && who && sig && Number(exp) > Date.now() && same(sig, await staffMac(exp, who))) {
     if (who === 'pin' && (await tabletConfigured())) return { id: 0, name: '', kind: 'pin' };

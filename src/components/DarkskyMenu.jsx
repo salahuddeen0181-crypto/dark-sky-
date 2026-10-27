@@ -343,17 +343,18 @@ export default class DarkskyMenu extends React.Component {
     }
     return this._refs[key];
   }
-  // Section change: a cloud of smoke bursts from the tap, the page dissolves into it and the next one condenses out
+  // Section change: a little smoke sways over the tapped card, the page quickly fades and the next one comes in (the smoke can be switched off in the admin)
   nav(view, sec, e) {
     const go = () => {
       document.querySelector('.ds-page.ds-picking')?.classList.remove('ds-picking'); // the page element stays, the cards don't
       const S = sec && this.C.SECTIONS.find(x => x.id === sec);
       this.setState({ view, sec: sec || null, cat: (S && S.cats[0]) || 'hookah', q: '', searchOpen: false, contentOn: false, leaving: false });
       window.scrollTo(0, 0);
-      clearTimeout(this._nt); this._nt = setTimeout(() => this.setState({ contentOn: true }), 60);
+      clearTimeout(this._nt); this._nt = setTimeout(() => this.setState({ contentOn: true }), 30);
     };
     const calm = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!this.scene || this.state.phase !== 'menu' || calm || this.state.leaving || this._picking) return go();
+    if (this.C.NAV_SMOKE === false) { this.setState({ leaving: true }); clearTimeout(this._lt); this._lt = setTimeout(go, 130); return; } // switched off in the admin: just a quick fade
     // a section card first lifts and lights up while the rest of the page steps back, then breaks up into smoke
     const card = e && e.currentTarget && e.currentTarget.closest && e.currentTarget.closest('[data-tile]');
     const smoke = () => {
@@ -362,13 +363,13 @@ export default class DarkskyMenu extends React.Component {
       else { const p = e && e.clientX ? e : { clientX: innerWidth / 2, clientY: innerHeight / 2 }; this.scene.burst(p.clientX, p.clientY); }
       this._picking = false;
       this.setState({ leaving: true });
-      clearTimeout(this._lt); this._lt = setTimeout(go, 240);
+      clearTimeout(this._lt); this._lt = setTimeout(go, 130);
     };
     if (!card) return smoke();
     this._picking = true;
     card.classList.add('ds-picked');
     card.closest('.ds-page')?.classList.add('ds-picking');
-    clearTimeout(this._lt); this._lt = setTimeout(smoke, 170);
+    clearTimeout(this._lt); this._lt = setTimeout(smoke, 90);
   }
   layoutIntro() {
     const el = this.introRef.current, h = window.innerHeight;
@@ -780,8 +781,8 @@ export default class DarkskyMenu extends React.Component {
         </div>
 
         <div className="ds-page" style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;${s.leaving
-          ? 'opacity:0;transform:scale(1.035);filter:blur(7px);transition:opacity .24s ease-in, transform .24s ease-in, filter .24s ease-in'
-          : `opacity:${s.contentOn ? 1 : 0};transform:${s.contentOn ? 'none' : 'translateY(10px) scale(.985)'};filter:${s.contentOn ? 'none' : 'blur(8px)'};transition:opacity .45s ease, transform .5s cubic-bezier(.2,.8,.2,1), filter .45s ease`}`)}>
+          ? 'opacity:0;transform:scale(1.02);filter:blur(4px);transition:opacity .13s ease-in, transform .13s ease-in, filter .13s ease-in'
+          : `opacity:${s.contentOn ? 1 : 0};transform:${s.contentOn ? 'none' : 'translateY(10px) scale(.985)'};filter:${s.contentOn ? 'none' : 'blur(8px)'};transition:opacity .28s ease, transform .3s cubic-bezier(.2,.8,.2,1), filter .28s ease`}`)}>
           {v.kind === 'home' && this.renderHome(v)}
           {!v.searching && sec && sec.id !== 'rules' && (
             <div style={css('position:relative;overflow:hidden;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), ' + GLASS_TINT + GLASS)}>
@@ -1175,7 +1176,7 @@ export default class DarkskyMenu extends React.Component {
                 </div>
                 <div style={css('padding:16px 20px')}>{this.renderRules(v)}</div>
                 <div style={css('position:sticky;bottom:0;background:#0d0d12;padding:12px 20px calc(18px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.06)')}>
-                  <button className="ds-press" onClick={() => this.closeAll()} style={css('width:100%;height:56px;border-radius:16px;border:1px solid rgba(232,121,60,.75);background:rgba(232,121,60,.12);box-shadow:0 0 24px rgba(232,121,60,.18);color:#f2a676;font:400 11px/1 Michroma,sans-serif;letter-spacing:.2em;text-transform:uppercase')}>{v.rules.ok}</button>
+                  <button className="ds-press" onClick={() => this.closeAll()} style={css('width:100%;height:56px;border-radius:16px;border:1px solid rgba(232,121,60,.75);background:rgba(232,121,60,.12);box-shadow:0 0 24px rgba(232,121,60,.18);color:#f2a676;font:400 11px/1 Michroma,sans-serif;letter-spacing:.2em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 16px 0 calc(16px + .2em)')}>{v.rules.ok}</button>
                 </div>
               </div>
             </div>

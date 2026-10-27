@@ -48,6 +48,12 @@ export default function ContentForm({ initial }) {
           {STAGES.map(([k, l]) => <button key={k} onClick={() => set({ cardStage: k })} className={`rounded-md px-3 py-1.5 ${(c.cardStage || 'black') === k ? 'bg-[#f2f2f4] text-[#050507]' : 'text-white/70'}`}>{l}</button>)}
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
+        <span>Дым при переходе между разделами:</span>
+        <div className="flex gap-1 rounded-lg border border-white/10 p-1">
+          {[[true, 'Вкл'], [false, 'Выкл']].map(([k, l]) => <button key={l} onClick={() => set({ navSmoke: k })} className={`rounded-md px-3 py-1.5 ${(c.navSmoke !== false) === k ? 'bg-[#f2f2f4] text-[#050507]' : 'text-white/70'}`}>{l}</button>)}
+        </div>
+      </div>
       <LangBar />
 
       {tab === 'sections' && <SectionsEditor c={c} set={set} />}

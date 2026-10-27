@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { tg, staffChatId, webhookSecret, botInfo } from '@/lib/telegram';
+import { tg, staffChatId, webhookSecret, botInfo, esc } from '@/lib/telegram';
 import { acceptOrder, serveOrder, getOrder } from '@/lib/orders';
 import { staffReady, registerTg, getStaffByTg, openShift, startShift, endShift } from '@/lib/staff';
 import { siteUrl } from '@/lib/site';
@@ -44,7 +44,7 @@ async function onPrivate(msg) {
   if (!staffReady()) return reply('Учёт официантов пока не настроен (нет базы данных).');
   const s = await registerTg(msg.from);
   if (s.status === 'blocked') return reply('Доступ закрыт администратором.');
-  if (s.status === 'pending') return reply(`Привет, ${s.name}! Заявка отправлена администратору — после одобрения здесь откроется приложение для заказов.`);
+  if (s.status === 'pending') return reply(`Привет, ${esc(s.name)}! Заявка отправлена администратору — после одобрения здесь откроется приложение для заказов.`);
   if (/^\/smena\b/.test(msg.text || '')) {
     const open = await openShift(s.id);
     if (open) { await endShift(s.id); return reply(`Смена закончена (с ${hhmm(open.started_at)} до ${hhmm(Date.now())}). Спасибо!`); }
@@ -52,7 +52,7 @@ async function onPrivate(msg) {
     return reply('Смена начата ✅ Закончить — снова /smena или кнопкой в приложении.', { reply_markup: await appButton() });
   }
   const shift = await openShift(s.id);
-  return reply(`${s.name}, вы в команде DARKSKY. ${shift ? `На смене с ${hhmm(shift.started_at)}.` : 'Смена не начата — /smena.'}\nЗаказы приходят в группу официантов, одобрять и править — в приложении.`, { reply_markup: await appButton() });
+  return reply(`${esc(s.name)}, вы в команде DARKSKY. ${shift ? `На смене с ${hhmm(shift.started_at)}.` : 'Смена не начата — /smena.'}\nЗаказы приходят в группу официантов, одобрять и править — в приложении.`, { reply_markup: await appButton() });
 }
 
 // Telegram webhook: group buttons, the waiters' private chats and the /id helper.

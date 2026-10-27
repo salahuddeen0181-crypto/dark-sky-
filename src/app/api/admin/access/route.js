@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { denyUnlessAdmin, startSession, pinLocked, pinFailed } from '@/lib/auth';
+import { denyUnlessAdmin, startSession, pinLocked, pinFailed, clientIp } from '@/lib/auth';
 import { checkAdminPassword, setAdminPassword, setTabletPin, isPin } from '@/lib/credentials';
 import { staffReady, findStaffByPin } from '@/lib/staff';
 
@@ -10,7 +10,7 @@ export async function POST(req) {
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: 'Без базы данных пароли задаются только в .env' }, { status: 503 });
   const b = await req.json().catch(() => ({}));
   if (b.action === 'password') {
-    const ip = 'admin:' + ((req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'local');
+    const ip = 'admin:' + clientIp(req);
     if (pinLocked(ip)) return NextResponse.json({ error: 'Слишком много попыток, подождите 10 минут' }, { status: 429 });
     if (!(await checkAdminPassword(b.current))) { pinFailed(ip); return NextResponse.json({ error: 'Текущий пароль неверный' }, { status: 400 }); }
     const next = String(b.next || '');

@@ -19,7 +19,7 @@ export async function tg(method, body = {}) {
   return j.result;
 }
 
-const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+export const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const tz = () => process.env.VENUE_TIMEZONE || 'America/Argentina/Buenos_Aires';
 const hhmm = d => new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: tz() });
 

@@ -36,6 +36,7 @@ export async function getContent() {
   return {
     TASTE: o.tastes || D.TASTE, // taste tags { key: { es, en, … } }, edited in the admin as a whole list
     CARD_STAGE: stageOf(o), // what is behind the dishes on their cards: 'black' | 'smoke' | 'glass'
+    NAV_SMOKE: o.navSmoke !== false, // a little smoke when moving between menu sections (off: just a fade)
     SECTIONS, CATS, PROMOS: o.promos || D.PROMOS, PROMO_NOTE: o.promoNote || D.PROMO_NOTE, PREP: o.prep || PREP,
     RULES: { ...D.RULES, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v != null)) },
   };
@@ -82,7 +83,7 @@ export async function saveContent(input) {
     cats: Object.fromEntries(Object.entries(input.cats || {}).filter(([id]) => catIds.has(id)).map(([id, x]) => [id, { n: clean(x.n, 40), hidden: !!x.hidden }])),
     order: Object.fromEntries(Object.entries(input.order || {}).filter(([id]) => ids.has(id)).map(([id, l]) => [id, (Array.isArray(l) ? l : []).filter(x => catIds.has(x))])),
     tastes: Array.isArray(input.tastes) ? cleanTastes(input.tastes) : undefined,
-    prep: clean(input.prep, 60), promoNote: clean(input.promoNote, 200), cardStage: STAGES.includes(input.cardStage) ? input.cardStage : 'black',
+    prep: clean(input.prep, 60), promoNote: clean(input.promoNote, 200), cardStage: STAGES.includes(input.cardStage) ? input.cardStage : 'black', navSmoke: input.navSmoke !== false,
     promos: Array.isArray(input.promos) ? input.promos.slice(0, 12).map(p => ({
       tag: clean(p.tag, 60), title: clean(p.title, 60), big: String(p.big || '').trim().slice(0, 20), d: clean(p.d, 200),
       window: Array.isArray(p.window) && p.window.length === 2 ? p.window.map(h => Math.max(0, Math.min(24, Math.round(+h) || 0))) : null,
@@ -108,7 +109,7 @@ export async function getContentForm() {
     sections: D.SECTIONS.map(s => { const c = cur.SECTIONS.find(x => x.id === s.id); return { id: s.id, n: f(c.n), tag: f(c.tag), cats: catsOf(s) }; }),
     cats: Object.fromEntries(cur.CATS.map(c => [c.id, { n: f(c.n), hidden: c.hidden }])),
     tastes: Object.entries(cur.TASTE).map(([k, n]) => ({ k, n: f(n) })),
-    prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardStage: cur.CARD_STAGE,
+    prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardStage: cur.CARD_STAGE, navSmoke: cur.NAV_SMOKE,
     promos: cur.PROMOS.map(p => ({ tag: f(p.tag), title: f(p.title), big: p.big || '', d: f(p.d), window: p.window || null })),
     rules: { title: f(R.title), noTitle: f(R.noTitle), generalTitle: f(R.generalTitle), ok: f(R.ok), no: R.no.map(f), general: R.general.map(f) },
   };
