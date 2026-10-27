@@ -50,6 +50,9 @@ create index if not exists orders_created on orders (created_at desc);
 
 -- Guest's comment for the waiter; edited_at: staff changed the lines (something ran out).
 alter table orders add column if not exists note text;
+-- a table's own name instead of its number («VIP 1»); the order keeps the name it had when it was placed
+alter table tables add column if not exists label text;
+alter table orders add column if not exists table_label text;
 alter table orders add column if not exists edited_at timestamptz;
 
 -- Admin-edited site content (home tiles, categories, promotions, rules) over the bundled defaults: key 'content'.

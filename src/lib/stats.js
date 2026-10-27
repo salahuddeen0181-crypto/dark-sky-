@@ -3,6 +3,7 @@ import * as S from './order-store';
 import { getMenuItems } from './menu-server';
 import * as D from './darksky-data';
 import { shiftsSince, onShift } from './staff';
+import { tableName } from './table-name';
 
 // Order statistics for the admin. A lounge night runs past midnight, so a "day" is a shift: 06:00 → 06:00 venue time.
 const TZ = () => process.env.VENUE_TIMEZONE || 'America/Argentina/Buenos_Aires';
@@ -82,7 +83,7 @@ export async function report(period = '7d') {
       const c = catOf[l.id] || 'other';
       bump(cats, c, { name: catName(c), revenue: 0, qty: 0 }, v => { v.revenue += l.total || 0; v.qty += l.qty; });
     }
-    bump(tables, o.table_number, { name: 'Стол ' + o.table_number, orders: 0, revenue: 0 }, v => { v.orders++; v.revenue += o.total; });
+    bump(tables, o.table_label || o.table_number, { name: tableName(o), orders: 0, revenue: 0 }, v => { v.orders++; v.revenue += o.total; });
     const acc = ms(o.accepted_at), srv = ms(o.served_at);
     if (acc) toAccept.push((acc - t) / 60e3);
     if (acc && srv) toServe.push((srv - acc) / 60e3);

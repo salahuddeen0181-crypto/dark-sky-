@@ -1,6 +1,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import { fmtPrice } from './money';
+import { tableName } from './table-name';
 
 // Telegram Bot API. TELEGRAM_API_BASE is only for tests (points at a mock server).
 const base = () => `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${process.env.TELEGRAM_BOT_TOKEN}`;
@@ -47,7 +48,7 @@ export function orderText(o, link, view = 'feed') {
   const head = view === 'mine'
     ? { accepted: '✅ <b>ВАШ ЗАКАЗ</b>', served: '🍽 <b>ПОДАНО</b>' }[o.status] || '🔔 <b>НОВЫЙ ЗАКАЗ</b>'
     : { new: '🔔 <b>НОВЫЙ ЗАКАЗ</b>', accepted: '✅ <b>ВЗЯТ</b>', served: '🍽 <b>ПОДАНО</b>' }[o.status] || '';
-  const out = [`${head}  ·  <b>СТОЛ ${o.table_number}</b>`, `#${o.id} · ${hhmm(o.created_at)}`, ''];
+  const out = [`${head}  ·  <b>${esc(tableName(o, 'СТОЛ').toUpperCase())}</b>`, `#${o.id} · ${hhmm(o.created_at)}`, ''];
   for (const l of o.lines) {
     out.push(`• ${esc(l.name)}${l.variant ? ' — ' + esc(l.variant) : ''} × <b>${l.qty}</b>   ${l.total == null ? 'уточнить' : fmtPrice(l.total)}`);
   }
@@ -97,7 +98,7 @@ export async function refreshOrderMessages(o, msgs, site) {
     if (m.role === 'feed') { text = orderText(o, link, 'feed'); kb = orderKeyboard(o, link, 'feed'); }
     else if (o.status === 'new') { text = orderText(o, link, 'offer'); kb = orderKeyboard(o, link, 'offer'); }
     else if (o.accepted_by_id && Number(m.staff_id) === Number(o.accepted_by_id)) { text = orderText(o, link, 'mine'); kb = orderKeyboard(o, link, 'mine'); }
-    else { text = `Заказ #${o.id} · Стол ${o.table_number} взял(а) <b>${esc(o.accepted_by)}</b>`; kb = { inline_keyboard: [] }; }
+    else { text = `Заказ #${o.id} · ${esc(tableName(o))} взял(а) <b>${esc(o.accepted_by)}</b>`; kb = { inline_keyboard: [] }; }
     return tg('editMessageText', { chat_id: m.chat_id, message_id: Number(m.message_id), text, parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } })
       .catch(e => { if (!/not modified/.test(e.message)) console.error('tg edit', m.chat_id, e.message); });
   }));
@@ -113,7 +114,7 @@ export async function refreshOrderMessage(o, site) {
 // "Nobody has taken it yet": a reply to the order in each waiter's chat (Telegram highlights the original),
 // with the «Взять» button again; with no waiter messages — in the feed group. minutes: how long the table waits.
 export async function remindOrder(o, msgs, minutes, site) {
-  const link = await orderLink(o, site), text = `⏰ <b>Стол ${o.table_number}</b> ждёт уже ${minutes} мин — заказ #${o.id} никто не взял`;
+  const link = await orderLink(o, site), text = `⏰ <b>${esc(tableName(o))}</b> ждёт уже ${minutes} мин — заказ #${o.id} никто не взял`;
   const targets = msgs.filter(m => m.role === 'waiter');
   const list = targets.length ? targets : msgs.filter(m => m.role === 'feed');
   await Promise.all(list.map(m => send(m.chat_id, text, orderKeyboard(o, link, m.role === 'feed' ? 'feed' : 'offer'), { reply_parameters: { message_id: Number(m.message_id), allow_sending_without_reply: true } })
@@ -125,6 +126,6 @@ export async function remindOrder(o, msgs, minutes, site) {
 export async function notifyEdited(o, chatId, changes, editor, site) {
   const link = await orderLink(o, site), dish = c => esc(c.name) + (c.variant ? ' — ' + esc(c.variant) : '');
   const lines = changes.map(c => (c.kind === 'removed' ? `➖ ${dish(c)}` : c.kind === 'added' ? `➕ ${dish(c)} × <b>${c.to}</b>` : `✏️ ${dish(c)}: × ${c.from} → × <b>${c.to}</b>`));
-  const text = [`✏️ <b>Заказ #${o.id} · Стол ${o.table_number} изменён</b>`, `Правил(а): ${esc(editor)}`, '', ...lines, '', `<b>Итого: ${fmtPrice(o.total)}</b>${o.on_request ? ' + позиции по запросу' : ''}`].join('\n');
+  const text = [`✏️ <b>Заказ #${o.id} · ${esc(tableName(o))} изменён</b>`, `Правил(а): ${esc(editor)}`, '', ...lines, '', `<b>Итого: ${fmtPrice(o.total)}</b>${o.on_request ? ' + позиции по запросу' : ''}`].join('\n');
   await send(chatId, text, link.button ? { inline_keyboard: [[{ text: '📋 Открыть заказ', url: link.url }]] } : undefined);
 }

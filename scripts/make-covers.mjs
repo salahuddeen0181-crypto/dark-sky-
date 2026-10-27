@@ -20,9 +20,9 @@ const COVERS = {
   // drinks and the hookah: their usual frame already shows them whole
   'cocktail-amber': 5.92, 'tea-tropic': 1.54, 'passion-lemonade': 0.83, hookah: 0.04,
 };
-// Philadelphia Ebi Ponzu: its clip shows avocado, which the roll does not have, so until a new clip it is a photo
-// of the finished plate (the clip's last frame, trimmed to the plate) on the cut-out stage, card and row alike
-const PHOTOS = { 'roll-phila-ebi': [5.9, 'cut/phila-ebi'] };
+// Philadelphia: the clip once named for Ebi Ponzu (it has avocado) is really a Philadelphia; until a clip of its own
+// the dish shows that clip's finished plate as a photo (last frame, trimmed to the plate), card and row alike
+const PHOTOS = { 'roll-phila-ebi': [5.9, 'cut/phila'] };
 
 const ff = args => {
   const r = spawnSync(FF, ['-hide_banner', '-loglevel', 'error', '-y', ...args]);

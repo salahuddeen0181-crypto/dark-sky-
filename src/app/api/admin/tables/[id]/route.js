@@ -2,8 +2,10 @@ import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { denyUnlessAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { cleanLabel, labelTaken } from '@/lib/table-label';
 
-// { active } — switch a table's QR on/off; { regenerate: true } — new link (old printed QR stops working).
+// { active } — switch a table's QR on/off; { regenerate: true } — new link (old printed QR stops working);
+// { label } — the table's own name («VIP 1»), '' to go back to its number. Past orders keep the name they had.
 export async function PATCH(req, { params }) {
   const deny = await denyUnlessAdmin(); if (deny) return deny;
   const { id } = await params;
@@ -11,6 +13,11 @@ export async function PATCH(req, { params }) {
   const sql = db();
   if ('active' in b) await sql`update tables set active = ${!!b.active} where id = ${id}`;
   if (b.regenerate) await sql`update tables set token = ${crypto.randomBytes(5).toString('base64url')} where id = ${id}`;
+  if ('label' in b) {
+    const label = cleanLabel(b.label);
+    if (label && (await labelTaken(sql, label, Number(id)))) return NextResponse.json({ error: `Стол «${label}» уже есть` }, { status: 400 });
+    await sql`update tables set label = ${label} where id = ${id}`;
+  }
   return NextResponse.json({ ok: true });
 }
 

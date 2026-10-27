@@ -17,7 +17,7 @@ export async function findTable(token) {
     const n = Number((token.match(DEMO) || [])[1]);
     return n >= 1 && n <= 20 ? { id: n, number: n, token } : null;
   }
-  const [t] = await db()`select id, number, token from tables where token = ${token} and active`;
+  const [t] = await db()`select id, number, label, token from tables where token = ${token} and active`;
   return t || null;
 }
 
@@ -41,8 +41,8 @@ export async function insertOrder(o) {
   }
   const sql = db();
   const [row] = await sql`
-    insert into orders (table_id, table_number, lines, subtotal, discount, total, cash, on_request, lang, note)
-    values (${o.table_id}, ${o.table_number}, ${sql.json(o.lines)}, ${o.subtotal}, ${o.discount}, ${o.total}, ${o.cash}, ${o.on_request}, ${o.lang}, ${o.note})
+    insert into orders (table_id, table_number, table_label, lines, subtotal, discount, total, cash, on_request, lang, note)
+    values (${o.table_id}, ${o.table_number}, ${o.table_label || null}, ${sql.json(o.lines)}, ${o.subtotal}, ${o.discount}, ${o.total}, ${o.cash}, ${o.on_request}, ${o.lang}, ${o.note})
     returning *`;
   return row;
 }

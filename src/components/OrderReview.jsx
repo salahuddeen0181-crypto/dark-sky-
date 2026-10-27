@@ -31,7 +31,7 @@ export default function OrderReview({ r }) {
         <div style={css('max-width:540px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:20px')}>
           <div style={css('display:flex;align-items:center;justify-content:space-between;gap:12px')}>
             <div style={css('display:flex;flex-direction:column;gap:8px')}>
-              <span style={css(LABEL)}>{t('table')} {r.table}</span>
+              <span style={css(LABEL)}>{r.table}</span>
               <h2 style={css('margin:0;font:400 20px/1.2 Michroma,sans-serif;letter-spacing:.06em;text-transform:uppercase')}>{r.sent ? t('order') : tO('review')}</h2>
             </div>
             <button onClick={r.onClose} aria-label="Close" style={css(CLOSE_BTN)}><Close /></button>

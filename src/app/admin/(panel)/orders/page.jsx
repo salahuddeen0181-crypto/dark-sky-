@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { fmtPrice } from '@/lib/money';
 import AutoRefresh from '@/components/admin/AutoRefresh';
+import { tableName } from '@/lib/table-name';
 
 const STATUS = { new: ['Новый', 'bg-[#e8793c] text-black'], accepted: ['Принят', 'bg-white/15'], served: ['Подано', 'bg-white/5 text-white/60'], failed: ['Не доставлен в Telegram', 'border border-[#e8793c]/60 text-[#f2a676]'] };
 
@@ -22,7 +23,7 @@ export default async function OrdersPage() {
           return (
             <div key={o.id} className="grid gap-2 rounded-2xl border border-white/10 bg-[#0e0e13] p-4 sm:grid-cols-[110px_1fr_auto]">
               <div>
-                <div className="font-display text-lg">Стол {o.table_number}</div>
+                <div className="font-display text-lg">{tableName(o)}</div>
                 <div className="text-xs text-white/45">#{o.id} · {time(o.created_at)}</div>
               </div>
               <div className="text-sm text-white/80">

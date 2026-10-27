@@ -10,6 +10,7 @@ import { css, Arrow, Close, CLOSE_BTN, GLASS } from './menu-ui';
 import { createSmoke } from '@/lib/smoke-scene';
 import OrderReview from './OrderReview';
 import CatStrip from './CatStrip';
+import { tableName } from '@/lib/table-name';
 
 const GREET = ['Hola', 'Hello', 'Привет', '你好', 'नमस्ते', 'مرحبا', 'Bonjour', 'Olá', 'Hallo', 'こんにちは'];
 const EN = { en: 'English', es: 'Spanish', ru: 'Russian', zh: 'Chinese', hi: 'Hindi', ar: 'Arabic', fr: 'French', pt: 'Portuguese', de: 'German', ja: 'Japanese' };
@@ -170,7 +171,8 @@ const WIDE_FIT = { objectPosition: '88% 60%', transform: 'scale(1.3)', transform
 function Media({ m, label = true, v = 'full' }) {
   const fill = css('width:100%;height:100%;object-fit:cover;display:block');
   // cut-out product photo (scripts/cutout.swift, or background removed in the admin): on the same smoky stage as the clips
-  if (m.mImg && m.mCut) return <><Smoke still={v === 'still'} /><img src={v !== 'full' && m.mSrc.startsWith('/media/cut/') ? m.mSrc.replace(/\.webp$/, '-th.webp') : m.mSrc} alt="" loading="lazy" style={CUT} /></>; // eslint-disable-line @next/next/no-img-element
+  // in the open card a photo (unlike a clip) would stand still: it floats gently instead (.ds-float)
+  if (m.mImg && m.mCut) return <><Smoke still={v === 'still'} /><img src={v !== 'full' && m.mSrc.startsWith('/media/cut/') ? m.mSrc.replace(/\.webp$/, '-th.webp') : m.mSrc} alt="" loading="lazy" className={v === 'full' ? 'ds-float' : undefined} style={CUT} /></>; // eslint-disable-line @next/next/no-img-element
   if (m.mImg) return <img src={m.mSrc} alt="" style={fill} />; // eslint-disable-line @next/next/no-img-element
   if (m.mVideo && /^\/media\/.+\.webm(#|$)/.test(m.mSrc)) return <><Smoke still={v === 'still'} /><ProductClip src={m.mSrc} v={v} /></>;
   if (m.mVideo) return <video src={m.mSrc} autoPlay muted loop playsInline style={fill} />;
@@ -933,7 +935,7 @@ export default class DarkskyMenu extends React.Component {
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 14.5l5.5 5.5L22 9" stroke="#f2a676" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
             <span style={css('font:400 18px/1.3 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{t('sent')}</span>
-            <span style={css('font:400 15px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.72)')}>{s.orderStatus === 'served' ? this.tO('served') : s.orderStatus === 'accepted' ? this.tO('accepted') : t('sentSub')} · {t('table')} {this.props.table && this.props.table.number}</span>
+            <span style={css('font:400 15px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.72)')}>{s.orderStatus === 'served' ? this.tO('served') : s.orderStatus === 'accepted' ? this.tO('accepted') : t('sentSub')} · {this.props.table && tableName(this.props.table, t('table'))}</span>
             <button onClick={() => this.newOrder()} style={css('margin-top:10px;height:52px;padding:0 24px;border-radius:16px;border:1px solid rgba(255,255,255,.18);font:600 14px/1 Manrope,sans-serif')}>{t('newOrder')}</button>
           </div>
         )}
@@ -980,7 +982,7 @@ export default class DarkskyMenu extends React.Component {
             {this.props.table && (
               <div style={css('display:flex;align-items:center;justify-content:space-between;gap:14px')}>
                 <span style={css('font:400 10px/1 Michroma,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.7)')}>{t('table')}</span>
-                <span style={css('min-width:64px;height:48px;padding:0 16px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font:600 18px/1 Manrope,sans-serif')}>{this.props.table.number}</span>
+                <span style={css('min-width:64px;height:48px;padding:0 16px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font:600 18px/1 Manrope,sans-serif')}>{this.props.table.label || this.props.table.number}</span>
               </div>
             )}
 
@@ -1094,7 +1096,7 @@ export default class DarkskyMenu extends React.Component {
       return { key: i, name: ci ? this.nm(ci) : l.id, variant, qty: l.qty, total: this.fmt(l.total) };
     }) : v.lines;
     return {
-      open: !!s.reviewOpen && lines.length > 0, t: v.t, tO: k => this.tO(k), flip: v.flip, table: this.props.table ? this.props.table.number : '',
+      open: !!s.reviewOpen && lines.length > 0, t: v.t, tO: k => this.tO(k), flip: v.flip, table: this.props.table ? tableName(this.props.table, v.t('table')) : '',
       lines, sent: !!s.sent, status: s.orderStatus, by: o ? o.by : null, edited: !!(o && o.edited),
       subtotal: o ? this.fmt(o.subtotal) : v.subtotal, discount: o ? '−' + this.fmt(o.discount) : v.discount, total: o ? this.fmt(o.total) : v.cartTotal,
       hasDiscount: o ? o.discount > 0 : s.cash, onReq: o ? o.onRequest : v.onReq,

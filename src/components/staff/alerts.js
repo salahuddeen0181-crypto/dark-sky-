@@ -1,5 +1,6 @@
 // New-order alerts for the staff board. Browsers allow sound and notifications only after a tap,
 // so enable() runs from the "Включить звук" button.
+import { tableName } from '@/lib/table-name';
 
 let ctx = null, wake = null;
 
@@ -28,7 +29,7 @@ export function announce(o) {
   chime();
   navigator.vibrate?.([200, 100, 200]);
   if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
-  try { new Notification(`Новый заказ · стол ${o.table_number}`, { body: o.lines.map(l => `${l.name} × ${l.qty}`).join(', '), tag: 'order-' + o.id }); } catch (e) { /* iOS outside a home-screen app */ }
+  try { new Notification(`Новый заказ · ${tableName(o)}`, { body: o.lines.map(l => `${l.name} × ${l.qty}`).join(', '), tag: 'order-' + o.id }); } catch (e) { /* iOS outside a home-screen app */ }
 }
 
 // The board usually lives on a tablet by the bar: keep its screen on while the page is open.

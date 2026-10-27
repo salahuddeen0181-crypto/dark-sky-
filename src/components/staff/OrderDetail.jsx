@@ -7,6 +7,7 @@ import { ShiftBar, useActor } from './Who';
 import AddDish from './AddDish';
 import { staffApi } from './session';
 import { useMe } from './useMe';
+import { tableName } from '@/lib/table-name';
 
 // One order (the Telegram link leads here): approve, serve, edit — change quantities, remove or add dishes.
 export default function OrderDetail({ id }) {
@@ -68,7 +69,7 @@ export default function OrderDetail({ id }) {
       </div>
       <ShiftBar s={s} />
       <div>
-        <div className="font-display text-4xl">Стол {o.table_number}</div>
+        <div className="font-display text-4xl">{tableName(o)}</div>
         <div className="text-sm text-white/50">#{o.id} · {hhmm(o.created_at)} · {ago(o.created_at, now)}{o.accepted_by ? ` · одобрил(а) ${o.accepted_by}` : ''}</div>
       </div>
 

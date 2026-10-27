@@ -308,8 +308,8 @@ export const MEDIA = {
   falafel: '/media/falafel.webm#t=2.46',
   langostinos: '/media/langostinos.webm#t=3.54',
   panqueques: '/media/panqueques.webm#t=5.63',
-  'phila-ebi': '/media/cut/phila-ebi.webp', // photo of the finished plate: the clip shows avocado, which this roll has not
-  phila: '/media/roll-phila.webm#t=1.08',
+  'phila-ebi': '/media/roll-phila.webm#t=1.08', // this clip is the Ebi Ponzu roll (the kitchen tile shows it too)
+  phila: '/media/cut/phila.webp', // photo of the plate from the other clip (roll-phila-ebi.webm, with avocado): Philadelphia
   maki: '/media/roll-maki.webm#t=2.71',
   aburi: '/media/roll-aburi.webm#t=5.38',
   horno: '/media/roll-horno.webm#t=4.75',

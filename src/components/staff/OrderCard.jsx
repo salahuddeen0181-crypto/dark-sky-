@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { fmt } from '@/components/admin/api';
+import { tableName } from '@/lib/table-name';
 
 export const STATUS = { new: ['Новый', 'bg-[#e8793c] text-black'], accepted: ['Одобрено', 'bg-white/15'], served: ['Подано', 'bg-white/5 text-white/60'], failed: ['Не доставлен', 'border border-[#e8793c]/60 text-[#f2a676]'] };
 export const hhmm = d => new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -15,7 +16,7 @@ export default function OrderCard({ o, now, busy, onAction }) {
       <Link href={`/staff/o/${o.id}`} className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="font-display text-2xl">Стол {o.table_number}</div>
+            <div className="font-display text-2xl">{tableName(o)}</div>
             <div className={`text-xs ${late ? 'text-[#f2a676]' : 'text-white/45'}`}>#{o.id} · {hhmm(o.created_at)} · {ago(o.created_at, now)}</div>
           </div>
           <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${cls}`}>{label}</span>

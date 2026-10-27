@@ -55,7 +55,7 @@ export async function placeOrder({ token, lines, cash, lang, note, site }) {
   const priced = await priceLines(lines);
 
   const o = await S.insertOrder({
-    table_id: table.id, table_number: table.number, lines: priced, ...sums(priced, !!cash), cash: !!cash,
+    table_id: table.id, table_number: table.number, table_label: table.label || null, lines: priced, ...sums(priced, !!cash), cash: !!cash,
     lang: String(lang || '').slice(0, 5), note: String(note || '').trim().slice(0, MAX_NOTE) || null,
   });
 

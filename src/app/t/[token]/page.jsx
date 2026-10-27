@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 export default async function TableMenu({ params }) {
   const { token } = await params;
   const [items, table, content] = await Promise.all([getMenuItems(), getTableByToken(token), getContent()]);
-  return <DarkskyMenu items={visibleItems(items, content)} content={content} table={table ? { number: table.number, token: table.token } : null} />;
+  return <DarkskyMenu items={visibleItems(items, content)} content={content} table={table ? { number: table.number, label: table.label || null, token: table.token } : null} />;
 }
