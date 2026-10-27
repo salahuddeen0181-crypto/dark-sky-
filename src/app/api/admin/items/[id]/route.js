@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { denyUnlessAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { menuChanged } from '@/lib/menu-cache';
 import { cleanItem } from '@/lib/item-schema';
 
 // Full save from the item editor.
@@ -17,6 +18,7 @@ export async function PUT(req, { params }) {
     update menu_items set cat = ${it.cat}, hidden = ${it.hidden}, data = ${sql.json(it.data)}, updated_at = now(),
       sort = case when ${moved} then (select coalesce(max(sort), 0) + 10 from menu_items where cat = ${it.cat}) else sort end
     where id = ${id}`;
+  menuChanged();
   return NextResponse.json({ ok: true });
 }
 
@@ -34,6 +36,7 @@ export async function PATCH(req, { params }) {
         : sql`update menu_items set data = data - ${flag}, updated_at = now() where id = ${id}`);
     }
   }
+  menuChanged();
   return NextResponse.json({ ok: true });
 }
 
@@ -41,5 +44,6 @@ export async function DELETE(req, { params }) {
   const deny = await denyUnlessAdmin(); if (deny) return deny;
   const { id } = await params;
   await db()`delete from menu_items where id = ${id}`;
+  menuChanged();
   return NextResponse.json({ ok: true });
 }

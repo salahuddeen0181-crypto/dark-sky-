@@ -1,6 +1,7 @@
 import 'server-only';
 import { db } from './db';
 import * as D from './darksky-data';
+import { cached, menuChanged } from './menu-cache';
 
 const LANGS = D.LANGS.map(l => l.code);
 
@@ -12,8 +13,7 @@ const PREP = Object.fromEntries(LANGS.map(l => [l, (D.UI[l] || D.UI.en).prep]));
 
 export async function getOverrides() {
   if (!hasDb()) return {};
-  const [r] = await db()`select value from settings where key = ${KEY}`;
-  return r ? r.value : {};
+  return cached('content', async () => { const [r] = await db()`select value from settings where key = ${KEY}`; return r ? r.value : {}; });
 }
 
 // Dish card background: plain black (default), the grey glow with drifting smoke, or frosted glass like the home tiles.
@@ -97,6 +97,7 @@ export async function saveContent(input) {
 
   await db()`insert into settings (key, value) values (${KEY}, ${db().json(c)})
     on conflict (key) do update set value = excluded.value, updated_at = now()`;
+  menuChanged();
 }
 
 // MARK: - Editor

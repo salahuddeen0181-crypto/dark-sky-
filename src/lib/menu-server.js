@@ -2,6 +2,7 @@ import 'server-only';
 import { db } from './db';
 import * as D from './darksky-data';
 import { findTable } from './order-store';
+import { cached } from './menu-cache';
 
 const hasDb = () => !!process.env.DATABASE_URL;
 
@@ -26,10 +27,9 @@ function localize(it) {
 export async function getMenuItems({ includeHidden = false } = {}) {
   if (!hasDb()) return D.ITEMS.map(it => (D.MEDIA[it.id] ? { ...it, media: D.MEDIA[it.id] } : it)); // preview without a database: the bundled menu, read-only
   const sql = db();
-  const rows = includeHidden
+  return cached(includeHidden ? 'items:all' : 'items', async () => (includeHidden
     ? await sql`select id, cat, sort, hidden, data from menu_items order by sort, id`
-    : await sql`select id, cat, sort, hidden, data from menu_items where not hidden order by sort, id`;
-  return rows.map(toItem);
+    : await sql`select id, cat, sort, hidden, data from menu_items where not hidden order by sort, id`).map(toItem));
 }
 
 export async function getMenuItem(id) {
