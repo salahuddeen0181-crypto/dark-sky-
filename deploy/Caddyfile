@@ -13,6 +13,11 @@
 	@media path /media/*
 	# fresh for an hour, then the browser shows its copy and fetches an updated clip in the background
 	header @media >Cache-Control "public, max-age=3600, stale-while-revalidate=604800"
+	# the guest menu pages are the same for everyone: Cloudflare keeps them at its edge near the guests (the server is
+	# far away) for 30 s, then serves the copy while fetching a fresh one. Admin edits show within about a minute;
+	# the browser itself always asks the edge. Orders and statuses go through /api, never cached.
+	@guest path / /t/*
+	header @guest >Cache-Control "public, max-age=0, s-maxage=30, stale-while-revalidate=300"
 	# no request is bigger than a photo upload (≤1.5 MB)
 	request_body {
 		max_size 2MB
