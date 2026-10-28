@@ -411,11 +411,13 @@ export default class DarkskyMenu extends React.Component {
   }
   showToast(msg) { this.setState({ toast: msg, toastOn: true }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toastOn: false }), 1600); }
   // oi: the free option picked (a dessert's topping) or null; the same dish with another topping is another line
+  // After an order has gone out the next dish starts a fresh cart, or sending again would repeat the sent lines;
+  // the sent order keeps its orderId, polling and status, reachable from the cart.
   addToCart(id, vi, qty, oi = null) {
     this.setState(s => {
-      const cart = s.cart.slice(); const k = cart.findIndex(l => l.id === id && l.vi === vi && (l.oi ?? null) === oi);
+      const cart = s.sent ? [] : s.cart.slice(); const k = cart.findIndex(l => l.id === id && l.vi === vi && (l.oi ?? null) === oi);
       if (k >= 0) cart[k] = { ...cart[k], qty: cart[k].qty + qty }; else cart.push(oi == null ? { id, vi, qty } : { id, vi, oi, qty });
-      return { cart, sent: false };
+      return s.sent ? { cart, sent: false, cash: false, note: '', sendErr: '' } : { cart };
     });
     this.showToast(this.t('added') + ' · ' + this.nm(this.item(id)));
   }
@@ -950,6 +952,16 @@ export default class DarkskyMenu extends React.Component {
           </div>
         )}
 
+        {!s.sent && s.orderView && (
+          <button onClick={() => this.setState({ cartOpen: false, reviewOpen: 'sent' })} style={css('display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-radius:16px;border:1px solid rgba(232,121,60,.4);background:rgba(232,121,60,.08)')}>
+            <span style={css('font:500 14px/1.35 Manrope,sans-serif')}>{t('sent')}</span>
+            <span style={css('display:flex;align-items:center;gap:10px;font:600 13px/1 Manrope,sans-serif;color:#f2a676')}>
+              {this.tO(s.orderStatus === 'served' ? 'stServed' : s.orderStatus === 'accepted' ? 'stAcc' : 'stSent')}
+              <Arrow w={1.5} flip={v.flip} />
+            </span>
+          </button>
+        )}
+
         {empty && <div style={css('padding:30px 0;text-align:center;font:400 15px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.6)')}>{t('empty')}</div>}
 
         {body && (
@@ -1035,8 +1047,8 @@ export default class DarkskyMenu extends React.Component {
         const err = j.error === 'rate' ? 'wait' : j.error === 'unavailable' ? 'unavailable' : 'sendFail';
         return this.setState({ sending: false, sendErr: err });
       }
-      this.setState({ sending: false, sent: true, orderId: j.id, orderStatus: j.status || 'new' });
-      this.pollOrder(j.id);
+      // poll once orderId is in state: React batches this update, so a tick right away would still see the old one and stop
+      this.setState({ sending: false, sent: true, orderId: j.id, orderStatus: j.status || 'new' }, () => this.pollOrder(j.id));
     } catch (e) {
       this.setState({ sending: false, sendErr: 'sendFail' });
     }
@@ -1050,7 +1062,7 @@ export default class DarkskyMenu extends React.Component {
       try {
         const r = await fetch(`/api/orders/${id}?t=${encodeURIComponent(this.props.table.token)}`, { cache: 'no-store' });
         // the order is gone (another table's link, the demo store restarted): forget it
-        if (r.status === 404) { clearInterval(this._poll); return this.setState({ sent: false, orderId: null, orderStatus: null, orderView: null }); }
+        if (r.status === 404) { clearInterval(this._poll); return this.setState(st => ({ sent: false, orderId: null, orderStatus: null, orderView: null, reviewOpen: st.reviewOpen === 'sent' ? false : st.reviewOpen })); }
         if (!r.ok) return;
         const o = await r.json();
         this.setState({ orderStatus: o.status, orderView: o });
@@ -1097,22 +1109,24 @@ export default class DarkskyMenu extends React.Component {
   newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '' }); }
 
   // Full-screen order: before sending — the cart as it stands; after — the order as the staff see it now.
+  // reviewOpen 'sent': the order already sent, opened from a new cart started after it.
   reviewVm(v) {
-    const s = this.state, o = s.sent && s.orderView;
+    const s = this.state, past = !s.sent && s.reviewOpen === 'sent', o = (s.sent || past) && s.orderView;
     const lines = o ? o.lines.map((l, i) => {
       const ci = this.item(l.id);
       const own = ci && (!ci.v || (l.vi != null && ci.v[l.vi])); // the guest's language when the dish is still on the menu as ordered
       const variant = own ? [ci.v ? this.tx(ci.v[l.vi].n) : '', this.optLabel(ci, l.oi)].filter(Boolean).join(' · ') : l.variant;
       return { key: i, name: ci ? this.nm(ci) : l.id, variant, qty: l.qty, total: this.fmt(l.total) };
-    }) : v.lines;
+    }) : past ? [] : v.lines;
     return {
       open: !!s.reviewOpen && lines.length > 0, t: v.t, tO: k => this.tO(k), flip: v.flip, table: this.props.table ? tableName(this.props.table, v.t('table')) : '',
-      lines, sent: !!s.sent, status: s.orderStatus, by: o ? o.by : null, edited: !!(o && o.edited),
+      lines, sent: !!s.sent || past, status: s.orderStatus, by: o ? o.by : null, edited: !!(o && o.edited),
       subtotal: o ? this.fmt(o.subtotal) : v.subtotal, discount: o ? '−' + this.fmt(o.discount) : v.discount, total: o ? this.fmt(o.total) : v.cartTotal,
       hasDiscount: o ? o.discount > 0 : s.cash, onReq: o ? o.onRequest : v.onReq,
       cash: s.cash, onCash: () => this.setState(st => ({ cash: !st.cash })), note: s.note || '', onNote: note => this.setState({ note }),
       sending: s.sending, err: s.sendErr ? this.tO(s.sendErr) : '', onSend: () => this.sendOrder(),
-      onBack: () => this.setState({ reviewOpen: false, cartOpen: true }), onClose: () => this.setState({ reviewOpen: false }), onNew: () => this.newOrder(),
+      onBack: () => this.setState({ reviewOpen: false, cartOpen: true }), onClose: () => this.setState({ reviewOpen: false }),
+      onNew: past ? () => this.setState({ reviewOpen: false, cartOpen: true }) : () => this.newOrder(),
     };
   }
 
@@ -1121,6 +1135,8 @@ export default class DarkskyMenu extends React.Component {
     preload(this.props.logoUrl, { as: 'image', fetchPriority: 'high' });
     const s = this.state;
     const v = s.ready ? this.vm() : null;
+    // the cart emptied again after an order went out: the bar leads to that order
+    const past = v && !v.cnt && !s.sent && s.orderView;
     const sheetWrap = y => css(`position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:center;pointer-events:none;transform:translateY(${y});transition:transform .45s cubic-bezier(.2,.8,.2,1)`);
     return (
       <div dir={v && v.rtl ? 'rtl' : 'ltr'} className={'ds-stage-' + (this.C.CARD_STAGE || 'black')} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:clip')}>
@@ -1136,13 +1152,13 @@ export default class DarkskyMenu extends React.Component {
         {v && s.phase !== 'intro' && (
           <>
             {this.renderMenu(v)}
-            {v.cnt > 0 && !v.anySheet && s.phase === 'menu' && (
+            {(v.cnt > 0 || past) && !v.anySheet && s.phase === 'menu' && (
               <div style={css('position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;justify-content:center;padding:12px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top, rgba(3,3,5,.9), rgba(3,3,5,0))')}>
-                <button onClick={() => this.setState(s.sent && this.props.table ? { reviewOpen: true } : { cartOpen: true })} style={css('width:100%;max-width:508px;height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 10px 0 20px;box-shadow:0 10px 40px rgba(232,121,60,.25)')}>
+                <button onClick={() => this.setState(past ? { reviewOpen: 'sent' } : s.sent && this.props.table ? { reviewOpen: true } : { cartOpen: true })} style={css('width:100%;max-width:508px;height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 10px 0 20px;box-shadow:0 10px 40px rgba(232,121,60,.25)')}>
                   <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.t('viewOrder')}</span>
                   <span style={css('display:flex;align-items:center;gap:10px')}>
-                    <span style={css('font:700 15px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{v.cartTotal}</span>
-                    <span style={css('min-width:40px;height:40px;padding:0 10px;border-radius:12px;background:#050507;color:#f2f2f4;display:flex;align-items:center;justify-content:center;font:700 14px/1 Manrope,sans-serif')}>{v.cnt}</span>
+                    <span style={css('font:700 15px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{past ? this.fmt(s.orderView.total) : v.cartTotal}</span>
+                    <span style={css('min-width:40px;height:40px;padding:0 10px;border-radius:12px;background:#050507;color:#f2f2f4;display:flex;align-items:center;justify-content:center;font:700 14px/1 Manrope,sans-serif')}>{past ? s.orderView.lines.reduce((n, l) => n + l.qty, 0) : v.cnt}</span>
                   </span>
                 </button>
               </div>
