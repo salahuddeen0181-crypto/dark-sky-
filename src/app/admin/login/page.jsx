@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/components/admin/api';
 
 export default function Login() {
@@ -19,6 +20,7 @@ export default function Login() {
         className="h-12 rounded-xl border border-white/15 bg-white/5 px-4 outline-none focus:border-[#e8793c]" />
       {err && <div className="text-sm text-[#f2a676]">{err}</div>}
       <button disabled={busy} className="h-12 rounded-xl bg-[#f2f2f4] font-semibold text-[#050507] disabled:opacity-60">{busy ? 'Входим…' : 'Войти'}</button>
+      <Link href="/admin/reset" className="self-center text-sm text-white/50 underline-offset-4 hover:underline">Забыли пароль?</Link>
     </form>
   );
 }

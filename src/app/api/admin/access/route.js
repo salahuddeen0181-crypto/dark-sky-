@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { denyUnlessAdmin, startSession, pinLocked, pinFailed, clientIp } from '@/lib/auth';
-import { checkAdminPassword, setAdminPassword, setTabletPin, isPin } from '@/lib/credentials';
+import { checkAdminPassword, setAdminPassword, setTabletPin, isPin, mailStatus, setMail, isEmail, adminInDb } from '@/lib/credentials';
+import { sendOwnerMail } from '@/lib/mail';
 import { staffReady, findStaffByPin } from '@/lib/staff';
 
 // { action: 'password', current, next } — new admin password (this device stays signed in, others are logged out);
-// { action: 'tablet', pin } — the bar tablet's PIN ('auto' = a random free one, returned once)
+// { action: 'tablet', pin } — the bar tablet's PIN ('auto' = a random free one, returned once);
+// { action: 'mail', to, user, pass } — recovery mail (empty pass keeps the saved one); { action: 'mail-test' }
 export async function POST(req) {
   const deny = await denyUnlessAdmin(); if (deny) return deny;
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: 'Без базы данных пароли задаются только в .env' }, { status: 503 });
@@ -28,5 +30,29 @@ export async function POST(req) {
     await setTabletPin(pin);
     return NextResponse.json({ ok: true, pin });
   }
+  if (b.action === 'mail') {
+    const to = String(b.to || '').trim().toLowerCase(), user = String(b.user || '').trim().toLowerCase();
+    const pass = String(b.pass || '').replace(/\s+/g, ''); // Google shows it in groups of four
+    if (to || user) {
+      if (!isEmail(to)) return NextResponse.json({ error: 'Проверьте адрес владельца' }, { status: 400 });
+      if (!isEmail(user)) return NextResponse.json({ error: 'Проверьте адрес Gmail-отправителя' }, { status: 400 });
+      if (pass && !/^[a-z]{16}$/i.test(pass)) return NextResponse.json({ error: 'Пароль приложения — 16 латинских букв' }, { status: 400 });
+    }
+    await setMail({ to, user, pass });
+    return NextResponse.json({ ok: true, mail: await mailStatus() });
+  }
+  if (b.action === 'mail-test') {
+    const r = await sendOwnerMail({
+      subject: 'DARKSKY: проверка почты',
+      text: 'Это тестовое письмо из админки DARKSKY. Если оно дошло — восстановление пароля по почте работает.',
+    });
+    return r.ok ? NextResponse.json({ ok: true, to: r.to }) : NextResponse.json({ error: r.error }, { status: 502 });
+  }
   return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 });
+}
+
+// Recovery mail settings and whether the admin's own password is in force, for the form (the app password itself is never sent)
+export async function GET() {
+  const deny = await denyUnlessAdmin(); if (deny) return deny;
+  return NextResponse.json({ mail: await mailStatus(), adminInDb: await adminInDb() });
 }
