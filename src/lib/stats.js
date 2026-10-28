@@ -20,14 +20,14 @@ function parts(t) {
 // Venue clock offset from UTC at time t (handles a timezone without DST as well as one with it)
 const offset = t => { const p = parts(t), m = new Date(t).getUTCMinutes(); return Date.UTC(p.y, p.m - 1, p.d, p.h, m) - Math.floor(t / 60e3) * 60e3; };
 // Start of the shift that contains t
-function shiftStart(t) {
+export function shiftStart(t) {
   const local = t + offset(t), l = new Date(local - SHIFT_START * 3600e3);
   const startLocal = Date.UTC(l.getUTCFullYear(), l.getUTCMonth(), l.getUTCDate(), SHIFT_START);
   return startLocal - offset(startLocal);
 }
-const shiftKey = t => new Date(shiftStart(t) + offset(shiftStart(t))).toISOString().slice(0, 10);
+export const shiftKey = t => new Date(shiftStart(t) + offset(shiftStart(t))).toISOString().slice(0, 10);
 // 'YYYY-MM-DD' → when that day's shift starts (06:00 venue time)
-function shiftOf(day) {
+export function shiftOf(day) {
   const [y, m, d] = day.split('-').map(Number), local = Date.UTC(y, m - 1, d, SHIFT_START);
   return local - offset(local);
 }

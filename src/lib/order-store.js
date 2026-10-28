@@ -96,14 +96,62 @@ export async function getOrderForTable(id, token) {
 
 // Staff board: everything still open plus what was served in the last 12 hours, newest first.
 export async function listOrders() {
-  if (memMode()) return mem().orders.filter(o => ACTIVE.has(o.status) || Date.now() - o.created_at < 12 * 3600e3).slice(0, 200);
-  return db()`select * from orders where status in ('new', 'accepted') or created_at > now() - interval '12 hours' order by created_at desc limit 200`;
+  if (memMode()) return mem().orders.filter(o => !o.archived_at && (ACTIVE.has(o.status) || Date.now() - o.created_at < 12 * 3600e3)).slice(0, 200);
+  return db()`select * from orders where archived_at is null and (status in ('new', 'accepted') or created_at > now() - interval '12 hours') order by created_at desc limit 200`;
 }
 
-// Statistics: every order created since the date, oldest first.
+// Statistics: every order created since the date, oldest first (archived ones left out).
 export async function ordersSince(date) {
-  if (memMode()) return mem().orders.filter(o => o.created_at >= +date).reverse();
-  return db()`select * from orders where created_at >= ${date} order by created_at`;
+  if (memMode()) return mem().orders.filter(o => !o.archived_at && o.created_at >= +date).reverse();
+  return db()`select * from orders where archived_at is null and created_at >= ${date} order by created_at`;
+}
+
+// MARK: - Archive
+// Everything not archived yet (orders, ended shifts, day reports) goes to one archive: the statistics start from
+// zero. Returns { at, orders, open } — open: orders still not served that leave the waiters' board too.
+export async function archiveAll() {
+  if (memMode()) {
+    const at = Date.now(), list = mem().orders.filter(o => !o.archived_at);
+    for (const o of list) o.archived_at = at;
+    return { at, orders: list.length, open: list.filter(o => ACTIVE.has(o.status)).length };
+  }
+  return db().begin(async sql => {
+    const [{ at }] = await sql`select now() as at`;
+    const rows = await sql`update orders set archived_at = ${at} where archived_at is null returning status`;
+    await sql`update shifts set archived_at = ${at} where archived_at is null and ended_at is not null`;
+    await sql`update shift_reports set archived_at = ${at} where archived_at is null`;
+    return { at, orders: rows.length, open: rows.filter(o => ACTIVE.has(o.status)).length };
+  });
+}
+// What would go: { orders, open } (for the confirmation)
+export async function archivePreview() {
+  if (memMode()) { const l = mem().orders.filter(o => !o.archived_at); return { orders: l.length, open: l.filter(o => ACTIVE.has(o.status)).length }; }
+  const [r] = await db()`select count(*)::int as orders, count(*) filter (where status in ('new', 'accepted'))::int as open from orders where archived_at is null`;
+  return r;
+}
+// Archives made so far, newest first: [{ at, orders, revenue, from, to }]
+export async function archives() {
+  if (memMode()) {
+    const by = new Map();
+    for (const o of mem().orders.filter(o => o.archived_at)) {
+      const a = by.get(o.archived_at) || { at: o.archived_at, orders: 0, revenue: 0, from: o.created_at, to: o.created_at };
+      a.orders++; a.revenue += o.status === 'failed' ? 0 : o.total; a.from = Math.min(a.from, o.created_at); a.to = Math.max(a.to, o.created_at);
+      by.set(o.archived_at, a);
+    }
+    return [...by.values()].sort((a, b) => b.at - a.at);
+  }
+  // at as text: microseconds kept, so it matches exactly when the archive is brought back
+  return db()`select archived_at::text as at, count(*)::int as orders, coalesce(sum(total) filter (where status <> 'failed'), 0)::int as revenue,
+    min(created_at) as "from", max(created_at) as "to" from orders where archived_at is not null group by archived_at order by archived_at desc limit 50`;
+}
+// Brings an archive back (at: as archives() gave it)
+export async function restoreArchive(at) {
+  if (memMode()) { for (const o of mem().orders) if (o.archived_at && String(o.archived_at) === String(at)) o.archived_at = null; return; }
+  await db().begin(async sql => {
+    await sql`update orders set archived_at = null where archived_at = ${at}::timestamptz`;
+    await sql`update shifts set archived_at = null where archived_at = ${at}::timestamptz`;
+    await sql`update shift_reports set archived_at = null where archived_at = ${at}::timestamptz`;
+  });
 }
 
 // MARK: - Telegram messages of an order and reminders

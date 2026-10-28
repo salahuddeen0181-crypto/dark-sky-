@@ -104,3 +104,20 @@ create table if not exists order_messages (
 -- "Nobody has taken it yet" reminders sent for an order
 alter table orders add column if not exists reminders int not null default 0;
 alter table orders add column if not exists reminded_at timestamptz;
+
+-- Archive: test orders (and the shifts and reports that go with them) set aside in the admin, so the statistics start
+-- from zero; everything archived at once shares one archived_at, which brings it back. Nothing is deleted.
+alter table orders add column if not exists archived_at timestamptz;
+alter table shifts add column if not exists archived_at timestamptz;
+
+-- The report of a working day (06:00 → 06:00 venue time): sent to the owners' group when the last waiter ends the
+-- shift (or at 06:00), kept for the admin. text: as sent to Telegram (HTML); data: the figures it was made from.
+create table if not exists shift_reports (
+  day         date primary key,
+  text        text not null,
+  data        jsonb not null,
+  last_order  timestamptz,                  -- the newest order it counts: a later order means it is out of date
+  sent_at     timestamptz,
+  created_at  timestamptz not null default now(),
+  archived_at timestamptz
+);

@@ -2,6 +2,10 @@ import Link from 'next/link';
 import { report, PERIODS, isDay } from '@/lib/stats';
 import { fmtPrice } from '@/lib/money';
 import { Card, Kpi, Columns, BarList, Stat } from '@/components/admin/stats/Charts';
+import ShiftReports from '@/components/admin/stats/ShiftReports';
+import ArchivePanel from '@/components/admin/stats/ArchivePanel';
+import { listReports } from '@/lib/shift-report';
+import { staffChatId } from '@/lib/telegram';
 
 const LABELS = { today: 'Сегодня', '7d': '7 дней', '30d': '30 дней', '90d': '90 дней' };
 const pct = v => (v == null ? '—' : Math.round(v * 100) + '%');
@@ -10,7 +14,7 @@ const ddmm = key => key.slice(8, 10) + '.' + key.slice(5, 7);
 
 export default async function StatsPage({ searchParams }) {
   const q = await searchParams, p = q.p;
-  const r = await report(isDay(q.from) && isDay(q.to) ? { from: q.from, to: q.to } : PERIODS[p] ? p : '7d');
+  const [r, reports] = await Promise.all([report(isDay(q.from) && isDay(q.to) ? { from: q.from, to: q.to } : PERIODS[p] ? p : '7d'), listReports()]);
   const { now, prev } = r;
 
   return (
@@ -92,6 +96,9 @@ export default async function StatsPage({ searchParams }) {
       <Card title="Столы" sub="Топ-10 по выручке">
         <BarList rows={r.tables.map(t => ({ name: t.name, value: t.revenue, label: fmtPrice(t.revenue), sub: `${t.orders} зак.` }))} />
       </Card>
+
+      <ShiftReports reports={JSON.parse(JSON.stringify(reports))} group={!!staffChatId()} />
+      <ArchivePanel />
     </div>
   );
 }

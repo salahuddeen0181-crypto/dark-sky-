@@ -7,7 +7,7 @@ const STATUS = { new: ['Новый', 'bg-[#e8793c] text-black'], accepted: ['П�
 
 export default async function OrdersPage() {
   const tz = process.env.VENUE_TIMEZONE || 'America/Argentina/Buenos_Aires';
-  const orders = await db()`select * from orders order by created_at desc limit 150`;
+  const orders = await db()`select * from orders where archived_at is null order by created_at desc limit 150`;
   const time = d => new Date(d).toLocaleString('ru-RU', { timeZone: tz, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   return (
     <div className="flex flex-col gap-4">

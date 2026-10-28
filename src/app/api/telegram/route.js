@@ -69,6 +69,11 @@ export async function POST(req) {
         chat_id: msg.chat.id, parse_mode: 'HTML',
         text: ok ? '✅ Этот чат подключён: сюда приходят заказы DARKSKY.' : `ID этого чата: <code>${msg.chat.id}</code>\nУкажите его в TELEGRAM_CHAT_ID, чтобы заказы приходили сюда.`,
       });
+    } else if (msg && /^\/report(@\w+)?\b/.test(msg.text || '') && String(msg.chat.id) === staffChatId()) {
+      // the owners' group asks for the figures of the shift so far (not kept: the end-of-shift report is)
+      const { buildReport, currentDay } = await import('@/lib/shift-report');
+      const b = await buildReport(currentDay());
+      await tg('sendMessage', { chat_id: msg.chat.id, parse_mode: 'HTML', text: b.n ? b.text : 'За эту смену заказов пока нет.' });
     } else if (msg?.chat?.type === 'private' && msg.from && /^\/(start|smena|app)\b/.test(msg.text || '')) await onPrivate(msg);
   } catch (e) {
     console.error('telegram webhook', e);

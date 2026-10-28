@@ -71,6 +71,10 @@ export async function startShift(staffId) {
 
 export async function endShift(staffId) {
   const [s] = await db()`update shifts set ended_at = now() where staff_id = ${staffId} and ended_at is null returning *`;
+  // the last waiter has gone: the day's report goes to the owners' group (in the background, the waiter isn't kept waiting)
+  if (s && !(await onShift()).length) {
+    import('./shift-report').then(r => r.shiftEnded(s.started_at)).catch(e => console.error('shift report', e.message));
+  }
   return s || null;
 }
 
@@ -95,7 +99,7 @@ export async function shiftsSince(date) {
   if (!staffReady()) return [];
   await closeStale();
   return db()`select sh.*, s.name from shifts sh join staff s on s.id = sh.staff_id
-    where coalesce(sh.ended_at, now()) >= ${date} order by sh.started_at desc`;
+    where sh.archived_at is null and coalesce(sh.ended_at, now()) >= ${date} order by sh.started_at desc`;
 }
 
 // MARK: - Personal PINs (a waiter signs in to the staff app with it, Telegram not needed)
