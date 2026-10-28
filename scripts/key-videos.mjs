@@ -47,6 +47,7 @@ const CLIPS = {
   'Pistachio_mousse_cakes': 'pistachio-mousse',
   'Rice_and_chicken': 'wok-rice',
   'Salad_ingredients_assembling': 'salad-cesar',
+  'Sushi_roll_deconstruction_and_re': 'roll-philadelphia', // salmon, cream cheese, prawn: Philadelphia (2026-10-28)
   'Sushi_roll_deconstruction': 'roll-tempura',
   'Sushi_roll_parts_assembling': 'roll-phila-ebi',
   'Sushi_roll_product_video_animation': 'roll-phila',
@@ -188,7 +189,8 @@ const only = new Set(process.argv.slice(3));
 fs.mkdirSync(OUT, { recursive: true });
 const files = fs.readdirSync(dir);
 const jobs = Object.entries(CLIPS).filter(([, slug]) => !only.size || only.has(slug)).map(([prefix, slug]) => {
-  const f = files.find(n => n.startsWith(prefix));
+  // a file a longer prefix names belongs to that clip ('Sushi_roll_deconstruction_and_re…' is not roll-tempura)
+  const f = files.find(n => n.startsWith(prefix) && !Object.keys(CLIPS).some(p => p.length > prefix.length && p.startsWith(prefix) && n.startsWith(p)));
   if (!f) { console.warn(`missing source for ${slug} (${prefix}…)`); return null; }
   return () => keyClip(path.join(dir, f), slug);
 }).filter(Boolean);
