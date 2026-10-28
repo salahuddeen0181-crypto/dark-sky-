@@ -278,6 +278,8 @@ export default class DarkskyMenu extends React.Component {
     window.addEventListener('scroll', this.onScroll, { passive: true });
     if (skip) setTimeout(() => this.loadTiles(), 300);
     requestAnimationFrame(() => this.layoutIntro());
+    this._onResize = () => this.layoutIntro();
+    window.addEventListener('resize', this._onResize);
     this._gt = setInterval(() => { if (this.state.phase !== 'intro') return; this.setState({ gOn: false }); setTimeout(() => this.setState(st => ({ gi: st.gi + 1, gOn: true })), 450); }, 2400);
     try {
       if (!this.canvasRef.current) return;
@@ -285,8 +287,6 @@ export default class DarkskyMenu extends React.Component {
       if (this.scene.fallback) this.setState({ no3d: true }); else setTimeout(() => this.setState({ sceneOn: true }), 2200);
       if (this.state.phase !== 'intro') { this.scene.enter(true); this.scene.setDim(this.dimVal()); }
       this.layoutIntro();
-      this._onResize = () => this.layoutIntro();
-      window.addEventListener('resize', this._onResize);
     } catch (e) { console.error('smoke scene', e); }
   }
   componentDidUpdate(pp, ps) {
@@ -373,6 +373,9 @@ export default class DarkskyMenu extends React.Component {
   }
   layoutIntro() {
     const el = this.introRef.current, h = window.innerHeight;
+    // a phone on its side: the language list turns into a compact grid so the logo keeps room above it
+    const flat = h < 520 && window.innerWidth > h;
+    if (flat !== !!this.state.flat) { this.setState({ flat }, () => requestAnimationFrame(() => this.layoutIntro())); return; }
     const block = el ? el.getBoundingClientRect().height : h * 0.34;
     const free = Math.max(140, h - block - 8), lf = free + 'px';
     if (!this.scene) { if (lf !== this.state.logoFree) this.setState({ logoFree: lf }); return; }
@@ -521,7 +524,7 @@ export default class DarkskyMenu extends React.Component {
   }
 
   renderIntro() {
-    const s = this.state, ready = s.ready;
+    const s = this.state, ready = s.ready, flat = !!s.flat;
     const t = k => (ready ? this.t(k) : '');
     return (
       <div style={css(`position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;opacity:${s.phase === 'intro' ? 1 : 0};pointer-events:${s.phase === 'intro' ? 'auto' : 'none'};transition:opacity .7s ease`)}>
@@ -530,13 +533,19 @@ export default class DarkskyMenu extends React.Component {
             <img src={s.logoAlpha || this.props.logoUrl} alt="DARKSKY Hookah Lounge" style={css('max-width:min(78vw,380px);max-height:100%;object-fit:contain')} /> {/* eslint-disable-line @next/next/no-img-element */}
           </div>
         )}
-        <div ref={this.introRef} style={css('width:100%;height:min(64vh,640px);display:flex;justify-content:center')}>
-          <div style={css('width:100%;max-width:440px;height:100%;display:flex;flex-direction:column;padding:26px 16px calc(18px + env(safe-area-inset-bottom))')}>
-            <div style={css('display:flex;flex-direction:column;align-items:center;gap:8px;padding-bottom:18px')}>
-              <span style={css(`font:600 clamp(34px,10vw,44px)/1.05 Manrope,sans-serif;letter-spacing:-.02em;opacity:${s.gOn === false ? 0 : 1};transform:translateY(${s.gOn === false ? '8px' : '0px'});transition:opacity .5s ease, transform .6s cubic-bezier(.2,.8,.2,1);min-height:46px`)}>{GREET[s.gi % GREET.length]}</span>
+        <div ref={this.introRef} style={css(`width:100%;height:${flat ? 'auto' : 'min(64vh,640px)'};display:flex;justify-content:center`)}>
+          <div style={css(`width:100%;max-width:${flat ? 600 : 440}px;height:100%;display:flex;flex-direction:column;padding:${flat ? '6px 16px calc(10px + env(safe-area-inset-bottom))' : '26px 16px calc(18px + env(safe-area-inset-bottom))'}`)}>
+            <div style={css(`display:flex;flex-direction:column;align-items:center;gap:8px;padding-bottom:${flat ? 10 : 18}px`)}>
+              {!flat && <span style={css(`font:600 clamp(34px,10vw,44px)/1.05 Manrope,sans-serif;letter-spacing:-.02em;opacity:${s.gOn === false ? 0 : 1};transform:translateY(${s.gOn === false ? '8px' : '0px'});transition:opacity .5s ease, transform .6s cubic-bezier(.2,.8,.2,1);min-height:46px`)}>{GREET[s.gi % GREET.length]}</span>}
               <span style={css('font:400 15px/1.3 Manrope,sans-serif;color:rgba(242,242,244,.7)')}>{t('chooseLang')}</span>
             </div>
-            <div style={css('flex:1;min-height:0;overflow-y:auto;border-radius:18px;background:linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03)), rgba(18,18,24,.42);border:1px solid rgba(255,255,255,.14);scrollbar-width:none' + GLASS)}>
+            {flat ? (
+              <div style={css('display:grid;grid-template-columns:repeat(5,1fr);gap:6px')}>
+                {ready && D.LANGS.map(l => (
+                  <button key={l.code} className="ds-press-bg" onClick={() => this.setLang(l.code)} style={css(`height:40px;padding:0 6px;border-radius:12px;border:1px solid ${l.code === s.lang ? '#e8793c' : 'rgba(255,255,255,.14)'};background:rgba(18,18,24,.42);display:flex;align-items:center;justify-content:center;font:500 14px/1 Manrope,sans-serif;color:#f2f2f4;white-space:nowrap;overflow:hidden;transition:border-color .2s` + GLASS)}>{l.name}</button>
+                ))}
+              </div>
+            ) : <div style={css('flex:1;min-height:0;overflow-y:auto;border-radius:18px;background:linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03)), rgba(18,18,24,.42);border:1px solid rgba(255,255,255,.14);scrollbar-width:none' + GLASS)}>
               {ready && D.LANGS.map((l, i) => (
                 <button key={l.code} className="ds-press-bg" onClick={() => this.setLang(l.code)} style={css('width:100%;min-height:58px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:transparent;transition:background .2s')}>
                   <span style={css(`flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;padding:10px 0;border-bottom:${i < D.LANGS.length - 1 ? '1px solid rgba(255,255,255,.08)' : '0'};text-align:start`)}>
@@ -548,9 +557,9 @@ export default class DarkskyMenu extends React.Component {
                   </span>
                 </button>
               ))}
-            </div>
-            <button className="ds-press" onClick={() => this.enter()} style={css('flex:none;height:54px;margin-top:14px;border-radius:14px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:center;font:600 16px/1 Manrope,sans-serif')}>{t('enter')}</button>
-            <div style={css('flex:none;padding-top:12px;font:500 11px/1 Manrope,sans-serif;letter-spacing:.12em;color:rgba(242,242,244,.45);text-align:center;text-transform:uppercase')}>{t('age')}</div>
+            </div>}
+            <button className="ds-press" onClick={() => this.enter()} style={css(`flex:none;height:${flat ? 48 : 54}px;margin-top:${flat ? 10 : 14}px;border-radius:14px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:center;font:600 16px/1 Manrope,sans-serif`)}>{t('enter')}</button>
+            <div style={css(`flex:none;padding-top:${flat ? 8 : 12}px;font:500 11px/1 Manrope,sans-serif;letter-spacing:.12em;color:rgba(242,242,244,.45);text-align:center;text-transform:uppercase`)}>{t('age')}</div>
           </div>
         </div>
       </div>
@@ -828,7 +837,7 @@ export default class DarkskyMenu extends React.Component {
           <button onClick={() => this.closeAll()} aria-label="Close" style={css('position:absolute;top:12px;right:-6px;' + CLOSE_BTN)}><Close /></button>
         </div>
         <Grip />
-        <div className="ds-stage" style={css(`height:min(42vh,72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}>
+        <div className="ds-stage" style={css(`height:min(max(42vh,240px),72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}>
           <Media m={sh} />
           {sh.pos && <>
             <button onClick={() => this.stepItem(-1)} aria-label="Previous" style={css('left:10px;' + STEP_BTN)}><Arrow size={16} flip="scaleX(-1)" /></button>
