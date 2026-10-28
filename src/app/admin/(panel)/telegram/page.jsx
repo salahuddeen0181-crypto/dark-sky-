@@ -1,4 +1,4 @@
-import { tg } from '@/lib/telegram';
+import { tgStatus } from '@/lib/telegram';
 import { siteUrl } from '@/lib/site';
 import TelegramActions from '@/components/admin/TelegramActions';
 
@@ -10,7 +10,7 @@ export default async function TelegramPage() {
   const hasToken = !!process.env.TELEGRAM_BOT_TOKEN, hasChat = !!process.env.TELEGRAM_CHAT_ID;
   let me = null, hook = null, err = '';
   if (hasToken) {
-    try { [me, hook] = await Promise.all([tg('getMe'), tg('getWebhookInfo')]); } catch (e) { err = e.message; }
+    try { [me, hook] = await tgStatus(); } catch (e) { err = e.message; }
   }
   const site = await siteUrl(), https = site.startsWith('https://');
   const hookOk = hook?.url === `${site}/api/telegram`;

@@ -94,6 +94,33 @@ export async function getOrderForTable(id, token) {
   return o || null;
 }
 
+// The admin's correction of an order, whatever its status. Moving the status back clears the later timestamps,
+// moving it on fills the missing ones with now.
+export async function saveOrderAdmin(id, s) {
+  if (memMode()) {
+    const o = memOrder(id);
+    if (!o) return null;
+    const at = Date.now(), st = s.status;
+    return Object.assign(o, s, {
+      accepted_at: st === 'new' ? null : o.accepted_at || at, served_at: st === 'served' ? o.served_at || at : null, edited_at: at,
+    });
+  }
+  const sql = db(), st = s.status;
+  const [o] = await sql`
+    update orders set lines = ${sql.json(s.lines)}, subtotal = ${s.subtotal}, discount = ${s.discount}, total = ${s.total},
+      on_request = ${s.on_request}, cash = ${s.cash}, note = ${s.note}, status = ${st}, edited_at = now(),
+      accepted_at = case when ${st} = 'new' then null else coalesce(accepted_at, now()) end,
+      served_at = case when ${st} = 'served' then coalesce(served_at, now()) else null end
+    where id = ${id} returning *`;
+  return o || null;
+}
+// One order out of the statistics (its own archive entry, brought back from «Архив статистики»)
+export async function archiveOrder(id) {
+  if (memMode()) { const o = memOrder(id); if (o) o.archived_at = Date.now(); return !!o; }
+  const [o] = await db()`update orders set archived_at = now() where id = ${id} and archived_at is null returning id`;
+  return !!o;
+}
+
 // Staff board: everything still open plus what was served in the last 12 hours, newest first.
 export async function listOrders() {
   if (memMode()) return mem().orders.filter(o => !o.archived_at && (ACTIVE.has(o.status) || Date.now() - o.created_at < 12 * 3600e3)).slice(0, 200);
@@ -148,9 +175,9 @@ export async function archives() {
 export async function restoreArchive(at) {
   if (memMode()) { for (const o of mem().orders) if (o.archived_at && String(o.archived_at) === String(at)) o.archived_at = null; return; }
   await db().begin(async sql => {
-    await sql`update orders set archived_at = null where archived_at = ${at}::timestamptz`;
-    await sql`update shifts set archived_at = null where archived_at = ${at}::timestamptz`;
-    await sql`update shift_reports set archived_at = null where archived_at = ${at}::timestamptz`;
+    await sql`update orders set archived_at = null where archived_at::text = ${String(at)}`;
+    await sql`update shifts set archived_at = null where archived_at::text = ${String(at)}`;
+    await sql`update shift_reports set archived_at = null where archived_at::text = ${String(at)}`;
   });
 }
 

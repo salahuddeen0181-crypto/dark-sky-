@@ -31,6 +31,15 @@ export async function botInfo() {
   return me.info;
 }
 
+// The bot and its webhook for the admin's Telegram page, kept for a minute (each check is two calls to Telegram);
+// the page's actions drop it, so what they changed shows at once
+const status = (globalThis.__darkskyTgStatus ||= { at: 0, v: null });
+export async function tgStatus() {
+  if (!status.v || Date.now() - status.at > 60e3) { status.v = await Promise.all([tg('getMe'), tg('getWebhookInfo')]); status.at = Date.now(); }
+  return status.v;
+}
+export const tgStatusChanged = () => { status.v = null; };
+
 // Where "Open order" leads: the staff Mini App inside Telegram (t.me/<bot>?startapp=o<id>) when it is set up,
 // else the order page on the site. Telegram accepts link buttons only for public https addresses.
 async function orderLink(o, site) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { denyUnlessAdmin } from '@/lib/auth';
-import { tg, staffChatId, webhookSecret } from '@/lib/telegram';
+import { tg, staffChatId, webhookSecret, tgStatusChanged } from '@/lib/telegram';
 import { siteUrl } from '@/lib/site';
 
 // { action: 'webhook' } — point the bot at this site; { action: 'findChat' } — the staff group's id;
@@ -14,6 +14,7 @@ export async function POST(req) {
       const url = `${await siteUrl()}/api/telegram`;
       if (!url.startsWith('https://')) return NextResponse.json({ error: `Telegram требует https-адрес, а сайт открыт как ${url}` }, { status: 400 });
       await tg('setWebhook', { url, secret_token: webhookSecret(), allowed_updates: ['message', 'callback_query'], drop_pending_updates: true });
+      tgStatusChanged();
       return NextResponse.json({ ok: true, url });
     }
     // Groups the bot was added to (only while the webhook is off: Telegram keeps the updates for getUpdates)

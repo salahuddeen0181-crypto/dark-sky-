@@ -135,7 +135,7 @@ export default function MenuAdmin({ items: initial, cats }) {
                     onPointerDown={e => startDrag(e, c.id, it.id)} onPointerMove={dragMove} onPointerUp={endDrag} onPointerCancel={endDrag}
                     className={`-ml-2 flex h-10 w-6 flex-none touch-none select-none items-center justify-center rounded text-lg leading-none text-white/35 hover:text-white/80 disabled:opacity-0 ${drag?.id === it.id ? 'cursor-grabbing text-[#f2a676]' : 'cursor-grab'}`}>⋮⋮</button>
                   <div className="h-12 w-12 flex-none overflow-hidden rounded-lg bg-[radial-gradient(circle_at_50%_35%,rgba(232,121,60,.18),#0c0c10_70%)]">
-                    {(it.img || it.media) && <img alt="" src={thumb(it.img, it.media)} className="h-full w-full object-cover" />}
+                    {(it.img || it.media) && <img alt="" src={thumb(it.img, it.media, true)} loading="lazy" decoding="async" className="h-full w-full object-cover" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

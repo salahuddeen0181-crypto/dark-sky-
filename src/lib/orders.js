@@ -128,6 +128,48 @@ export async function editOrder(id, edits = [], add = [], site, editor = null) {
   return o;
 }
 
+// The admin's manual correction of any order, served ones too (statistics read it as it then stands):
+// lines [{ i, qty, price }] — by index; qty 0 removes the line, price replaces the menu's (null: "on request");
+// add [{ id, vi, oi, qty }] — dishes from the menu; cash, status ('new' | 'accepted' | 'served'), note.
+const ADMIN_MAX_QTY = 99, MAX_PRICE = 1e8;
+export async function adminEditOrder(id, { lines: edits = [], add = [], cash, status, note } = {}, site) {
+  const cur = await S.getOrder(id);
+  if (!cur) throw new OrderError('not_found', 404);
+  if (!Array.isArray(edits) || !Array.isArray(add) || add.length > MAX_LINES) throw new OrderError('bad_lines');
+  const lines = cur.lines.map(l => ({ ...l }));
+  for (const e of edits) {
+    const l = lines[Math.floor(Number(e?.i))];
+    if (!l) throw new OrderError('bad_lines');
+    if (e.qty != null) {
+      const q = Math.floor(Number(e.qty));
+      if (!(q >= 0 && q <= ADMIN_MAX_QTY)) throw new OrderError('bad_lines');
+      l.qty = q;
+    }
+    if (e.price !== undefined) {
+      const p = e.price === null || e.price === '' ? null : Math.round(Number(e.price));
+      if (p != null && !(p >= 0 && p <= MAX_PRICE)) throw new OrderError('bad_price');
+      l.price = p;
+    }
+    l.total = l.price == null ? null : l.price * l.qty;
+  }
+  for (const n of add.length ? await priceLines(add, { allowHidden: true }) : []) {
+    const same = lines.find(l => lineKey(l) === lineKey(n) && l.price === n.price);
+    if (same) { same.qty = Math.min(ADMIN_MAX_QTY, same.qty + n.qty); same.total = same.price == null ? null : same.price * same.qty; } else lines.push(n);
+  }
+  const kept = lines.filter(l => l.qty > 0);
+  if (!kept.length) throw new OrderError('empty');
+  if (kept.length > MAX_LINES) throw new OrderError('bad_lines');
+  const c = cash == null ? !!cur.cash : !!cash;
+  const o = await S.saveOrderAdmin(id, {
+    lines: kept, ...sums(kept, c), cash: c,
+    status: ['new', 'accepted', 'served'].includes(status) ? status : cur.status,
+    note: note === undefined ? cur.note : String(note || '').trim().slice(0, MAX_NOTE) || null,
+  });
+  if (!o) throw new OrderError('not_found', 404);
+  await tgRefresh(o, site);
+  return o;
+}
+
 export const getOrder = S.getOrder;
 export const listOrders = S.listOrders;
 

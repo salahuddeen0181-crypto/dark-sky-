@@ -14,4 +14,5 @@ export const ru = o => (o && typeof o === 'object' ? o.ru || o.en || o.es || '' 
 export const fmt = n => (n == null ? 'по запросу' : '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
 
 // Preview picture for an item: an uploaded photo, or the menu's own media — a keyed clip shows its still (.webp).
-export const thumb = (img, media) => (img ? `/api/img/${img}` : media ? media.split('#')[0].replace(/\.webm$/i, '.webp') : null);
+// small: the 320 px copy every bundled picture has (<name>-th.webp), for lists
+export const thumb = (img, media, small = false) => (img ? `/api/img/${img}` : media ? media.split('#')[0].replace(/\.(webm|webp)$/i, small ? '-th.webp' : '.webp') : null);
