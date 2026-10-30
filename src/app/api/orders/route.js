@@ -6,7 +6,7 @@ export async function POST(req) {
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'bad_json' }, { status: 400 }); }
   try {
-    const o = await placeOrder({ token: body.token, lines: body.lines, cash: !!body.cash, lang: body.lang, note: body.note, site: await siteUrl() });
+    const o = await placeOrder({ token: body.token, lines: body.lines, cash: !!body.cash, lang: body.lang, note: body.note, key: body.key, site: await siteUrl() });
     return NextResponse.json(o);
   } catch (e) {
     if (e instanceof OrderError) return NextResponse.json({ error: e.code }, { status: e.status });

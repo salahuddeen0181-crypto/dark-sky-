@@ -291,7 +291,7 @@ export default class DarkskyMenu extends React.Component {
   }
   componentDidUpdate(pp, ps) {
     const s = this.state;
-    if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent)) this.saveOrder();
+    if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent || ps.sendKey !== s.sendKey)) this.saveOrder();
     if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal());
     // the page behind an open sheet must not scroll
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen || this.state.rulesOpen) ? 'hidden' : '';
@@ -417,11 +417,11 @@ export default class DarkskyMenu extends React.Component {
     this.setState(s => {
       const cart = s.sent ? [] : s.cart.slice(); const k = cart.findIndex(l => l.id === id && l.vi === vi && (l.oi ?? null) === oi);
       if (k >= 0) cart[k] = { ...cart[k], qty: cart[k].qty + qty }; else cart.push(oi == null ? { id, vi, qty } : { id, vi, oi, qty });
-      return s.sent ? { cart, sent: false, cash: false, note: '', sendErr: '' } : { cart };
+      return s.sent ? { cart, sent: false, cash: false, note: '', sendErr: '', sendKey: null } : { cart, sendKey: null };
     });
     this.showToast(this.t('added') + ' · ' + this.nm(this.item(id)));
   }
-  changeLine(i, d) { this.setState(s => { const cart = s.cart.slice(); const q = cart[i].qty + d; if (q <= 0) cart.splice(i, 1); else cart[i] = { ...cart[i], qty: q }; return { cart }; }); }
+  changeLine(i, d) { this.setState(s => { const cart = s.cart.slice(); const q = cart[i].qty + d; if (q <= 0) cart.splice(i, 1); else cart[i] = { ...cart[i], qty: q }; return { cart, sendKey: null }; }); }
   openItem(id) { this.setState({ sheetId: id, vi: 0, oi: null, qty: 1, cartOpen: false, langOpen: false, slide: 0 }); }
   // dishes of the open one's category, in menu order: the sheet steps through them (wrapping round)
   siblings(it) { return this.props.items.filter(i => i.cat === it.cat && !i.hidden); }
@@ -523,6 +523,21 @@ export default class DarkskyMenu extends React.Component {
       sh, addLabel, lines, suggest, cnt, onReq, anySheet,
       subtotal: this.fmt(sub), discount: '−' + this.fmt(disc), cartTotal: this.fmt(sub - disc),
     };
+  }
+
+  // The cart lives in the sticky header, always in the same spot (a bar fixed to the bottom of the screen rode up and
+  // down with Safari's toolbar). After sending it opens the order as sent; once the cart is empty again, that order.
+  renderCartBtn(v) {
+    const s = this.state, past = !v.cnt && !s.sent && s.orderView;
+    if (!v.cnt && !past) return null;
+    const n = past ? s.orderView.lines.reduce((k, l) => k + l.qty, 0) : v.cnt;
+    return (
+      <button onClick={() => this.setState(past ? { reviewOpen: 'sent', sheetId: null, langOpen: false } : s.sent && this.props.table ? { reviewOpen: true, sheetId: null, langOpen: false } : { cartOpen: true, sheetId: null, langOpen: false })}
+        aria-label={v.t('viewOrder')} className="ds-press" style={css('height:44px;padding:0 6px 0 12px;border-radius:14px;background:#f2f2f4;color:#050507;display:flex;align-items:center;gap:8px;box-shadow:0 6px 24px rgba(232,121,60,.25)')}>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M4 6.5h12l-1 10H5l-1-10z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M7.2 6.5V5.4a2.8 2.8 0 015.6 0v1.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+        <span key={n} className="ds-bump" style={css('min-width:30px;height:32px;padding:0 8px;border-radius:10px;background:#050507;color:#f2f2f4;display:flex;align-items:center;justify-content:center;font:700 13px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{n}</span>
+      </button>
+    );
   }
 
   renderIntro() {
@@ -758,7 +773,7 @@ export default class DarkskyMenu extends React.Component {
   renderMenu(v) {
     const s = this.state, { t, sec } = v;
     return (
-      <div style={css(`position:relative;z-index:2;max-width:540px;margin:0 auto;min-height:100vh;padding-bottom:130px;opacity:${s.phase === 'menu' ? 1 : 0};transition:opacity .9s ease .15s`)}>
+      <div style={css(`position:relative;z-index:2;max-width:540px;margin:0 auto;min-height:100vh;padding-bottom:40px;opacity:${s.phase === 'menu' ? 1 : 0};transition:opacity .9s ease .15s`)}>
         <div style={css('position:sticky;top:0;z-index:4;background:rgba(34,35,42,.5);border-bottom:1px solid rgba(255,255,255,.06);padding-top:env(safe-area-inset-top)' + GLASS)}>
           <div style={css('display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 18px')}>
             {!sec ? (
@@ -781,6 +796,7 @@ export default class DarkskyMenu extends React.Component {
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" strokeWidth="1.2" /><path d="M1.8 8h12.4M8 1.7c1.8 1.8 2.6 4 2.6 6.3S9.8 12.5 8 14.3M8 1.7C6.2 3.5 5.4 5.7 5.4 8s.8 4.5 2.6 6.3" stroke="currentColor" strokeWidth="1.2" /></svg>
                 <span style={css('font:400 10px/1 Michroma,sans-serif;letter-spacing:.1em;text-transform:uppercase')}>{v.langCode}</span>
               </button>
+              {this.renderCartBtn(v)}
             </div>
           </div>
           {s.searchOpen && (
@@ -1036,11 +1052,13 @@ export default class DarkskyMenu extends React.Component {
   async sendOrder() {
     const s = this.state, table = this.props.table;
     if (!table || s.sending || !s.cart.length) return;
-    this.setState({ sending: true, sendErr: '' });
+    // one key per send of this cart: pressing again after a lost answer gets the same order back, not a second one
+    const key = s.sendKey || (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+    this.setState({ sending: true, sendErr: '', sendKey: key });
     try {
       const r = await fetch('/api/orders', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, oi: l.oi ?? null, qty: l.qty })), cash: s.cash, lang: s.lang, note: s.note }),
+        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, oi: l.oi ?? null, qty: l.qty })), cash: s.cash, lang: s.lang, note: s.note, key }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -1048,7 +1066,7 @@ export default class DarkskyMenu extends React.Component {
         return this.setState({ sending: false, sendErr: err });
       }
       // poll once orderId is in state: React batches this update, so a tick right away would still see the old one and stop
-      this.setState({ sending: false, sent: true, orderId: j.id, orderStatus: j.status || 'new' }, () => this.pollOrder(j.id));
+      this.setState({ sending: false, sent: true, sendKey: null, orderId: j.id, orderStatus: j.status || 'new' }, () => this.pollOrder(j.id));
     } catch (e) {
       this.setState({ sending: false, sendErr: 'sendFail' });
     }
@@ -1082,7 +1100,7 @@ export default class DarkskyMenu extends React.Component {
     const s = this.state;
     try {
       if (!s.cart.length && !s.orderId) return localStorage.removeItem(this.orderKey());
-      localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent }));
+      localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent, sendKey: s.sendKey || null }));
     } catch (e) { /* private mode or storage full: works as before, just without the restore */ }
   }
   // only pushes the deadline of what is already kept (changes are saved as they happen)
@@ -1103,10 +1121,10 @@ export default class DarkskyMenu extends React.Component {
       const cart = (o.cart || []).filter(l => this.item(l.id) && l.qty > 0);
       const orderId = this.props.table && Number.isInteger(o.orderId) ? o.orderId : null;
       if (!cart.length && !orderId) return null;
-      return { cart, cash: !!o.cash, note: String(o.note || ''), orderId, sent: !!(orderId && o.sent), orderStatus: orderId ? 'new' : null };
+      return { cart, cash: !!o.cash, note: String(o.note || ''), orderId, sent: !!(orderId && o.sent), orderStatus: orderId ? 'new' : null, sendKey: typeof o.sendKey === 'string' ? o.sendKey : null };
     } catch (e) { return null; }
   }
-  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '' }); }
+  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '', sendKey: null }); }
 
   // Full-screen order: before sending — the cart as it stands; after — the order as the staff see it now.
   // reviewOpen 'sent': the order already sent, opened from a new cart started after it.
@@ -1135,8 +1153,6 @@ export default class DarkskyMenu extends React.Component {
     preload(this.props.logoUrl, { as: 'image', fetchPriority: 'high' });
     const s = this.state;
     const v = s.ready ? this.vm() : null;
-    // the cart emptied again after an order went out: the bar leads to that order
-    const past = v && !v.cnt && !s.sent && s.orderView;
     const sheetWrap = y => css(`position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:center;pointer-events:none;transform:translateY(${y});transition:transform .45s cubic-bezier(.2,.8,.2,1)`);
     return (
       <div dir={v && v.rtl ? 'rtl' : 'ltr'} className={'ds-stage-' + (this.C.CARD_STAGE || 'black')} style={css('position:relative;min-height:100vh;background:#030305;color:#f2f2f4;overflow-x:clip')}>
@@ -1152,21 +1168,10 @@ export default class DarkskyMenu extends React.Component {
         {v && s.phase !== 'intro' && (
           <>
             {this.renderMenu(v)}
-            {(v.cnt > 0 || past) && !v.anySheet && s.phase === 'menu' && (
-              <div style={css('position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;justify-content:center;padding:12px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top, rgba(3,3,5,.9), rgba(3,3,5,0))')}>
-                <button onClick={() => this.setState(past ? { reviewOpen: 'sent' } : s.sent && this.props.table ? { reviewOpen: true } : { cartOpen: true })} style={css('width:100%;max-width:508px;height:60px;border-radius:18px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 10px 0 20px;box-shadow:0 10px 40px rgba(232,121,60,.25)')}>
-                  <span style={css('font:400 11px/1 Michroma,sans-serif;letter-spacing:.14em;text-transform:uppercase')}>{v.t('viewOrder')}</span>
-                  <span style={css('display:flex;align-items:center;gap:10px')}>
-                    <span style={css('font:700 15px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{past ? this.fmt(s.orderView.total) : v.cartTotal}</span>
-                    <span style={css('min-width:40px;height:40px;padding:0 10px;border-radius:12px;background:#050507;color:#f2f2f4;display:flex;align-items:center;justify-content:center;font:700 14px/1 Manrope,sans-serif')}>{past ? s.orderView.lines.reduce((n, l) => n + l.qty, 0) : v.cnt}</span>
-                  </span>
-                </button>
-              </div>
-            )}
           </>
         )}
 
-        <div style={css(`position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));z-index:9;transform:translateX(-50%) translateY(${s.toastOn ? '0px' : '10px'});opacity:${s.toastOn ? 1 : 0};transition:opacity .3s, transform .3s;pointer-events:none;padding:11px 16px;border-radius:14px;background:#14141a;border:1px solid rgba(255,255,255,.12);font:500 13px/1 Manrope,sans-serif;white-space:nowrap;display:flex;align-items:center;gap:8px`)}>
+        <div style={css(`position:fixed;left:50%;top:calc(76px + env(safe-area-inset-top));z-index:9;transform:translateX(-50%) translateY(${s.toastOn ? '0px' : '-10px'});opacity:${s.toastOn ? 1 : 0};transition:opacity .3s, transform .3s;pointer-events:none;padding:11px 16px;border-radius:14px;background:#14141a;border:1px solid rgba(255,255,255,.12);font:500 13px/1 Manrope,sans-serif;white-space:nowrap;display:flex;align-items:center;gap:8px`)}>
           <span style={css('width:7px;height:7px;border-radius:50%;background:#e8793c')} /><span>{s.toast}</span>
         </div>
 

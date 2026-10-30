@@ -33,6 +33,15 @@ export async function menuRows(ids) {
   return db()`select id, hidden, data from menu_items where id in ${db()(ids)}`;
 }
 
+// A retry of a send already placed (same table, same key) gets that order back; null otherwise
+export async function orderByKey(tableId, key) {
+  if (!key) return null;
+  if (memMode()) return mem().orders.find(o => o.table_id === tableId && o.client_key === key) || null;
+  const [o] = await db()`select id, status from orders where table_id = ${tableId} and client_key = ${key}`;
+  return o || null;
+}
+
+// null: the same send was placed meanwhile by a parallel request (the unique key held it off)
 export async function insertOrder(o) {
   if (memMode()) {
     const row = { ...o, id: ++mem().seq, status: 'new', accepted_by: null, tg_message_id: null, created_at: Date.now(), accepted_at: null, served_at: null, edited_at: null };
@@ -41,8 +50,9 @@ export async function insertOrder(o) {
   }
   const sql = db();
   const [row] = await sql`
-    insert into orders (table_id, table_number, table_label, lines, subtotal, discount, total, cash, on_request, lang, note)
-    values (${o.table_id}, ${o.table_number}, ${o.table_label || null}, ${sql.json(o.lines)}, ${o.subtotal}, ${o.discount}, ${o.total}, ${o.cash}, ${o.on_request}, ${o.lang}, ${o.note})
+    insert into orders (table_id, table_number, table_label, lines, subtotal, discount, total, cash, on_request, lang, note, client_key)
+    values (${o.table_id}, ${o.table_number}, ${o.table_label || null}, ${sql.json(o.lines)}, ${o.subtotal}, ${o.discount}, ${o.total}, ${o.cash}, ${o.on_request}, ${o.lang}, ${o.note}, ${o.client_key || null})
+    on conflict (table_id, client_key) where client_key is not null do nothing
     returning *`;
   return row;
 }

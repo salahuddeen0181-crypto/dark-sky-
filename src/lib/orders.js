@@ -47,17 +47,21 @@ async function priceLines(lines, { allowHidden = false } = {}) {
   });
 }
 
-export async function placeOrder({ token, lines, cash, lang, note, site }) {
+export async function placeOrder({ token, lines, cash, lang, note, key, site }) {
   if (!Array.isArray(lines) || !lines.length || lines.length > MAX_LINES) throw new OrderError('bad_lines');
   const table = await S.findTable(token);
   if (!table) throw new OrderError('bad_table', 404);
+  const client_key = /^[\w-]{8,64}$/.test(key || '') ? key : null;
+  const placed = await S.orderByKey(table.id, client_key);
+  if (placed) return { id: placed.id, status: placed.status };
   if ((await S.recentOrders(table.id, RATE_MINUTES)) >= RATE_N) throw new OrderError('rate', 429);
   const priced = await priceLines(lines);
 
   const o = await S.insertOrder({
     table_id: table.id, table_number: table.number, table_label: table.label || null, lines: priced, ...sums(priced, !!cash), cash: !!cash,
-    lang: String(lang || '').slice(0, 5), note: String(note || '').trim().slice(0, MAX_NOTE) || null,
+    lang: String(lang || '').slice(0, 5), note: String(note || '').trim().slice(0, MAX_NOTE) || null, client_key,
   });
+  if (!o) { const p = await S.orderByKey(table.id, client_key); return { id: p.id, status: p.status }; }
 
   // privately to the waiters on shift (first to press «Взять» gets it) and to the owners' feed group
   if (tgReady()) {

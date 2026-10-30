@@ -13,7 +13,7 @@ const tz = () => process.env.VENUE_TIMEZONE || 'America/Argentina/Buenos_Aires';
 const hhmm = d => new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: tz() });
 const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 const dayLabel = day => `${day.slice(8, 10)}.${day.slice(5, 7)} (${WD[new Date(day + 'T12:00:00Z').getUTCDay()]})`;
-const mins = v => (v == null ? '—' : v < 1 ? '<1 мин' : Math.round(v) + ' мин');
+const mins = v => (v == null ? '—' : v < 1 ? '&lt;1 мин' : Math.round(v) + ' мин');
 const pct = v => Math.round(v * 100) + '%';
 const delta = (a, b) => (!b ? '' : ` <i>(${a >= b ? '↑' : '↓'}${Math.abs(Math.round(((a - b) / b) * 100))}% к прошлой смене)</i>`);
 

@@ -110,6 +110,11 @@ alter table orders add column if not exists reminded_at timestamptz;
 alter table orders add column if not exists archived_at timestamptz;
 alter table shifts add column if not exists archived_at timestamptz;
 
+-- One send from the guest's phone: a retry of the same send (lost answer on a weak connection, a double tap)
+-- finds the order already placed instead of placing it again
+alter table orders add column if not exists client_key text;
+create unique index if not exists orders_client_key on orders (table_id, client_key) where client_key is not null;
+
 -- The report of a working day (06:00 → 06:00 venue time): sent to the owners' group when the last waiter ends the
 -- shift (or at 06:00), kept for the admin. text: as sent to Telegram (HTML); data: the figures it was made from.
 create table if not exists shift_reports (
