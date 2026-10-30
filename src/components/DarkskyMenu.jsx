@@ -10,6 +10,7 @@ import { css, Arrow, Close, CLOSE_BTN, GLASS } from './menu-ui';
 import { createSmoke } from '@/lib/smoke-scene';
 import OrderReview from './OrderReview';
 import GuestAsk from './GuestAsk';
+import QrScan from './QrScan';
 import CatStrip from './CatStrip';
 import { tableName } from '@/lib/table-name';
 
@@ -98,6 +99,7 @@ const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isHevc() ? '.m
 // Home tiles shown large play the full clip, the rest the small one (matches tiles in vm())
 const FULL_TILES = new Set(['hookah', 'kitchen']);
 const ORDER_KEEP_MIN = 30; // no touch or scroll in the menu for longer than this: the visit is over, the next one starts clean
+const ORDER_WAIT_MIN = 45; // how long after sending the phone follows the order's status (and the visit waits for it)
 const newKey = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 // a send without an answer keeps its key through cart changes (sendOrder sorts out what arrived); otherwise a change means a new send
 const keepKey = s => (s.sendErr === 'lost' ? s.sendKey : null);
@@ -306,7 +308,7 @@ export default class DarkskyMenu extends React.Component {
   }
   componentDidUpdate(pp, ps) {
     const s = this.state;
-    if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent || ps.sendKey !== s.sendKey || ps.extraOf !== s.extraOf)) this.saveOrder();
+    if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent || ps.sendKey !== s.sendKey || ps.extraOf !== s.extraOf || ps.sentAt !== s.sentAt)) this.saveOrder();
     if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal());
     // the page behind an open sheet must not scroll
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen || this.state.rulesOpen) ? 'hidden' : '';
@@ -1060,7 +1062,13 @@ export default class DarkskyMenu extends React.Component {
                 <Arrow w={1.5} flip={v.flip} />
               </button>
             ) : (
-              <div style={css('padding:16px;border-radius:18px;border:1px dashed rgba(255,255,255,.2);text-align:center;font:500 14px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.75)')}>{this.tO('scanQr')}</div>
+              <div style={css('padding:16px;border-radius:18px;border:1px dashed rgba(255,255,255,.2);display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;font:500 14px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.75)')}>
+                {this.tO('scanQr')}
+                <button className="ds-press" onClick={() => this.setState({ scanOpen: true, cartOpen: false })} style={css('height:50px;padding:0 20px;border-radius:14px;background:#f2f2f4;color:#050507;display:flex;align-items:center;justify-content:center;gap:10px;font:600 15px/1 Manrope,sans-serif')}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2" /><path d="M7 12h10" /></svg>
+                  {this.tO('scanBtn')}
+                </button>
+              </div>
             )}
           </>
         )}
@@ -1096,7 +1104,7 @@ export default class DarkskyMenu extends React.Component {
       return this.setState({ sending: false, sendErr: err, sendKey: null, sendLines: null });
     }
     // poll once orderId is in state: React batches this update, so a tick right away would still see the old one and stop
-    const done = { sending: false, sent: true, sendErr: '', sendKey: null, sendLines: null, extraOf: null, orderId: j.id, orderStatus: j.status || 'new', orderView: null };
+    const done = { sending: false, sent: true, sendErr: '', sendKey: null, sendLines: null, extraOf: null, orderId: j.id, orderStatus: j.status || 'new', orderView: null, sentAt: Date.now() };
     // the first send had arrived after all, and the cart changed since: the order is what that send carried,
     // and only what was added goes out — as a new order, if the guest wants it
     if (j.existing && !sameLines(lines, sendLines)) {
@@ -1137,9 +1145,8 @@ export default class DarkskyMenu extends React.Component {
   // Staff accept / serve / edit it (staff page or Telegram) → the guest sees it here.
   pollOrder(id) {
     clearInterval(this._poll);
-    const started = Date.now();
     const tick = async () => {
-      if (this.state.orderId !== id || Date.now() - started > 45 * 60e3) return clearInterval(this._poll);
+      if (this.state.orderId !== id || !this.waiting()) return clearInterval(this._poll);
       try {
         const r = await fetch(`/api/orders/${id}?t=${encodeURIComponent(this.props.table.token)}`, { cache: 'no-store' });
         // the order is gone (another table's link, the demo store restarted): forget it
@@ -1163,7 +1170,7 @@ export default class DarkskyMenu extends React.Component {
     const s = this.state;
     try {
       if (!s.cart.length && !s.orderId) return localStorage.removeItem(this.orderKey());
-      localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent, sendKey: s.sendKey || null, sendLines: s.sendLines || null, extraOf: s.extraOf || null }));
+      localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent, sendKey: s.sendKey || null, sendLines: s.sendLines || null, extraOf: s.extraOf || null, sentAt: s.sentAt || null }));
     } catch (e) { /* private mode or storage full: works as before, just without the restore */ }
   }
   // MARK: - The visit
@@ -1177,10 +1184,12 @@ export default class DarkskyMenu extends React.Component {
   checkIdle() {
     const s = this.state;
     if (Date.now() - (this._lastAct || 0) < ORDER_KEEP_MIN * 60e3 || (!s.cart.length && !s.orderId)) return;
-    if (s.sending || s.sendErr === 'lost' || (s.orderId && s.orderStatus !== 'served')) return;
+    if (s.sending || s.sendErr === 'lost' || (this.waiting() && s.orderStatus !== 'served')) return;
     this.newOrder();
     this.setState({ sheetId: null, langOpen: false });
   }
+  // the sent order is still being followed: within ORDER_WAIT_MIN of sending (a reload does not extend it)
+  waiting() { const s = this.state; return !!s.orderId && Date.now() - (s.sentAt || 0) < ORDER_WAIT_MIN * 60e3; }
   // only pushes the deadline of what is already kept (changes are saved as they happen)
   touchOrder() {
     try {
@@ -1204,10 +1213,10 @@ export default class DarkskyMenu extends React.Component {
       // a send that never got its answer before the page went away: ask again on opening
       const lost = !sent && !!sendLines;
       return { cart, cash: !!o.cash, note: String(o.note || ''), orderId, sent, orderStatus: orderId ? 'new' : null, sendKey, sendLines,
-        extraOf: Number.isInteger(o.extraOf) ? o.extraOf : null, ...(lost ? { sendErr: 'lost', ask: { kind: 'lost' } } : {}) };
+        extraOf: Number.isInteger(o.extraOf) ? o.extraOf : null, sentAt: Number(o.sentAt) || 0, ...(lost ? { sendErr: 'lost', ask: { kind: 'lost' } } : {}) };
     } catch (e) { return null; }
   }
-  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '', sendKey: null, sendLines: null, extraOf: null, ask: null }); }
+  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '', sendKey: null, sendLines: null, extraOf: null, sentAt: 0, ask: null }); }
 
   // Full-screen order: before sending — the cart as it stands; after — the order as the staff see it now.
   // reviewOpen 'sent': the order already sent, opened from a new cart started after it.
@@ -1311,6 +1320,7 @@ export default class DarkskyMenu extends React.Component {
 
             {this.props.table && <OrderReview r={this.reviewVm(v)} />}
             {this.props.table && <GuestAsk a={this.askVm(v)} />}
+            {s.scanOpen && <QrScan tO={k => this.tO(k)} onClose={() => this.setState({ scanOpen: false })} />}
           </>
         )}
       </div>
