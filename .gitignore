@@ -45,3 +45,6 @@ next-env.d.ts
 # server secrets
 /deploy/.env
 /.next-test/
+
+# personal Claude Code permissions (prod access), never shipped
+/.claude/settings.local.json
