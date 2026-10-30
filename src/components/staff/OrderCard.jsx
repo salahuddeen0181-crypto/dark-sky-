@@ -18,6 +18,7 @@ export default function OrderCard({ o, now, busy, onAction }) {
           <div>
             <div className="font-display text-2xl">{tableName(o)}</div>
             <div className={`text-xs ${late ? 'text-[#f2a676]' : 'text-white/45'}`}>#{o.id} · {hhmm(o.created_at)} · {ago(o.created_at, now)}</div>
+            {o.extra_of && <div className="mt-1 text-xs font-semibold text-[#f2a676]">➕ Дозаказ к #{o.extra_of}</div>}
           </div>
           <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${cls}`}>{label}</span>
         </div>

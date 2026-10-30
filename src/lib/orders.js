@@ -9,6 +9,7 @@ export class OrderError extends Error {
 
 const staffName = o => (o && typeof o === 'object' ? o.ru || o.en || o.es || '' : o || '');
 const MAX_LINES = 40, MAX_QTY = 20, MAX_NOTE = 200, RATE_N = 5, RATE_MINUTES = 2;
+const EXTRA_HOURS = 6; // «Дозаказ к #N» links only to an order of the same table placed within this
 
 const sums = (lines, cash) => {
   let subtotal = 0, onRequest = false;
@@ -47,21 +48,23 @@ async function priceLines(lines, { allowHidden = false } = {}) {
   });
 }
 
-export async function placeOrder({ token, lines, cash, lang, note, key, site }) {
+export async function placeOrder({ token, lines, cash, lang, note, key, extraOf, site }) {
   if (!Array.isArray(lines) || !lines.length || lines.length > MAX_LINES) throw new OrderError('bad_lines');
   const table = await S.findTable(token);
   if (!table) throw new OrderError('bad_table', 404);
   const client_key = /^[\w-]{8,64}$/.test(key || '') ? key : null;
   const placed = await S.orderByKey(table.id, client_key);
-  if (placed) return { id: placed.id, status: placed.status };
+  // existing: this send had already gone through (its answer was lost), nothing new was placed
+  if (placed) return { id: placed.id, status: placed.status, existing: true };
   if ((await S.recentOrders(table.id, RATE_MINUTES)) >= RATE_N) throw new OrderError('rate', 429);
   const priced = await priceLines(lines);
+  const extra_of = await S.recentOrderOfTable(table.id, Number(extraOf), EXTRA_HOURS);
 
   const o = await S.insertOrder({
     table_id: table.id, table_number: table.number, table_label: table.label || null, lines: priced, ...sums(priced, !!cash), cash: !!cash,
-    lang: String(lang || '').slice(0, 5), note: String(note || '').trim().slice(0, MAX_NOTE) || null, client_key,
+    lang: String(lang || '').slice(0, 5), note: String(note || '').trim().slice(0, MAX_NOTE) || null, client_key, extra_of,
   });
-  if (!o) { const p = await S.orderByKey(table.id, client_key); return { id: p.id, status: p.status }; }
+  if (!o) { const p = await S.orderByKey(table.id, client_key); return { id: p.id, status: p.status, existing: true }; }
 
   // privately to the waiters on shift (first to press «Взять» gets it) and to the owners' feed group
   if (tgReady()) {

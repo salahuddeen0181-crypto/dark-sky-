@@ -115,6 +115,9 @@ alter table shifts add column if not exists archived_at timestamptz;
 alter table orders add column if not exists client_key text;
 create unique index if not exists orders_client_key on orders (table_id, client_key) where client_key is not null;
 
+-- The same guests ordering again: the order they added to (shown to staff as «Дозаказ к #N»)
+alter table orders add column if not exists extra_of int;
+
 -- The report of a working day (06:00 → 06:00 venue time): sent to the owners' group when the last waiter ends the
 -- shift (or at 06:00), kept for the admin. text: as sent to Telegram (HTML); data: the figures it was made from.
 create table if not exists shift_reports (

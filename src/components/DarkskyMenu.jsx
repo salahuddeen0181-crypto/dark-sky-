@@ -9,6 +9,7 @@ import { css, Arrow, Close, CLOSE_BTN, GLASS } from './menu-ui';
 // In the first bundle, not a lazy chunk: on a far server every extra round trip delays the intro by ~0.3–1 s
 import { createSmoke } from '@/lib/smoke-scene';
 import OrderReview from './OrderReview';
+import GuestAsk from './GuestAsk';
 import CatStrip from './CatStrip';
 import { tableName } from '@/lib/table-name';
 
@@ -96,7 +97,14 @@ const isHevc = () => { const ua = navigator.userAgent; return /AppleWebKit/.test
 const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isHevc() ? '.mov' : '.webm');
 // Home tiles shown large play the full clip, the rest the small one (matches tiles in vm())
 const FULL_TILES = new Set(['hookah', 'kitchen']);
-const ORDER_KEEP_MIN = 30; // a saved cart / order not opened or changed for longer than this is a past visit
+const ORDER_KEEP_MIN = 30; // no touch or scroll in the menu for longer than this: the visit is over, the next one starts clean
+const newKey = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+// a send without an answer keeps its key through cart changes (sendOrder sorts out what arrived); otherwise a change means a new send
+const keepKey = s => (s.sendErr === 'lost' ? s.sendKey : null);
+const lineKey = l => `${l.id}:${l.vi ?? ''}:${l.oi ?? ''}`;
+const sameLines = (a, b) => a.length === b.length && a.every(l => b.some(m => lineKey(m) === lineKey(l) && m.qty === l.qty));
+// what the cart has on top of what was sent (removals can only be done by the waiter)
+const addedLines = (now, sent) => now.map(l => ({ ...l, qty: l.qty - (sent.find(m => lineKey(m) === lineKey(l))?.qty || 0) })).filter(l => l.qty > 0);
 
 // While the guest is still on the intro, quietly fill the browser cache: the home tiles' stills and clips first
 // (seen right after entering), then every dish's small picture, so sections open with pictures already there.
@@ -265,11 +273,18 @@ export default class DarkskyMenu extends React.Component {
     let lang = null; try { lang = localStorage.getItem('darksky.lang'); } catch (e) {}
     if (!lang) { const n = (navigator.language || 'es').slice(0, 2); lang = D.LANGS.some(l => l.code === n) ? n : 'es'; }
     const saved = this.loadOrder();
-    // leaving or reloading the page counts as being here: the 30 minutes start again from that moment
-    // (iPhone may never fire pagehide when the guest just switches apps, hence visibilitychange too)
-    this._onHide = () => this.touchOrder();
+    // leaving the page counts as being here: the 30 minutes start again from that moment
+    // (iPhone may never fire pagehide when the guest just switches apps, hence visibilitychange too);
+    // coming back to it after longer than that starts a new visit
+    this._lastAct = Date.now();
+    this._onHide = e => {
+      if (e.type === 'visibilitychange' && document.visibilityState === 'visible') return this.checkIdle();
+      this._lastAct = Date.now(); this.touchOrder();
+    };
     window.addEventListener('pagehide', this._onHide);
     document.addEventListener('visibilitychange', this._onHide);
+    window.addEventListener('pointerdown', this.markActive, { passive: true });
+    this._idle = setInterval(() => this.checkIdle(), 60e3);
     // a reload mid-order goes straight back to the menu, the cart and the order's status
     const skip = !!this.props.skipIntro || !!saved;
     this.setState({ ready: true, lang, phase: skip ? 'menu' : 'intro', ...saved }, () => saved && saved.orderId && this.pollOrder(saved.orderId));
@@ -291,7 +306,7 @@ export default class DarkskyMenu extends React.Component {
   }
   componentDidUpdate(pp, ps) {
     const s = this.state;
-    if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent || ps.sendKey !== s.sendKey)) this.saveOrder();
+    if (s.ready && (ps.cart !== s.cart || ps.cash !== s.cash || ps.note !== s.note || ps.orderId !== s.orderId || ps.sent !== s.sent || ps.sendKey !== s.sendKey || ps.extraOf !== s.extraOf)) this.saveOrder();
     if (pp.smokeIntensity !== this.props.smokeIntensity && this.scene && this.state.phase === 'menu') this.scene.setDim(this.dimVal());
     // the page behind an open sheet must not scroll
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen || this.state.rulesOpen) ? 'hidden' : '';
@@ -301,10 +316,11 @@ export default class DarkskyMenu extends React.Component {
   // the background smoke stands still while a sheet covers it or the page is being scrolled
   pauseSmoke() { this.scene && this.scene.pause(this._sheetPause || this._scrolling); }
   onScroll = () => {
+    this.markActive();
     if (!this._scrolling) { this._scrolling = true; this.pauseSmoke(); }
     clearTimeout(this._st); this._st = setTimeout(() => { this._scrolling = false; this.pauseSmoke(); }, 250);
   };
-  componentWillUnmount() { window.removeEventListener('scroll', this.onScroll); clearTimeout(this._st); clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); window.removeEventListener('pagehide', this._onHide); document.removeEventListener('visibilitychange', this._onHide); }
+  componentWillUnmount() { window.removeEventListener('scroll', this.onScroll); clearTimeout(this._st); clearInterval(this._gt); clearInterval(this._poll); clearTimeout(this._lt); this.tiles && this.tiles.dispose(); this.scene && this.scene.dispose(); clearTimeout(this._tt); clearTimeout(this._nt); this._onResize && window.removeEventListener('resize', this._onResize); window.removeEventListener('pagehide', this._onHide); window.removeEventListener('pointerdown', this.markActive); clearInterval(this._idle); document.removeEventListener('visibilitychange', this._onHide); }
 
   // What warmMedia() fetches in the background: tile clips with their stills, then every dish's small picture
   warm() {
@@ -410,18 +426,24 @@ export default class DarkskyMenu extends React.Component {
     setTimeout(() => { this.setState({ phase: 'menu' }); this.scene && this.scene.setDim(this.dimVal()); setTimeout(() => this.loadTiles(), 120); }, 750);
   }
   showToast(msg) { this.setState({ toast: msg, toastOn: true }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toastOn: false }), 1600); }
-  // oi: the free option picked (a dessert's topping) or null; the same dish with another topping is another line
-  // After an order has gone out the next dish starts a fresh cart, or sending again would repeat the sent lines;
-  // the sent order keeps its orderId, polling and status, reachable from the cart.
+  // oi: the free option picked (a dessert's topping) or null; the same dish with another topping is another line.
+  // Once an order has gone out the dish is not added at once: the guest sees that order and says whether to start
+  // a new one (startExtra), so sending again never repeats the sent lines.
   addToCart(id, vi, qty, oi = null) {
+    if (this.state.sent && this.props.table) return this.setState({ ask: { kind: 'more', add: { id, vi, qty, oi } }, sheetId: null, cartOpen: false });
     this.setState(s => {
-      const cart = s.sent ? [] : s.cart.slice(); const k = cart.findIndex(l => l.id === id && l.vi === vi && (l.oi ?? null) === oi);
+      const cart = s.cart.slice(); const k = cart.findIndex(l => l.id === id && l.vi === vi && (l.oi ?? null) === oi);
       if (k >= 0) cart[k] = { ...cart[k], qty: cart[k].qty + qty }; else cart.push(oi == null ? { id, vi, qty } : { id, vi, oi, qty });
-      return s.sent ? { cart, sent: false, cash: false, note: '', sendErr: '', sendKey: null } : { cart, sendKey: null };
+      return { cart, sendKey: keepKey(s) };
     });
     this.showToast(this.t('added') + ' · ' + this.nm(this.item(id)));
   }
-  changeLine(i, d) { this.setState(s => { const cart = s.cart.slice(); const q = cart[i].qty + d; if (q <= 0) cart.splice(i, 1); else cart[i] = { ...cart[i], qty: q }; return { cart, sendKey: null }; }); }
+  changeLine(i, d) { this.setState(s => { const cart = s.cart.slice(); const q = cart[i].qty + d; if (q <= 0) cart.splice(i, 1); else cart[i] = { ...cart[i], qty: q }; return { cart, sendKey: keepKey(s) }; }); }
+  // «Yes, a new order»: a fresh cart with that dish, marked for the staff as the same guests ordering more;
+  // the sent order stays reachable from the cart (orderId / orderView are kept)
+  startExtra({ id, vi, qty, oi }) {
+    this.setState(s => ({ ask: null, cart: [], sent: false, cash: false, note: '', sendErr: '', sendKey: null, sendLines: null, extraOf: s.orderId }), () => this.addToCart(id, vi, qty, oi));
+  }
   openItem(id) { this.setState({ sheetId: id, vi: 0, oi: null, qty: 1, cartOpen: false, langOpen: false, slide: 0 }); }
   // dishes of the open one's category, in menu order: the sheet steps through them (wrapping round)
   siblings(it) { return this.props.items.filter(i => i.cat === it.cat && !i.hidden); }
@@ -1049,27 +1071,68 @@ export default class DarkskyMenu extends React.Component {
   closeAll() { this.setState({ sheetId: null, cartOpen: false, langOpen: false, rulesOpen: false }); }
   tO(k) { const U = D.UI_ORDER; return (U[this.state.lang] || U.en)[k]; }
 
+  // MARK: - Sending without duplicates
+  // One key per send: until the server answers for it, every retry carries the same key and the lines it first
+  // carried (sendLines), so an order whose answer was lost comes back as itself instead of being placed twice.
   async sendOrder() {
     const s = this.state, table = this.props.table;
     if (!table || s.sending || !s.cart.length) return;
-    // one key per send of this cart: pressing again after a lost answer gets the same order back, not a second one
-    const key = s.sendKey || (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
-    this.setState({ sending: true, sendErr: '', sendKey: key });
+    const key = s.sendKey || newKey();
+    const lines = s.cart.map(l => ({ id: l.id, vi: l.vi, oi: l.oi ?? null, qty: l.qty }));
+    const sendLines = s.sendKey && s.sendLines ? s.sendLines : lines;
+    this.setState({ sending: true, sendErr: '', sendKey: key, sendLines });
+    let r = null, j = {};
     try {
-      const r = await fetch('/api/orders', {
+      r = await fetch('/api/orders', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: table.token, lines: s.cart.map(l => ({ id: l.id, vi: l.vi, oi: l.oi ?? null, qty: l.qty })), cash: s.cash, lang: s.lang, note: s.note, key }),
+        body: JSON.stringify({ token: table.token, lines, cash: s.cash, lang: s.lang, note: s.note, key, extraOf: s.extraOf || null }),
       });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        const err = j.error === 'rate' ? 'wait' : j.error === 'unavailable' ? 'unavailable' : 'sendFail';
-        return this.setState({ sending: false, sendErr: err });
-      }
-      // poll once orderId is in state: React batches this update, so a tick right away would still see the old one and stop
-      this.setState({ sending: false, sent: true, sendKey: null, orderId: j.id, orderStatus: j.status || 'new' }, () => this.pollOrder(j.id));
-    } catch (e) {
-      this.setState({ sending: false, sendErr: 'sendFail' });
+      j = await r.json().catch(() => ({}));
+    } catch (e) { r = null; }
+    // no answer (network gone, server down): the order may or may not have arrived — ask, keep the key
+    if (!r || r.status >= 500) return this.setState({ sending: false, sendErr: 'lost', ask: { kind: 'lost' } });
+    if (!r.ok) {
+      const err = j.error === 'rate' ? 'wait' : j.error === 'unavailable' ? 'unavailable' : 'sendFail';
+      return this.setState({ sending: false, sendErr: err, sendKey: null, sendLines: null });
     }
+    // poll once orderId is in state: React batches this update, so a tick right away would still see the old one and stop
+    const done = { sending: false, sent: true, sendErr: '', sendKey: null, sendLines: null, extraOf: null, orderId: j.id, orderStatus: j.status || 'new', orderView: null };
+    // the first send had arrived after all, and the cart changed since: the order is what that send carried,
+    // and only what was added goes out — as a new order, if the guest wants it
+    if (j.existing && !sameLines(lines, sendLines)) {
+      const more = addedLines(lines, sendLines);
+      return this.setState({ ...done, cart: sendLines, reviewOpen: false, ask: { kind: more.length ? 'extra' : 'removed', id: j.id, more } }, () => this.pollOrder(j.id));
+    }
+    this.setState(done, () => this.pollOrder(j.id));
+  }
+  // «Send as an extra order»: only the added lines, linked to the order that arrived
+  sendExtra(id, more) {
+    this.setState({ ask: null, cart: more, sent: false, sendErr: '', sendKey: null, sendLines: null, extraOf: id, reviewOpen: false }, () => this.sendOrder());
+  }
+
+  // What the open question shows (GuestAsk); null when there is none
+  askVm(v) {
+    const a = this.state.ask, s = this.state, tO = k => this.tO(k);
+    if (!a || !v) return null;
+    const close = () => this.setState({ ask: null });
+    if (a.kind === 'more') {
+      const r = this.reviewVm(v);
+      return {
+        title: tO('moreTitle'), status: `#${s.orderId} · ${tO(s.orderStatus === 'served' ? 'stServed' : s.orderStatus === 'accepted' ? 'stAcc' : 'stSent')}`,
+        lines: r.lines, total: r.total, text: tO('moreAsk'),
+        buttons: [{ label: tO('moreYes'), primary: true, onClick: () => this.startExtra(a.add) }, { label: tO('moreNo'), onClick: close }],
+      };
+    }
+    if (a.kind === 'lost') return {
+      title: tO('lostTitle'), text: tO('lostText'),
+      buttons: [{ label: tO('resend'), primary: true, onClick: () => this.setState({ ask: null }, () => this.sendOrder()) }, { label: tO('later'), onClick: close }],
+    };
+    if (a.kind === 'extra') return {
+      title: tO('extraTitle'), text: tO('extraText').replace('{n}', a.id),
+      lines: a.more.map((l, i) => { const it = this.item(l.id); return { key: i, name: it ? this.nm(it) : l.id, qty: l.qty, total: '' }; }),
+      buttons: [{ label: tO('extraSend'), primary: true, onClick: () => this.sendExtra(a.id, a.more) }, { label: tO('moreNo'), onClick: close }],
+    };
+    return { title: tO('extraTitle'), text: tO('callWaiter'), buttons: [{ label: 'OK', primary: true, onClick: close }] };
   }
   // Staff accept / serve / edit it (staff page or Telegram) → the guest sees it here.
   pollOrder(id) {
@@ -1084,7 +1147,7 @@ export default class DarkskyMenu extends React.Component {
         if (!r.ok) return;
         const o = await r.json();
         this.setState({ orderStatus: o.status, orderView: o });
-        if (o.status === 'served') clearInterval(this._poll);
+        if (o.status === 'served') { clearInterval(this._poll); this._lastAct = Date.now(); }
       } catch (e) { /* offline for a moment: try again next tick */ }
     };
     this._poll = setInterval(tick, 4000);
@@ -1100,8 +1163,23 @@ export default class DarkskyMenu extends React.Component {
     const s = this.state;
     try {
       if (!s.cart.length && !s.orderId) return localStorage.removeItem(this.orderKey());
-      localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent, sendKey: s.sendKey || null }));
+      localStorage.setItem(this.orderKey(), JSON.stringify({ at: Date.now(), cart: s.cart, cash: s.cash, note: s.note || '', orderId: s.orderId, sent: s.sent, sendKey: s.sendKey || null, sendLines: s.sendLines || null, extraOf: s.extraOf || null }));
     } catch (e) { /* private mode or storage full: works as before, just without the restore */ }
+  }
+  // MARK: - The visit
+  // A touch or a scroll keeps it going (the saved entry's deadline is pushed at most once a minute). ORDER_KEEP_MIN
+  // without either ends it: empty cart, the sent order forgotten — unless the guest is still waiting for something
+  // (a send without its answer, an order not served yet).
+  markActive = () => {
+    const now = Date.now(); this._lastAct = now;
+    if (now - (this._touchAt || 0) > 60e3) { this._touchAt = now; this.touchOrder(); }
+  };
+  checkIdle() {
+    const s = this.state;
+    if (Date.now() - (this._lastAct || 0) < ORDER_KEEP_MIN * 60e3 || (!s.cart.length && !s.orderId)) return;
+    if (s.sending || s.sendErr === 'lost' || (s.orderId && s.orderStatus !== 'served')) return;
+    this.newOrder();
+    this.setState({ sheetId: null, langOpen: false });
   }
   // only pushes the deadline of what is already kept (changes are saved as they happen)
   touchOrder() {
@@ -1121,10 +1199,15 @@ export default class DarkskyMenu extends React.Component {
       const cart = (o.cart || []).filter(l => this.item(l.id) && l.qty > 0);
       const orderId = this.props.table && Number.isInteger(o.orderId) ? o.orderId : null;
       if (!cart.length && !orderId) return null;
-      return { cart, cash: !!o.cash, note: String(o.note || ''), orderId, sent: !!(orderId && o.sent), orderStatus: orderId ? 'new' : null, sendKey: typeof o.sendKey === 'string' ? o.sendKey : null };
+      const sent = !!(orderId && o.sent), sendKey = typeof o.sendKey === 'string' ? o.sendKey : null;
+      const sendLines = sendKey && Array.isArray(o.sendLines) ? o.sendLines : null;
+      // a send that never got its answer before the page went away: ask again on opening
+      const lost = !sent && !!sendLines;
+      return { cart, cash: !!o.cash, note: String(o.note || ''), orderId, sent, orderStatus: orderId ? 'new' : null, sendKey, sendLines,
+        extraOf: Number.isInteger(o.extraOf) ? o.extraOf : null, ...(lost ? { sendErr: 'lost', ask: { kind: 'lost' } } : {}) };
     } catch (e) { return null; }
   }
-  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '', sendKey: null }); }
+  newOrder() { clearInterval(this._poll); this.setState({ cart: [], sent: false, cartOpen: false, reviewOpen: false, cash: false, note: '', orderId: null, orderStatus: null, orderView: null, sendErr: '', sendKey: null, sendLines: null, extraOf: null, ask: null }); }
 
   // Full-screen order: before sending — the cart as it stands; after — the order as the staff see it now.
   // reviewOpen 'sent': the order already sent, opened from a new cart started after it.
@@ -1142,7 +1225,7 @@ export default class DarkskyMenu extends React.Component {
       subtotal: o ? this.fmt(o.subtotal) : v.subtotal, discount: o ? '−' + this.fmt(o.discount) : v.discount, total: o ? this.fmt(o.total) : v.cartTotal,
       hasDiscount: o ? o.discount > 0 : s.cash, onReq: o ? o.onRequest : v.onReq,
       cash: s.cash, onCash: () => this.setState(st => ({ cash: !st.cash })), note: s.note || '', onNote: note => this.setState({ note }),
-      sending: s.sending, err: s.sendErr ? this.tO(s.sendErr) : '', onSend: () => this.sendOrder(),
+      sending: s.sending, err: s.sendErr ? this.tO(s.sendErr === 'lost' ? 'lostText' : s.sendErr) : '', onSend: () => this.sendOrder(),
       onBack: () => this.setState({ reviewOpen: false, cartOpen: true }), onClose: () => this.setState({ reviewOpen: false }),
       onNew: past ? () => this.setState({ reviewOpen: false, cartOpen: true }) : () => this.newOrder(),
     };
@@ -1227,6 +1310,7 @@ export default class DarkskyMenu extends React.Component {
             </div>
 
             {this.props.table && <OrderReview r={this.reviewVm(v)} />}
+            {this.props.table && <GuestAsk a={this.askVm(v)} />}
           </>
         )}
       </div>

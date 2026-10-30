@@ -71,6 +71,7 @@ export default function OrderDetail({ id }) {
       <div>
         <div className="font-display text-4xl">{tableName(o)}</div>
         <div className="text-sm text-white/50">#{o.id} · {hhmm(o.created_at)} · {ago(o.created_at, now)}{o.accepted_by ? ` · одобрил(а) ${o.accepted_by}` : ''}</div>
+        {o.extra_of && <div className="text-sm font-semibold text-[#f2a676]">➕ Дозаказ к #{o.extra_of} — те же гости</div>}
       </div>
 
       <div className="flex flex-col divide-y divide-white/5 rounded-2xl border border-white/10 bg-[#0e0e13] px-4">

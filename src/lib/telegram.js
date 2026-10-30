@@ -57,7 +57,9 @@ export function orderText(o, link, view = 'feed') {
   const head = view === 'mine'
     ? { accepted: '✅ <b>ВАШ ЗАКАЗ</b>', served: '🍽 <b>ПОДАНО</b>' }[o.status] || '🔔 <b>НОВЫЙ ЗАКАЗ</b>'
     : { new: '🔔 <b>НОВЫЙ ЗАКАЗ</b>', accepted: '✅ <b>ВЗЯТ</b>', served: '🍽 <b>ПОДАНО</b>' }[o.status] || '';
-  const out = [`${head}  ·  <b>${esc(tableName(o, 'СТОЛ').toUpperCase())}</b>`, `#${o.id} · ${hhmm(o.created_at)}`, ''];
+  const out = [`${head}  ·  <b>${esc(tableName(o, 'СТОЛ').toUpperCase())}</b>`, `#${o.id} · ${hhmm(o.created_at)}`];
+  if (o.extra_of) out.push(`➕ <b>Дозаказ к #${o.extra_of}</b> — те же гости`);
+  out.push('');
   for (const l of o.lines) {
     out.push(`• ${esc(l.name)}${l.variant ? ' — ' + esc(l.variant) : ''} × <b>${l.qty}</b>   ${l.total == null ? 'уточнить' : fmtPrice(l.total)}`);
   }

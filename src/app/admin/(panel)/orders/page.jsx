@@ -12,7 +12,7 @@ export default async function OrdersPage({ searchParams }) {
   const tz = process.env.VENUE_TIMEZONE || 'America/Argentina/Buenos_Aires';
   const limit = Math.min(1000, Math.max(STEP, Math.round(Number((await searchParams).n) || STEP)));
   // one extra row tells whether there is more
-  const rows = await db()`select id, table_number, table_label, lines, total, cash, on_request, status, accepted_by, note, edited_at, created_at
+  const rows = await db()`select id, table_number, table_label, lines, total, cash, on_request, status, accepted_by, note, edited_at, extra_of, created_at
     from orders where archived_at is null order by created_at desc limit ${limit + 1}`;
   const orders = rows.slice(0, limit), more = rows.length > limit;
   const time = d => new Date(d).toLocaleString('ru-RU', { timeZone: tz, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -31,7 +31,7 @@ export default async function OrdersPage({ searchParams }) {
             <div key={o.id} className="grid gap-2 rounded-2xl border border-white/10 bg-[#0e0e13] p-4 sm:grid-cols-[110px_1fr_auto]">
               <div>
                 <div className="font-display text-lg">{tableName(o)}</div>
-                <div className="text-xs text-white/45">#{o.id} · {time(o.created_at)}</div>
+                <div className="text-xs text-white/45">#{o.id} · {time(o.created_at)}{o.extra_of ? ` · дозаказ к #${o.extra_of}` : ''}</div>
               </div>
               <div className="text-sm text-white/80">
                 {o.lines.map((l, i) => <div key={i}>{l.name}{l.variant ? ` — ${l.variant}` : ''} × {l.qty}</div>)}
