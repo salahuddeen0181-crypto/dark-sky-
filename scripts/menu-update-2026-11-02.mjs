@@ -19,12 +19,13 @@ for (const dish of ['dark-roll', 'midnight-roll']) {
   console.log(`${id}: added to ${cat}${DRY ? ' (dry run)' : ''}`);
   if (!DRY) await sql`insert into menu_items (id, cat, sort, hidden, data) values (${id}, ${cat}, ${next}, false, ${sql.json({ ...data, media: MEDIA[id] })})`;
 }
-// Cuba Libre: its own clip and the owner's description; the price and strength stay as they are
+// Cuba Libre and Cosmoflower: their own clips and the owner's descriptions; prices and the rest stay as they are
 const CUBA_D = {"en": "Refreshing and sweetish, with a citrus tang. 45 ml Ron especial, Coca-Cola on top, lime.", "es": "Refrescante y dulzón, con un toque cítrico. 45 ml de Ron especial, Coca-Cola, lima.", "ru": "Освежающий, сладковатый, с цитрусовой кислинкой. 45 мл Ron especial, Coca-Cola, лайм.", "zh": "清爽微甜，带柑橘酸香。45 毫升 Ron especial、Coca-Cola、青柠。", "hi": "ताज़ा, हल्का मीठा, खट्टे स्वाद के साथ। 45 ml स्पेशल रम, Coca-Cola, नींबू।", "ar": "منعش وحلو قليلًا مع حموضة حمضيات. 45 مل Ron especial، Coca-Cola، ليمون أخضر.", "fr": "Rafraîchissant et légèrement sucré, avec une pointe d’agrumes. 45 ml de Ron especial, Coca-Cola, citron vert.", "pt": "Refrescante e levemente doce, com um toque cítrico. 45 ml de Ron especial, Coca-Cola, limão.", "de": "Erfrischend, leicht süß, mit Zitrusnote. 45 ml Ron especial, Coca-Cola, Limette.", "ja": "爽やかでほんのり甘く、柑橘の酸味。Ron especial 45ml、Coca-Cola、ライム。"};
-const [cuba] = await sql`select data from menu_items where id = 'cl11'`;
-if (!cuba || (cuba.data.media === MEDIA.cl11 && cuba.data.d?.ru === CUBA_D.ru)) console.log('cl11: left as it is');
-else {
-  console.log(`cl11: clip and description${DRY ? ' (dry run)' : ''}`);
-  if (!DRY) await sql`update menu_items set data = (data - 'img') || ${sql.json({ media: MEDIA.cl11, d: CUBA_D })}, updated_at = now() where id = 'cl11'`;
+const COSMO_D = {"en": "Berry-forward, lightly bitter, with a refreshing finish. 30 ml vodka, 30 ml Aperol, 30 ml blackberry liqueur.", "es": "Frutos rojos, ligeramente amargo, con un final refrescante. 30 ml de vodka, 30 ml de Aperol, 30 ml de licor de mora.", "ru": "Ягодный, слегка горьковатый, с освежающим послевкусием. 30 мл водки, 30 мл Aperol, 30 мл ежевичного ликёра.", "zh": "莓果风味，微苦，余味清爽。30 毫升伏特加、30 毫升 Aperol、30 毫升黑莓利口酒。", "hi": "बेरी जैसा, हल्का कड़वा, ताज़गी भरे स्वाद के साथ। 30 ml वोदका, 30 ml Aperol, 30 ml ब्लैकबेरी लिकर।", "ar": "بنكهة التوت، مر قليلًا، مع نهاية منعشة. 30 مل فودكا، 30 مل Aperol، 30 مل ليكيور العليق.", "fr": "Fruité, légèrement amer, avec une finale rafraîchissante. 30 ml de vodka, 30 ml d’Aperol, 30 ml de liqueur de mûre.", "pt": "Frutado, levemente amargo, com final refrescante. 30 ml de vodka, 30 ml de Aperol, 30 ml de licor de amora.", "de": "Beerig, leicht bitter, mit erfrischendem Abgang. 30 ml Wodka, 30 ml Aperol, 30 ml Brombeerlikör.", "ja": "ベリーの風味にほのかな苦み、爽やかな後味。ウォッカ 30ml、Aperol 30ml、ブラックベリーリキュール 30ml。"};
+for (const [id, text] of [['cl11', CUBA_D], ['sg3', COSMO_D]]) {
+  const [it] = await sql`select data from menu_items where id = ${id}`;
+  if (!it || (it.data.media === MEDIA[id] && it.data.d?.ru === text.ru)) { console.log(`${id}: left as it is`); continue; }
+  console.log(`${id}: clip and description${DRY ? ' (dry run)' : ''}`);
+  if (!DRY) await sql`update menu_items set data = (data - 'img') || ${sql.json({ media: MEDIA[id], d: text })}, updated_at = now() where id = ${id}`;
 }
 await sql.end();

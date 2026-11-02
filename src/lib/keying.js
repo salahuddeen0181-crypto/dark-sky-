@@ -26,7 +26,7 @@ export function sampleKey(px, W, H, hc = 130, span = 60) {
   return { hk, sk: mid(.6, 1), vk: mid(.5, 2), lk: mid(.4, 3) };
 }
 
-export function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, shadow = 1, feather = null, lift = 0 } = {}, W, H) {
+export function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, shadow = 1, feather = null, lift = 0, grey = null } = {}, W, H) {
   const { hk, sk, vk, lk } = key, n = W * H;
   for (let p = 0; p < n; p++) {
     const i = p * 3, r = px[i], g = px[i + 1], b = px[i + 2];
@@ -43,7 +43,7 @@ export function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, sha
     // despill, only for colours close to the screen hue: pull green down, then neutralise what is left
     // (smoke and glass over the screen would otherwise stay cyan)
     const spill = (1 - smooth(25, 50, dh)) * .85, lim = Math.max(r, b), g2 = g > lim ? g - (g - lim) * spill : g;
-    const lum = lift && k > .15 ? Math.max(.3 * r + .59 * g2 + .11 * b, lift) : .3 * r + .59 * g2 + .11 * b, ks = lift && k > .15 ? 1 : spill * .8;
+    const lum = lift && k > .15 ? Math.max(.3 * r + .59 * g2 + .11 * b, lift) : .3 * r + .59 * g2 + .11 * b, ks = (lift && k > .15) || (grey && h > grey[0] && h < grey[1]) ? 1 : spill * .8; // grey: a hue range to take the colour out of (the screen seen through a drink)
     // the shadow part of a pixel is black: straight colour = foreground share / total opacity
     const fg = 1 - k, keep = fg / Math.max(1e-3, fg + k * sh);
     const o = p * 4;

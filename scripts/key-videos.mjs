@@ -38,7 +38,7 @@ const OPTS = {
   udon: { feather: [.1, .07], shadow: 1.25 }, 'wok-rice': { feather: [.1, .07], shadow: 1.25 },
   // filmed landscape with the camera following a wide bowl and the croutons falling at its side: keep the whole frame
   'salad-cesar': { wide: true },
-  'cuba-libre': { shadow: 1.25 }, 'roll-dark': { shadow: 1.25 }, 'roll-midnight': { shadow: 1.25, wide: true }, // dark glossy plates; this one filmed landscape
+  cosmoflower: { grey: [45, 175] }, 'cuba-libre': { shadow: 1.25 }, 'roll-dark': { shadow: 1.25 }, 'roll-midnight': { shadow: 1.25, wide: true }, // dark glossy plates; this one filmed landscape
 };
 const CLIPS = {
   'Chicken_teriyaki_sushi_roll': 'roll-horno',
@@ -68,6 +68,7 @@ const CLIPS = {
   'Sushi_roll_assembling_on_plate': 'roll-newyork',
   'Unagi_sushi_roll': 'roll-unagi',
   'US_dollar_bills_fluttering': 'cash',
+  'Cosmoflower': 'cosmoflower', // 'Martini_glass_rotating_on_green_…', renamed
   'Cuba_libre': 'cuba-libre', // 'Glass_rotating_with_Cuba_Libre_…', renamed
   'Midnight_roll': 'roll-midnight', // 'Sushi_roll_piece_deconstruction_…_9c24999f', renamed
   'Dark_roll': 'roll-dark', // the admin's source name 'Sushi_roll_deconstruction_and_re…_270249b0', renamed: the prefix is taken
