@@ -35,17 +35,25 @@ export function probe(file) {
 
 class Unusable extends Error {}
 
-async function stills(dir, stem, frame, W, H) {
-  // the frame with the most of the dish on it: as it is, small, and trimmed to the dish for list rows
-  const write = (vf, name) => new Promise((res, rej) => {
+// The box around the dish plus 4% (as scripts/make-covers.mjs): a thumbnail is always the dish, not the empty frame
+function dishBox(frame, W, H) {
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (frame[(y * W + x) * 4 + 3] > 24) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (x1 < x0) return null;
+  const m = Math.round(Math.max(x1 - x0, y1 - y0) * .04), l = Math.max(0, x0 - m), t = Math.max(0, y0 - m);
+  return { x: l, y: t, w: Math.min(W, x1 + m + 1) - l, h: Math.min(H, y1 + m + 1) - t };
+}
+
+// frame: the fullest one, as the poster; cover: what the list row and the small cards show, trimmed to the dish
+async function stills(dir, stem, frame, cover, W, H) {
+  const write = (src, vf, name) => new Promise((res, rej) => {
     const p = ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${W}x${H}`, '-i', '-', ...(vf ? ['-vf', vf] : []), '-frames:v', '1', '-c:v', 'libwebp', '-quality', '82', '-alpha_quality', '90', path.join(dir, name)], ['pipe', 'ignore', 'inherit']);
-    p.stdin.on('error', () => {}); p.stdin.end(frame); done(p).then(res, rej);
+    p.stdin.on('error', () => {}); p.stdin.end(src); done(p).then(res, rej);
   });
-  let x0 = W, y0 = H, x1 = 0, y1 = 0;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (frame[(y * W + x) * 4 + 3] > 30) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  await write(null, stem + '.webp');
-  await write(`scale=${W > H ? 427 : 320}:-2`, stem + '-th.webp');
-  await write(x1 > x0 && y1 > y0 ? `crop=${x1 - x0 + 1}:${y1 - y0 + 1}:${x0}:${y0}` : null, stem + '-cover.webp');
+  const box = dishBox(cover, W, H), trim = box ? `crop=${box.w}:${box.h}:${box.x}:${box.y},` : '';
+  await write(frame, null, stem + '.webp');
+  await write(frame, `scale=${W > H ? 427 : 320}:-2`, stem + '-th.webp');
+  await write(cover, `${trim}scale=-2:'min(320,ih)':flags=lanczos`, stem + '-cover.webp');
 }
 
 async function keyClip(id, info) {
@@ -60,7 +68,7 @@ async function keyClip(id, info) {
   const stop = () => { dec.kill('SIGKILL'); enc.kill('SIGKILL'); dec.stdout.destroy(); };
   const guard = setTimeout(stop, MAX_MINUTES * 60e3); // a clip that hangs must not hold up the queue
   const out = Buffer.alloc(W * H * 4), alpha = new Float32Array(W * H), tmp = new Float32Array(W * H), both = Buffer.alloc(W * H * 2 * 3);
-  let buf = Buffer.alloc(0), back, frames = 0, best = 0, bestCover = -1, still = null;
+  let buf = Buffer.alloc(0), back, frames = 0, best = 0, bestCover = -1, still = null, first = null, firstCover = 0;
   for await (const chunk of dec.stdout) {
     buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
     while (buf.length >= frame) {
@@ -77,6 +85,7 @@ async function keyClip(id, info) {
       }
       if (!enc.stdin.write(Buffer.from(both))) await new Promise(r => enc.stdin.once('drain', r));
       let cover = 0; for (let i = 0; i < alpha.length; i += 7) cover += alpha[i];
+      if (!frames) { first = Buffer.from(out); firstCover = cover; }
       if (cover > bestCover * 1.002) { bestCover = cover; best = frames; still = Buffer.from(out); } // earliest frame of (nearly) full coverage
       buf = buf.subarray(frame); frames++;
     }
@@ -87,7 +96,8 @@ async function keyClip(id, info) {
   if (!frames) throw new Unusable('В файле не нашлось кадров видео');
   if (bestCover < alpha.length / 7 * .01) throw new Unusable('После вырезки фона в кадре ничего не осталось: объект слишком похож на фон.');
   await done(ff(['-threads', '1', '-i', path.join(dir, stem + '.mp4'), '-vf', 'scale=trunc(iw/4)*2:trunc(ih/4)*2:flags=lanczos', '-c:v', 'libx264', '-preset', 'medium', '-crf', '25', '-pix_fmt', 'yuv420p', '-g', String(FPS), '-movflags', '+faststart', '-an', path.join(dir, stem + '-sm.mp4')], ['ignore', 'ignore', 'inherit']));
-  await stills(dir, stem, still, W, H);
+  // a clip that opens on the finished dish shows that on its thumbnail; one that assembles it, its fullest frame
+  await stills(dir, stem, still, firstCover > bestCover * .4 ? first : still, W, H);
   return `/api/clip/${id}/${stem}.mp4#t=${(best / FPS).toFixed(2)}`;
 }
 

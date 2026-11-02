@@ -2,7 +2,7 @@
 // open on it, a few only end on it), trimmed to the dish → public/media/<slug>-cover.webp, 320 px tall, alpha kept. The open dish card
 // keeps playing the clip as before (poster <slug>.webp, start #t= in MEDIA).
 //
-//   FFMPEG=/path/to/ffmpeg node scripts/make-covers.mjs
+//   FFMPEG=/path/to/ffmpeg node scripts/make-covers.mjs [slug ...]   (a slug not listed below: its first frame)
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -43,12 +43,13 @@ function trim(png) {
   fs.renameSync(tmp, png);
 }
 
-for (const [slug, t] of Object.entries(COVERS)) {
+const only = process.argv.slice(2);
+for (const [slug, t] of only.length ? only.map(s => [s, COVERS[s] ?? 0]) : Object.entries(COVERS)) {
   const png = path.join(MEDIA, slug + '.cover.png');
   frame(slug, t, png); trim(png); webp(png, slug + '-cover.webp', 320); fs.unlinkSync(png);
   console.log(`${slug.padEnd(18)} t=${t} → ${slug}-cover.webp`);
 }
-for (const [slug, [t, out]] of Object.entries(PHOTOS)) {
+for (const [slug, [t, out]] of only.length ? [] : Object.entries(PHOTOS)) {
   const png = path.join(MEDIA, slug + '.cover.png');
   frame(slug, t, png); trim(png); webp(png, out + '.webp'); webp(png, out + '-th.webp', 320); fs.unlinkSync(png);
   console.log(`${slug.padEnd(18)} t=${t} → ${out}.webp (photo)`);
