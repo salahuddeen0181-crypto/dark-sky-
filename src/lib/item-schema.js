@@ -40,6 +40,8 @@ export function cleanItem(b, cats, existing) {
   if (existing?.opt) data.opt = existing.opt; // free choice (a dessert's topping): not in the form yet, kept as it is
   if (b.hit) data.hit = true;
   if (b.new) data.new = true;
+  const marks = Array.isArray(b.b) ? b.b.filter(k => typeof k === 'string' && /^[a-z0-9-]{1,24}$/.test(k)) : []; // keys from Контент → Шильдики
+  if (marks.length) data.b = [...new Set(marks)].slice(0, 6);
   if (Array.isArray(b.pair)) { const p = b.pair.map(x => str(x, 60)).filter(Boolean).slice(0, 6); if (p.length) data.pair = p; }
   if (typeof b.img === 'string' && /^[0-9a-f-]{36}$/.test(b.img)) data.img = b.img;
   else if (CLIP_PATH.test(b.media || '')) data.media = b.media; // a finished upload (clip-worker.js)

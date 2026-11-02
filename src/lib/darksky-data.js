@@ -25,6 +25,14 @@ const RAW = {
 };
 export const UI = Object.fromEntries(Object.entries(RAW).map(([l, a]) => [l, Object.fromEntries(K.map((k, i) => [k, a[i]]))]));
 
+// Badges on the dishes, as the admin may change them (Контент → Шильдики): hit and new are the dishes' own flags,
+// any other is listed in the dish's b
+const uiWord = k => Object.fromEntries(Object.entries(UI).map(([l, u]) => [l, u[k]]));
+export const BADGES = [
+  { k: 'hit', n: uiWord('hit'), bg: '#f2f2f4', color: '#050507' },
+  { k: 'new', n: uiWord('new'), bg: '#e8793c', color: '#050507' },
+];
+
 export const CATS = [
   { id: 'hookah', kind: 'hookah', n: L('Hookah','Hookah','Кальяны','水烟','हुक्का','الشيشة','Chicha','Narguilé','Shisha','シーシャ') },
   { id: 'promos', kind: 'promos', n: L('Promotions','Promociones','Акции','优惠','ऑफ़र','العروض','Promotions','Promoções','Angebote','プロモーション') },

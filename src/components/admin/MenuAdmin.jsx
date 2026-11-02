@@ -21,7 +21,7 @@ function Switch({ on, onChange, label }) {
   );
 }
 
-export default function MenuAdmin({ items: initial, cats }) {
+export default function MenuAdmin({ items: initial, cats, badges = [] }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [q, setQ] = useState(''), [onlyStop, setOnlyStop] = useState(false), [err, setErr] = useState('');
@@ -145,8 +145,7 @@ export default function MenuAdmin({ items: initial, cats }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/admin/items/${it.id}`} className="font-semibold hover:text-[#f2a676]">{it.name}</Link>
-                      {it.hit && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase text-black">хит</span>}
-                      {it.new && <span className="rounded bg-[#e8793c] px-1.5 py-0.5 text-[10px] font-bold uppercase text-black">new</span>}
+                      {badges.filter(b => (b.k === 'hit' ? it.hit : b.k === 'new' ? it.new : it.b?.includes(b.k))).map(b => <span key={b.k} style={{ background: b.bg, color: b.color }} className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">{b.name}</span>)}
                       {it.hidden && <span className="rounded border border-[#e8793c]/60 px-1.5 py-0.5 text-[10px] font-bold uppercase text-[#f2a676]">стоп</span>}
                     </div>
                     <div className="truncate text-xs text-white/50">{priceLabel(it)}{ru(it.d) ? ' · ' + ru(it.d) : ''}</div>

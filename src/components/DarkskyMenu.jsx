@@ -422,6 +422,10 @@ export default class DarkskyMenu extends React.Component {
   get C() { return this.props.content || D; }
   // taste tags as named in the admin (a tag removed there just disappears from the dishes)
   tastes(it) { const T = this.C.TASTE || D.TASTE; return (it.t || []).filter(k => T[k]).map(k => this.tx(T[k])); }
+  // the dish's badges, in the admin's order
+  marks(it) {
+    return (this.C.BADGES || D.BADGES).filter(b => (b.k === 'hit' ? it.hit : b.k === 'new' ? it.new : (it.b || []).includes(b.k))).map(b => ({ k: b.k, text: this.tx(b.n), bg: b.bg, color: b.color }));
+  }
   tx(o) { if (o == null) return ''; if (typeof o === 'string') return o; const l = this.state.lang; return o[l] ?? o.en ?? o.es ?? Object.values(o)[0] ?? ''; }
   nm(it) { return (it.nm && this.tx(it.nm)) || it.name; } // guest-facing name in the current language
   fmt(n) { return n == null ? this.t('onRequest') : '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
@@ -487,7 +491,7 @@ export default class DarkskyMenu extends React.Component {
     const c = this.count(it.id), d = this.tx(it.d), meta = this.tx(it.m);
     let price = this.fmt(it.p);
     if (it.v) { const ps = it.v.map(v => v.p), mn = Math.min(...ps), mx = Math.max(...ps); price = this.fmt(mn) + (mx > mn ? '+' : ''); }
-    return { ...this.mediaVm(it), id: it.id, name: this.nm(it), desc: d, meta, price, hit: !!it.hit, isNew: !!it.new,
+    return { ...this.mediaVm(it), id: it.id, name: this.nm(it), desc: d, meta, price, marks: this.marks(it), hit: !!it.hit, isNew: !!it.new,
       inCart: c > 0, count: c, addBg: c ? '#e8793c' : '#111116', addColor: c ? '#050507' : '#f2f2f4',
       onOpen: () => this.openItem(it.id), onAdd: e => this.quickAdd(it.id, e) };
   }
@@ -529,7 +533,7 @@ export default class DarkskyMenu extends React.Component {
       const pick = on => ({ border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' });
       const opts = it.opt ? [null, ...it.opt.o.map((_, i) => i)].map(oi => ({ name: this.tx(oi == null ? it.opt.none : it.opt.o[oi]), price: '', onPick: () => this.setState({ oi }), ...pick(oi === s.oi) })) : [];
       const sib = this.siblings(it), at = sib.findIndex(x => x.id === it.id);
-      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: this.tastes(it), strLabel: it.str ? `${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, optTitle: it.opt ? this.tx(it.opt.n) : '', opts, pairs };
+      sh = { ...this.mediaVm(it, true), credit: PHOTO_CREDITS[it.media], pos: sib.length > 1 ? `${at + 1} / ${sib.length}` : '', id: it.id, name: this.nm(it), desc: this.tx(it.d), meta: this.tx(it.m), marks: this.marks(it), hit: !!it.hit, isNew: !!it.new, catName: this.catName(it.cat), tags: this.tastes(it), strLabel: it.str ? `${it.str[1]} / 10` : '', segs: it.str ? this.segs(it.str) : null, variants, optTitle: it.opt ? this.tx(it.opt.n) : '', opts, pairs };
       const p = this.price(it, s.vi);
       addLabel = p == null ? t('add') : `${t('add')} · ${this.fmt(p * s.qty)}`;
     }
@@ -695,7 +699,7 @@ export default class DarkskyMenu extends React.Component {
             <div style={css('display:flex;flex-direction:column;gap:8px')}>
               <div style={css('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
                 <span style={css('font:400 20px/1.15 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{h.name}</span>
-                {h.hit && <Badge bg="#f2f2f4" color="#050507">{t('hit')}</Badge>}
+                {h.marks.map(b => <Badge key={b.k} bg={b.bg} color={b.color}>{b.text}</Badge>)}
               </div>
               <span style={css('font:400 13.5px/1.45 Manrope,sans-serif;color:rgba(242,242,244,.68);text-wrap:pretty')}>{h.desc}</span>
             </div>
@@ -740,8 +744,7 @@ export default class DarkskyMenu extends React.Component {
             <div style={css('display:flex;flex-direction:column;gap:5px;min-width:0')}>
               <div style={css('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
                 <span style={css('font:600 15px/1.3 Manrope,sans-serif;letter-spacing:.01em')}>{it.name}</span>
-                {it.hit && <Badge bg="#f2f2f4" color="#050507" size={9.5} pad="4px 6px" radius={5}>{t('hit')}</Badge>}
-                {it.isNew && <Badge bg="#e8793c" color="#050507" size={9.5} pad="4px 6px" radius={5}>{t('new')}</Badge>}
+                {it.marks.map(b => <Badge key={b.k} bg={b.bg} color={b.color} size={9.5} pad="4px 6px" radius={5}>{b.text}</Badge>)}
               </div>
               {it.desc && <span style={css('font:400 13px/1.45 Manrope,sans-serif;color:rgba(242,242,244,.62);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden')}>{it.desc}</span>}
               {it.meta && <span style={css('font:500 11.5px/1.3 Manrope,sans-serif;letter-spacing:.04em;color:rgba(242,242,244,.5)')}>{it.meta}</span>}
@@ -898,8 +901,7 @@ export default class DarkskyMenu extends React.Component {
         <div style={css('display:flex;align-items:flex-start;justify-content:space-between;gap:12px')}>
           <div style={css('display:flex;flex-direction:column;gap:10px;min-width:0')}>
             <div style={css('display:flex;gap:6px')}>
-              {sh.hit && <Badge bg="#f2f2f4" color="#050507">{t('hit')}</Badge>}
-              {sh.isNew && <Badge bg="#e8793c" color="#050507">{t('new')}</Badge>}
+              {sh.marks.map(b => <Badge key={b.k} bg={b.bg} color={b.color}>{b.text}</Badge>)}
               <span style={css('font:500 11px/1 Manrope,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(242,242,244,.55);padding:4px 0')}>{sh.catName}</span>
             </div>
             <h2 style={css('margin:0;font:400 22px/1.25 Michroma,sans-serif;letter-spacing:.03em;text-transform:uppercase;text-wrap:balance')}>{sh.name}</h2>

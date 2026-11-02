@@ -6,11 +6,13 @@ import { api } from './api';
 import PhotoPanel from './PhotoPanel';
 import { L3, asML, input, label, LangProvider, LangBar } from './L3';
 
-export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
+const word = (n, or) => (n && typeof n === 'object' ? n.ru || n.es || n.en || or : n || or);
+
+export default function ItemForm({ item, cats, tastes, badges = [], hitName, newName, others, defaultCat }) {
   const router = useRouter();
   const [f, setF] = useState(() => ({
     // guest name in every language; the Spanish one is also the name staff see (Telegram, admin)
-    nm: { ...asML(item?.nm), es: item?.nm?.es || item?.name || '' }, cat: item?.cat || defaultCat, hidden: !!item?.hidden, hit: !!item?.hit, new: !!item?.new,
+    nm: { ...asML(item?.nm), es: item?.nm?.es || item?.name || '' }, cat: item?.cat || defaultCat, hidden: !!item?.hidden, hit: !!item?.hit, new: !!item?.new, b: item?.b || [],
     d: asML(item?.d), m: asML(item?.m), p: item?.p ?? '', onRequest: item ? item.p == null && !item.v : false,
     v: (item?.v || []).map(v => ({ n: asML(v.n), p: v.p ?? '' })), t: item?.t || [], str: item?.str || null,
     pair: item?.pair || [], img: item?.img || null, media: item?.media || null, cut: !!item?.cut,
@@ -21,7 +23,7 @@ export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
   async function save() {
     setBusy(true); setErr('');
     const body = {
-      name: f.nm.es.trim() || Object.values(f.nm).find(x => x.trim()) || '', nm: f.nm, cat: f.cat, hidden: f.hidden, hit: f.hit, new: f.new, d: f.d, m: f.m,
+      name: f.nm.es.trim() || Object.values(f.nm).find(x => x.trim()) || '', nm: f.nm, cat: f.cat, hidden: f.hidden, hit: f.hit, new: f.new, b: f.b.filter(k => badges.some(x => x.k === k)), d: f.d, m: f.m,
       p: f.onRequest ? null : f.p, v: f.v, t: f.t, str: f.cat === 'hookah' ? f.str : null, pair: f.pair,
       img: f.img, media: f.media, cut: f.cut, keepMedia: !!f.media,
     };
@@ -123,8 +125,9 @@ export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
           </div>
 
           <div className="flex flex-wrap gap-5 text-sm">
-            <label className="flex items-center gap-2"><input type="checkbox" checked={f.hit} onChange={e => set({ hit: e.target.checked })} /> Хит</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={f.new} onChange={e => set({ new: e.target.checked })} /> Новинка</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={f.hit} onChange={e => set({ hit: e.target.checked })} /> {word(hitName, 'Хит')}</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={f.new} onChange={e => set({ new: e.target.checked })} /> {word(newName, 'Новинка')}</label>
+            {badges.map(x => <label key={x.k} className="flex items-center gap-2"><input type="checkbox" checked={f.b.includes(x.k)} onChange={e => set({ b: e.target.checked ? [...f.b, x.k] : f.b.filter(k => k !== x.k) })} /> {x.name}</label>)}
             <label className="flex items-center gap-2"><input type="checkbox" checked={f.hidden} onChange={e => set({ hidden: e.target.checked })} /> Стоп-лист (скрыть из меню)</label>
           </div>
 

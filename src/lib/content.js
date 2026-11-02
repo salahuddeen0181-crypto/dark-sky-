@@ -54,6 +54,7 @@ export async function getContent() {
   // rules2: the house rules in their 2026-10 shape (tabs «Prohibited» / «General»); older saved rules are ignored
   const r = o.rules2 || {};
   return {
+    BADGES: o.badges || D.BADGES, // [{ k, n, bg, color }] in the order they are shown
     TASTE: o.tastes || D.TASTE, // taste tags { key: { es, en, … } }, edited in the admin as a whole list
     CARD_STAGE: stageOf(o), // what is behind the dishes on their cards: 'black' | 'smoke' | 'glass'
     NAV_SMOKE: o.navSmoke !== false, // a little smoke when moving between menu sections (off: just a fade)
@@ -138,6 +139,17 @@ async function keepDishes(tree, current) {
   }
 }
 
+// The editor's list → what is stored; hit and new always stay, a nameless badge is dropped
+const HEX = /^#[0-9a-f]{6}$/i;
+function cleanBadges(list) {
+  const out = list.slice(0, 20).flatMap(b => {
+    const n = clean(b?.n, 24), def = D.BADGES.find(x => x.k === b?.k);
+    if (!TASTE_KEY.test(b?.k || '') || (!n && !def)) return [];
+    return [{ k: b.k, n: n || def.n, bg: HEX.test(b.bg) ? b.bg : '#e8793c', color: HEX.test(b.color) ? b.color : '#050507' }];
+  });
+  return [...D.BADGES.filter(d => !out.some(b => b.k === d.k)), ...out];
+}
+
 export async function saveContent(input) {
   // keep only known fields; texts in the languages the admin filled
   const current = treeOf(await getOverrides());
@@ -146,6 +158,7 @@ export async function saveContent(input) {
   const c = {
     tree,
     tastes: Array.isArray(input.tastes) ? cleanTastes(input.tastes) : undefined,
+    badges: Array.isArray(input.badges) ? cleanBadges(input.badges) : undefined,
     prep: clean(input.prep, 60), promoNote: clean(input.promoNote, 200), cardStage: STAGES.includes(input.cardStage) ? input.cardStage : 'black', navSmoke: input.navSmoke !== false,
     promos: Array.isArray(input.promos) ? input.promos.slice(0, 12).map(p => ({
       tag: clean(p.tag, 60), title: clean(p.title, 60), big: String(p.big || '').trim().slice(0, 20), d: clean(p.d, 200),
@@ -173,6 +186,7 @@ export async function getContentForm() {
     cats: Object.fromEntries(tree.flatMap(s => s.cats).map(c => [c.id, { n: f(c.n), hidden: !!c.hidden }])),
     dishes: await dishCounts(),
     tastes: Object.entries(cur.TASTE).map(([k, n]) => ({ k, n: f(n) })),
+    badges: cur.BADGES.map(b => ({ ...b, n: f(b.n) })),
     prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardStage: cur.CARD_STAGE, navSmoke: cur.NAV_SMOKE,
     promos: cur.PROMOS.map(p => ({ tag: f(p.tag), title: f(p.title), big: p.big || '', d: f(p.d), window: p.window || null })),
     rules: { title: f(R.title), noTitle: f(R.noTitle), generalTitle: f(R.generalTitle), ok: f(R.ok), no: R.no.map(f), general: R.general.map(f) },
