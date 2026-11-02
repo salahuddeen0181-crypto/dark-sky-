@@ -4,7 +4,7 @@ import { api, thumb } from './api';
 import { cutout } from './cutout';
 
 // Resize in the browser so the database only stores ~100 KB per photo.
-async function shrink(file, max = 1200) {
+export async function shrink(file, max = 1200) {
   const bmp = await createImageBitmap(file);
   const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas');

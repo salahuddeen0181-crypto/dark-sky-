@@ -1,7 +1,7 @@
 import 'server-only';
 import * as S from './order-store';
 import { getMenuItems } from './menu-server';
-import * as D from './darksky-data';
+import { editableCats } from './content';
 import { shiftsSince, onShift } from './staff';
 import { tableName } from './table-name';
 
@@ -62,7 +62,8 @@ export async function report(period = '7d') {
   const valid = rows.filter(o => o.status !== 'failed');
   const cur = valid.filter(o => ms(o.created_at) >= start && ms(o.created_at) < end), prev = valid.filter(o => ms(o.created_at) < start);
   const catOf = Object.fromEntries(menu.map(i => [i.id, i.cat]));
-  const catName = id => (D.CATS.find(c => c.id === id)?.n.ru) || id;
+  const names = Object.fromEntries((await editableCats()).map(c => [c.id, c.name]));
+  const catName = id => names[id] || id;
 
   // revenue per shift (oldest first) and load per hour / weekday
   const days = Array.from({ length: n }, (_, i) => ({ key: shiftKey(start + i * DAY + 12 * 3600e3), revenue: 0, orders: 0 }));

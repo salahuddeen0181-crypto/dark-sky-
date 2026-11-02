@@ -22,9 +22,7 @@ export default function ContentForm({ initial }) {
     setBusy(true); setMsg(null);
     try {
       await api('/api/admin/content', 'PUT', {
-        ...c,
-        sections: Object.fromEntries(c.sections.map(s => [s.id, { n: s.n, tag: s.tag }])),
-        order: Object.fromEntries(c.sections.map(s => [s.id, s.cats])),
+        ...c, dishes: undefined,
       });
       setMsg(['ok', 'Сохранено']);
       setDirty(false); router.refresh();

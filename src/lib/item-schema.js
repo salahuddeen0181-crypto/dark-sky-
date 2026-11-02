@@ -5,7 +5,6 @@ import * as D from './darksky-data';
 const LANGS = D.LANGS.map(l => l.code);
 
 // Admin item form → the item shape the menu renders. Unknown fields are dropped.
-export const EDITABLE_CATS = D.CATS.filter(c => c.kind !== 'promos' && c.kind !== 'rules').map(c => c.id); // dish categories only
 
 const str = (v, max = 400) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 // { es, en, ru, … } with empty languages removed — the admin types every language by hand.
@@ -19,11 +18,12 @@ function l3(o, max) {
 }
 const price = v => (v === null || v === '' || v === undefined ? null : Math.max(0, Math.round(Number(v)) || 0));
 
-export function cleanItem(b, existing) {
+// cats: the dish categories as they stand (editableCats() in content.js)
+export function cleanItem(b, cats, existing) {
   const name = str(b.name, 80);
   if (!name) throw new Error('Укажите название');
   const cat = String(b.cat || '');
-  if (!EDITABLE_CATS.includes(cat)) throw new Error('Неизвестная категория');
+  if (!cats.some(c => c.id === cat)) throw new Error('Неизвестная категория');
   const data = { name };
   const nm = l3(b.nm, 80); if (nm && typeof nm === 'object') data.nm = nm; // guest-facing name per language
   const d = l3(b.d, 600); if (d) data.d = d;

@@ -3,6 +3,7 @@ import { denyUnlessAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { menuChanged } from '@/lib/menu-cache';
 import { cleanItem } from '@/lib/item-schema';
+import { editableCats } from '@/lib/content';
 
 // Full save from the item editor.
 export async function PUT(req, { params }) {
@@ -12,7 +13,7 @@ export async function PUT(req, { params }) {
   const [cur] = await sql`select cat, data from menu_items where id = ${id}`;
   if (!cur) return NextResponse.json({ error: 'Не найдено' }, { status: 404 });
   let it;
-  try { it = cleanItem(await req.json(), cur.data); } catch (e) { return NextResponse.json({ error: e.message }, { status: 400 }); }
+  try { it = cleanItem(await req.json(), await editableCats(), cur.data); } catch (e) { return NextResponse.json({ error: e.message }, { status: 400 }); }
   const moved = it.cat !== cur.cat;
   await sql`
     update menu_items set cat = ${it.cat}, hidden = ${it.hidden}, data = ${sql.json(it.data)}, updated_at = now(),

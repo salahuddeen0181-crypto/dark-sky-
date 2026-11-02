@@ -173,6 +173,12 @@ const COVER = css('position:relative;width:100%;height:100%;object-fit:contain;d
 const CUT = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;padding:7% 6%;box-sizing:border-box;filter:drop-shadow(0 10px 16px rgba(0,0,0,.6))');
 
 // Section tiles on the home screen: the dish sits where the 3D scene was (right of the text / above it)
+// What fills a section's tile or banner: its clip, the picture uploaded in the admin, or the 3D scene
+function TileMedia({ t, v, fit }) {
+  if (t.clip) return <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={t.clip} v={v} fit={fit} /></div>;
+  if (t.img) return <img src={t.img} alt="" loading="lazy" decoding="async" style={css('position:absolute;inset:0;width:100%;height:100%;object-fit:cover')} />; // eslint-disable-line @next/next/no-img-element
+  return <canvas ref={t.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />;
+}
 const HERO_FIT = { objectPosition: '82% 50%', transform: 'scale(1.08)' }, TILE_FIT = { objectPosition: '50% 20%', transform: 'scale(1.1)' };
 const WIDE_FIT = { objectPosition: '88% 60%', transform: 'scale(1.3)', transformOrigin: '88% 60%' }; // wide tile: keep clear of the big number on the left
 
@@ -329,6 +335,7 @@ export default class DarkskyMenu extends React.Component {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const stem = src => src.split('#')[0].replace(/\.webm$/i, ''), clips = [], images = [];
     for (const S of this.C.SECTIONS) {
+      if (S.img) images.push(S.img);
       if (!S.clip) continue;
       const v = FULL_TILES.has(S.id) ? 'full' : 'sm';
       images.push(stem(S.clip) + (v === 'sm' ? '-th' : '') + '.webp');
@@ -366,7 +373,7 @@ export default class DarkskyMenu extends React.Component {
     const go = () => {
       document.querySelector('.ds-page.ds-picking')?.classList.remove('ds-picking'); // the page element stays, the cards don't
       const S = sec && this.C.SECTIONS.find(x => x.id === sec);
-      this.setState({ view, sec: sec || null, cat: (S && S.cats[0]) || 'hookah', q: '', searchOpen: false, contentOn: false, leaving: false });
+      this.setState({ view, sec: sec || null, cat: (S && (S.cats.find(id => this.props.items.some(i => i.cat === id)) || S.cats[0])) || 'hookah', q: '', searchOpen: false, contentOn: false, leaving: false });
       window.scrollTo(0, 0);
       clearTimeout(this._nt); this._nt = setTimeout(() => this.setState({ contentOn: true }), 30);
     };
@@ -411,7 +418,7 @@ export default class DarkskyMenu extends React.Component {
   get C() { return this.props.content || D; }
   // taste tags as named in the admin (a tag removed there just disappears from the dishes)
   tastes(it) { const T = this.C.TASTE || D.TASTE; return (it.t || []).filter(k => T[k]).map(k => this.tx(T[k])); }
-  tx(o) { if (o == null) return ''; if (typeof o === 'string') return o; const l = this.state.lang; return o[l] ?? o.en ?? o.es ?? ''; }
+  tx(o) { if (o == null) return ''; if (typeof o === 'string') return o; const l = this.state.lang; return o[l] ?? o.en ?? o.es ?? Object.values(o)[0] ?? ''; }
   nm(it) { return (it.nm && this.tx(it.nm)) || it.name; } // guest-facing name in the current language
   fmt(n) { return n == null ? this.t('onRequest') : '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
   fromFmt(p) { return this.tX('from').replace('{p}', this.fmt(p)); }
@@ -496,9 +503,15 @@ export default class DarkskyMenu extends React.Component {
     const secVm = (S, extra) => {
       const its = this.props.items.filter(i => S.cats.includes(i.cat)), ps = its.map(i => this.price(i, 0)).filter(p => p != null);
       const from = ps.length ? this.fromFmt(Math.min(...ps)) : '';
-      return { id: S.id, name: this.tx(S.n), tag: this.tx(S.tag), from, count: its.length, big: '', row: 'auto', col: 'auto', border: 'rgba(255,255,255,.09)', ref: this.tileRef('tile-' + S.id, S.id), clip: S.clip, onOpen: e => this.nav('section', S.id, e), ...extra };
+      return { id: S.id, name: this.tx(S.n), tag: this.tx(S.tag), from, count: its.length, big: '', row: 'auto', col: 'auto', border: 'rgba(255,255,255,.09)', ref: this.tileRef('tile-' + S.id, S.id), clip: S.clip, img: S.img, onOpen: e => this.nav('section', S.id, e), ...extra };
     };
     const bizLive = live([14, 17]);
+    // Home: the sections with something to show, in the admin's order. The first is the big tile; the rest fill two
+    // columns (the second stands two rows tall) without a gap, promotions wide at the end.
+    const homeSecs = this.C.SECTIONS.filter(S => !S.kind || S.kind === 'hookah' ? this.props.items.some(i => S.cats.includes(i.cat)) : false);
+    const [heroSec, ...restSecs] = homeSecs, n = restSecs.length;
+    const homeTiles = restSecs.map((S, i) => secVm(S, n === 1 || (n > 3 && n % 2 === 0 && i === n - 1) ? { col: 'span 2' } : i === 0 && n > 2 ? { row: 'span 2' } : {}));
+    if (SEC('promos')) homeTiles.push(secVm(SEC('promos'), { col: 'span 2', big: bizLive ? '−20%' : '−15%', border: 'rgba(232,121,60,.4)' }));
 
     let items = [];
     if (searching) { const q = this.norm(s.q); items = this.props.items.filter(it => this.norm(it.name + ' ' + this.nm(it) + ' ' + this.tx(it.d) + ' ' + this.catName(it.cat)).includes(q)); }
@@ -531,13 +544,9 @@ export default class DarkskyMenu extends React.Component {
     return {
       rtl, flip: rtl ? 'scaleX(-1)' : 'none', langCode: s.lang, t, searching, sec, cat, kind, bizLive, live,
       langs: D.LANGS.map((l, i) => { const on = l.code === s.lang; return { code: l.code, name: l.name, sub: EN[l.code], on, last: i === D.LANGS.length - 1, onPick: () => this.setLang(l.code) }; }),
-      cats: (sec ? sec.cats : []).map(id => this.C.CATS.find(c => c.id === id)).map(c => ({ id: c.id, name: this.tx(c.n), count: this.props.items.filter(i => i.cat === c.id).length, on: c.id === s.cat, onPick: () => this.pickCat(c.id) })),
-      hero: secVm(SEC('hookah')),
-      tiles: [
-        secVm(SEC('kitchen'), { row: 'span 2' }), secVm(SEC('cocktails')), secVm(SEC('tea')),
-        secVm(SEC('bar')), secVm(SEC('soft')),
-        secVm(SEC('promos'), { col: 'span 2', big: bizLive ? '−20%' : '−15%', border: 'rgba(232,121,60,.4)' }),
-      ],
+      cats: (sec ? sec.cats : []).map(id => this.C.CATS.find(c => c.id === id)).map(c => ({ id: c.id, name: this.tx(c.n), count: this.props.items.filter(i => i.cat === c.id).length, on: c.id === s.cat, onPick: () => this.pickCat(c.id) })).filter(c => c.count),
+      hero: heroSec ? secVm(heroSec) : null,
+      tiles: homeTiles,
       hits: this.props.items.filter(i => i.hit).map(i => this.miniVm(i)),
       hookahs: this.props.items.filter(i => i.cat === 'hookah').map(h => ({ ...this.rowVm(h), strLabel: h.str ? `${h.str[1]} / 10` : '', segs: h.str ? this.segs(h.str) : null, tags: this.tastes(h), addBg: this.count(h.id) ? '#e8793c' : '#f2f2f4', addColor: '#050507' })),
       listTitle: searching ? '“' + s.q.trim() + '”' : this.tx(cat.n), items: items.map(x => this.rowVm(x)),
@@ -611,13 +620,11 @@ export default class DarkskyMenu extends React.Component {
     const s = this.state, { t, hero } = v;
     return (
       <div style={css('display:flex;flex-direction:column;gap:10px')}>
-        <div className="ds-press-hero" data-tile onClick={hero.onOpen} style={css('position:relative;overflow:hidden;height:300px;border-radius:26px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 120% at 78% 40%, rgba(232,121,60,.16), rgba(10,10,14,0) 62%), ' + GLASS_TINT + ';cursor:pointer;transition:transform .2s' + GLASS)}>
-          {hero.clip
-            ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={hero.clip} v="full" fit={HERO_FIT} /></div>
-            : <canvas ref={hero.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
+        {hero && <div className="ds-press-hero" data-tile onClick={hero.onOpen} style={css('position:relative;overflow:hidden;height:300px;border-radius:26px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 120% at 78% 40%, rgba(232,121,60,.16), rgba(10,10,14,0) 62%), ' + GLASS_TINT + ';cursor:pointer;transition:transform .2s' + GLASS)}>
+          <TileMedia t={hero} v="full" fit={HERO_FIT} />
           <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.5) 0%, rgba(5,5,8,.25) 42%, rgba(5,5,8,0) 66%)')} />
           <div style={css('position:absolute;inset:0;padding:20px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;max-width:64%')}>
-            {v.bizLive
+            {hero.id !== 'hookah' ? <span /> : v.bizLive
               ? <span style={css('align-self:flex-start;display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:10px;background:#e8793c;color:#050507;font:700 10.5px/1 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase')}><span style={css('width:6px;height:6px;border-radius:50%;background:#050507')} />Business Hookah −20% · {t('now')}</span>
               : <span style={css('font:500 11px/1 Manrope,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(242,242,244,.6)')}>{t('prep')}</span>}
             <div style={css('display:flex;flex-direction:column;gap:10px')}>
@@ -629,14 +636,12 @@ export default class DarkskyMenu extends React.Component {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
 
         <div style={css('display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:176px;gap:10px')}>
           {v.tiles.map(tl => (
             <div key={tl.id} className="ds-press-tile" data-tile onClick={tl.onOpen} style={css(`position:relative;overflow:hidden;border-radius:22px;border:1px solid ${tl.border};background:radial-gradient(110% 80% at 60% 30%, rgba(232,121,60,.11), rgba(10,10,14,0) 65%), ${GLASS_TINT};grid-row:${tl.row};grid-column:${tl.col};cursor:pointer;transition:transform .2s${GLASS}`)}>
-              {tl.clip
-                ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={tl.clip} v={tl.row === 'auto' ? 'sm' : 'full'} fit={tl.col === 'auto' ? TILE_FIT : WIDE_FIT} /></div>
-                : <canvas ref={tl.ref} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
+              <TileMedia t={tl} v={tl.row === 'auto' ? 'sm' : 'full'} fit={tl.col === 'auto' ? TILE_FIT : WIDE_FIT} />
               <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top, rgba(5,5,8,.6) 0%, rgba(5,5,8,.3) 34%, rgba(5,5,8,0) 58%)')} />
               {tl.big && <span style={css('position:absolute;top:16px;left:16px;font:400 30px/1 Michroma,sans-serif;color:#f2a676;pointer-events:none')}>{tl.big}</span>}
               {tl.count > 0 && <span style={css('position:absolute;top:12px;right:12px;min-width:30px;height:24px;padding:0 8px;border-radius:8px;background:rgba(5,5,8,.6);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font:600 11px/1 Manrope,sans-serif;color:rgba(242,242,244,.8);pointer-events:none')}>{tl.count}</span>}
@@ -828,7 +833,7 @@ export default class DarkskyMenu extends React.Component {
               <input value={s.q} onChange={e => this.setState({ q: e.target.value })} placeholder={t('searchPh')} autoFocus style={css('width:100%;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);padding:0 16px;font-size:15px;outline:none')} />
             </div>
           )}
-          {!v.searching && sec && sec.cats.length > 1 && <CatStrip cats={v.cats} shown={s.catsPinned} flip={v.flip} />}
+          {!v.searching && sec && v.cats.length > 1 && <CatStrip cats={v.cats} shown={s.catsPinned} flip={v.flip} />}
         </div>
 
         <div className="ds-page" style={css(`padding:16px 16px 0;display:flex;flex-direction:column;gap:18px;${s.leaving
@@ -838,9 +843,7 @@ export default class DarkskyMenu extends React.Component {
           {!v.searching && sec && sec.id !== 'rules' && (
             <div style={css('position:relative;overflow:hidden;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:radial-gradient(90% 140% at 80% 40%, rgba(232,121,60,.15), rgba(10,10,14,0) 60%), ' + GLASS_TINT + GLASS)}>
               <div style={css('position:relative;height:168px')}>
-                {sec.clip
-                  ? <div style={css('position:absolute;inset:0;z-index:0')}><ProductClip src={sec.clip} v="full" fit={HERO_FIT} /></div>
-                  : <canvas ref={this.tileRef('banner-' + sec.id, sec.id)} style={css('position:absolute;inset:0;width:100%;height:100%;display:block')} />}
+                <TileMedia t={{ clip: sec.clip, img: sec.img, ref: this.tileRef('banner-' + sec.id, sec.id) }} v="full" fit={HERO_FIT} />
                 <div style={css('position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(5,5,8,.5) 0%, rgba(5,5,8,.2) 50%, rgba(5,5,8,0) 72%)')} />
                 <div style={css('position:absolute;left:18px;bottom:18px;max-width:62%;display:flex;flex-direction:column;gap:8px;pointer-events:none')}>
                   <span style={css('font:400 22px/1.1 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{this.tx(sec.n)}</span>
@@ -848,7 +851,7 @@ export default class DarkskyMenu extends React.Component {
                 </div>
               </div>
               {/* the section's categories, all in sight; once scrolled away the strip in the header takes over */}
-              {sec.cats.length > 1 && (
+              {v.cats.length > 1 && (
                 <div ref={this.catGridRef} style={css('position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:2px 12px 12px')}>
                   {v.cats.map(c => (
                     <button key={c.id} onClick={c.onPick} className="ds-press" style={css(`height:54px;padding:0 14px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:start;border:1px solid ${c.on ? '#f2f2f4' : 'rgba(255,255,255,.14)'};background:${c.on ? '#f2f2f4' : 'rgba(255,255,255,.07)'};color:${c.on ? '#050507' : '#f2f2f4'};transition:background .2s,color .2s`)}>

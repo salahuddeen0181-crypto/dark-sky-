@@ -21,15 +21,34 @@ export async function getOverrides() {
 export const STAGES = ['black', 'smoke', 'glass'];
 const stageOf = o => (STAGES.includes(o.cardStage) ? o.cardStage : o.cardSmoke ? 'smoke' : 'black');
 
-// The shapes DarkskyMenu reads: { SECTIONS, CATS, PROMOS, PROMO_NOTE, RULES, PREP }
+// MARK: - The menu's structure
+// tree: [{ id, n, tag, hidden, img, cats: [{ id, n, hidden }] }] in menu order, built in the admin. Until the first
+// save it comes from darksky-data.js with the older overrides (sections / cats / order) laid over it.
+// Hookah has its own screen, promotions and rules are not dish lists: they stay, and hold no other categories.
+const PINNED = ['promos', 'rules'], FIXED = ['hookah', ...PINNED];
+const NOT_DISHES = new Set(D.CATS.filter(c => c.kind === 'promos' || c.kind === 'rules').map(c => c.id));
+function baseTree(o) {
+  return D.SECTIONS.map(s => {
+    const order = (o.order?.[s.id] || []).filter(id => s.cats.includes(id));
+    return {
+      id: s.id, n: o.sections?.[s.id]?.n || s.n, tag: o.sections?.[s.id]?.tag || s.tag, hidden: false, img: null,
+      cats: [...order, ...s.cats.filter(id => !order.includes(id))].map(id => ({ id, n: o.cats?.[id]?.n || D.CATS.find(c => c.id === id).n, hidden: !!o.cats?.[id]?.hidden })),
+    };
+  });
+}
+const treeOf = o => o.tree || baseTree(o);
+
+// The shapes DarkskyMenu reads: { SECTIONS, CATS, PROMOS, PROMO_NOTE, RULES, PREP }. A hidden section hides its dishes too.
 export async function getContent() {
   const o = await getOverrides().catch(e => { console.error('content', e); return {}; });
-  const CATS = D.CATS.map(c => ({ ...c, n: o.cats?.[c.id]?.n || c.n, hidden: !!o.cats?.[c.id]?.hidden }));
-  const hidden = new Set(CATS.filter(c => c.hidden).map(c => c.id));
-  const SECTIONS = D.SECTIONS.map(s => {
-    const order = (o.order?.[s.id] || []).filter(id => s.cats.includes(id));
-    const cats = [...order, ...s.cats.filter(id => !order.includes(id))].filter(id => !hidden.has(id));
-    return { ...s, n: o.sections?.[s.id]?.n || s.n, tag: o.sections?.[s.id]?.tag || s.tag, cats };
+  const tree = treeOf(o);
+  const CATS = [
+    ...tree.flatMap(s => s.cats.map(c => ({ ...D.CATS.find(x => x.id === c.id), id: c.id, n: c.n, hidden: !!(c.hidden || s.hidden) }))),
+    ...D.CATS.filter(c => NOT_DISHES.has(c.id)).map(c => ({ ...c, hidden: false })),
+  ];
+  const SECTIONS = tree.filter(s => !s.hidden).map(s => {
+    const b = D.SECTIONS.find(x => x.id === s.id);
+    return { ...b, id: s.id, n: s.n, tag: s.tag, img: s.img ? '/api/img/' + s.img : null, clip: s.img ? null : b?.clip || null, cats: s.cats.filter(c => !c.hidden).map(c => c.id) };
   });
   // rules2: the house rules in their 2026-10 shape (tabs «Prohibited» / «General»); older saved rules are ignored
   const r = o.rules2 || {};
@@ -40,6 +59,13 @@ export async function getContent() {
     SECTIONS, CATS, PROMOS: o.promos || D.PROMOS, PROMO_NOTE: o.promoNote || D.PROMO_NOTE, PREP: o.prep || PREP,
     RULES: { ...D.RULES, ...Object.fromEntries(Object.entries(r).filter(([, v]) => v != null)) },
   };
+}
+
+// Categories a dish can belong to (hidden ones too), for the admin and the staff; name: Russian, else any language
+const ruName = v => (v && typeof v === 'object' ? v.ru || v.es || v.en || Object.values(v)[0] || '' : v || '');
+export async function editableCats() {
+  const { CATS } = await getContent();
+  return CATS.filter(c => !NOT_DISHES.has(c.id)).map(c => ({ id: c.id, name: ruName(c.n) }));
 }
 
 // Dishes of hidden categories are left out of the guest menu entirely (search and "house favourites" too).
@@ -75,13 +101,49 @@ function cleanTastes(list) {
   return out;
 }
 
+// A problem the admin can fix: shown to them as it is
+export class ContentError extends Error {}
+
+// The editor's sections + category names → the stored tree. The fixed sections always stay; promotions and rules go last.
+const NODE_ID = /^[a-z0-9-]{1,40}$/, IMG_ID = /^[0-9a-f-]{36}$/;
+function cleanTree(list, names, current) {
+  const secs = new Set(), cats = new Set(), out = [];
+  for (const s of list.slice(0, 30)) {
+    if (!NODE_ID.test(s?.id) || secs.has(s.id)) continue;
+    secs.add(s.id);
+    const n = clean(s.n, 40);
+    if (!n) throw new ContentError('У каждого раздела должно быть название');
+    const own = PINNED.includes(s.id) ? [] : s.id === 'hookah' ? ['hookah'] : (Array.isArray(s.cats) ? s.cats : []).filter(id => NODE_ID.test(id) && id !== 'hookah' && !NOT_DISHES.has(id));
+    const nodes = own.filter(id => !cats.has(id)).slice(0, 40).map(id => {
+      cats.add(id);
+      const name = clean(names?.[id]?.n, 40);
+      if (!name) throw new ContentError('У каждой категории должно быть название');
+      return { id, n: name, hidden: !!names[id].hidden };
+    });
+    out.push({ id: s.id, n, tag: clean(s.tag, 120), hidden: !!s.hidden && s.id !== 'rules', img: IMG_ID.test(s.img || '') ? s.img : null, cats: nodes });
+  }
+  for (const id of FIXED) if (!secs.has(id)) out.push(current.find(s => s.id === id));
+  return [...out.filter(s => !PINNED.includes(s.id)), ...PINNED.map(id => out.find(s => s.id === id))];
+}
+// A category can't go away with dishes in it, or they would vanish from the menu
+async function dishCounts() {
+  const rows = await db()`select cat, count(*)::int as n from menu_items group by cat`;
+  return Object.fromEntries(rows.map(r => [r.cat, r.n]));
+}
+async function keepDishes(tree, current) {
+  const kept = new Set(tree.flatMap(s => s.cats.map(c => c.id))), name = id => current.flatMap(s => s.cats).find(c => c.id === id)?.n;
+  for (const [cat, n] of Object.entries(await dishCounts())) {
+    if (!kept.has(cat) && !NOT_DISHES.has(cat)) throw new ContentError(`В категории «${ruName(name(cat)) || cat}» ${n} поз.: сначала перенесите их в другую категорию`);
+  }
+}
+
 export async function saveContent(input) {
   // keep only known fields; texts in the languages the admin filled
-  const ids = new Set(D.SECTIONS.map(s => s.id)), catIds = new Set(D.CATS.map(c => c.id));
+  const current = treeOf(await getOverrides());
+  const tree = cleanTree(Array.isArray(input.sections) ? input.sections : [], input.cats, current);
+  await keepDishes(tree, current);
   const c = {
-    sections: Object.fromEntries(Object.entries(input.sections || {}).filter(([id]) => ids.has(id)).map(([id, s]) => [id, { n: clean(s.n, 40), tag: clean(s.tag, 120) }])),
-    cats: Object.fromEntries(Object.entries(input.cats || {}).filter(([id]) => catIds.has(id)).map(([id, x]) => [id, { n: clean(x.n, 40), hidden: !!x.hidden }])),
-    order: Object.fromEntries(Object.entries(input.order || {}).filter(([id]) => ids.has(id)).map(([id, l]) => [id, (Array.isArray(l) ? l : []).filter(x => catIds.has(x))])),
+    tree,
     tastes: Array.isArray(input.tastes) ? cleanTastes(input.tastes) : undefined,
     prep: clean(input.prep, 60), promoNote: clean(input.promoNote, 200), cardStage: STAGES.includes(input.cardStage) ? input.cardStage : 'black', navSmoke: input.navSmoke !== false,
     promos: Array.isArray(input.promos) ? input.promos.slice(0, 12).map(p => ({
@@ -101,14 +163,14 @@ export async function saveContent(input) {
 }
 
 // MARK: - Editor
-// Everything the content editor shows, texts in every language; categories in their current order, hidden ones too.
+// Everything the content editor shows, texts in every language; hidden sections and categories too.
 export async function getContentForm() {
-  const o = await getOverrides(), cur = await getContent(), f = asForm;
-  const catsOf = s => { const order = (o.order?.[s.id] || []).filter(id => s.cats.includes(id)); return [...order, ...s.cats.filter(id => !order.includes(id))]; };
+  const o = await getOverrides(), cur = await getContent(), f = asForm, tree = treeOf(o);
   const R = cur.RULES;
   return {
-    sections: D.SECTIONS.map(s => { const c = cur.SECTIONS.find(x => x.id === s.id); return { id: s.id, n: f(c.n), tag: f(c.tag), cats: catsOf(s) }; }),
-    cats: Object.fromEntries(cur.CATS.map(c => [c.id, { n: f(c.n), hidden: c.hidden }])),
+    sections: tree.map(s => ({ id: s.id, n: f(s.n), tag: f(s.tag), hidden: !!s.hidden, img: s.img || null, clip: D.SECTIONS.find(x => x.id === s.id)?.clip || null, cats: s.cats.map(c => c.id) })),
+    cats: Object.fromEntries(tree.flatMap(s => s.cats).map(c => [c.id, { n: f(c.n), hidden: !!c.hidden }])),
+    dishes: await dishCounts(),
     tastes: Object.entries(cur.TASTE).map(([k, n]) => ({ k, n: f(n) })),
     prep: f(cur.PREP), promoNote: f(cur.PROMO_NOTE), cardStage: cur.CARD_STAGE, navSmoke: cur.NAV_SMOKE,
     promos: cur.PROMOS.map(p => ({ tag: f(p.tag), title: f(p.title), big: p.big || '', d: f(p.d), window: p.window || null })),

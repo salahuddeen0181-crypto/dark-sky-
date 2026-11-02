@@ -122,7 +122,12 @@ export default function MenuAdmin({ items: initial, cats }) {
 
       {cats.map(c => {
         const list = visible.filter(x => x.cat === c.id);
-        if (!list.length) return null;
+        if (!list.length) return filtered ? null : (
+          <section key={c.id} className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-white/15 px-4 py-3">
+            <span className="text-sm font-semibold uppercase tracking-[.12em] text-white/60">{c.name}</span>
+            <Link href={`/admin/items/new?cat=${c.id}`} className="rounded-lg border border-white/15 px-3 py-2 text-sm text-white/75 hover:bg-white/5">+ Добавить позицию</Link>
+          </section>
+        );
         return (
           <section key={c.id} className="rounded-2xl border border-white/10 bg-[#0e0e13]">
             <h2 className="flex items-baseline justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold uppercase tracking-[.12em]">
