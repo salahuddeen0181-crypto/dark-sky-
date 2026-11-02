@@ -93,7 +93,7 @@ const Smoke = ({ still }) => <div className={still ? 'ds-smoke still' : 'ds-smok
 // Keyed product clip from scripts/key-videos.mjs: the still first, the video only while it is on screen.
 // Safari and iOS get HEVC with alpha (.mov), everyone else VP9 with alpha (.webm); '#t=' starts it on the still's frame.
 // clips filmed landscape and kept whole (scripts/key-videos.mjs, wide): shown without the 1.2× zoom, edges included
-const WIDE_CLIPS = new Set(['/media/salad-cesar']);
+const WIDE_CLIPS = new Set(['/media/salad-cesar', '/media/roll-midnight']);
 const CLIP = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;transform:scale(1.2)');
 const isHevc = () => { const ua = navigator.userAgent; return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android|Firefox/.test(ua); };
 // clips uploaded in the admin are one MP4 for everyone (AlphaClip)
