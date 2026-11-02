@@ -19,4 +19,12 @@ for (const dish of ['dark-roll', 'midnight-roll']) {
   console.log(`${id}: added to ${cat}${DRY ? ' (dry run)' : ''}`);
   if (!DRY) await sql`insert into menu_items (id, cat, sort, hidden, data) values (${id}, ${cat}, ${next}, false, ${sql.json({ ...data, media: MEDIA[id] })})`;
 }
+// Cuba Libre: its own clip and the owner's description; the price and strength stay as they are
+const CUBA_D = {"en": "Refreshing and sweetish, with a citrus tang. 45 ml Ron especial, Coca-Cola on top, lime.", "es": "Refrescante y dulzón, con un toque cítrico. 45 ml de Ron especial, Coca-Cola, lima.", "ru": "Освежающий, сладковатый, с цитрусовой кислинкой. 45 мл Ron especial, Coca-Cola, лайм.", "zh": "清爽微甜，带柑橘酸香。45 毫升 Ron especial、Coca-Cola、青柠。", "hi": "ताज़ा, हल्का मीठा, खट्टे स्वाद के साथ। 45 ml स्पेशल रम, Coca-Cola, नींबू।", "ar": "منعش وحلو قليلًا مع حموضة حمضيات. 45 مل Ron especial، Coca-Cola، ليمون أخضر.", "fr": "Rafraîchissant et légèrement sucré, avec une pointe d’agrumes. 45 ml de Ron especial, Coca-Cola, citron vert.", "pt": "Refrescante e levemente doce, com um toque cítrico. 45 ml de Ron especial, Coca-Cola, limão.", "de": "Erfrischend, leicht süß, mit Zitrusnote. 45 ml Ron especial, Coca-Cola, Limette.", "ja": "爽やかでほんのり甘く、柑橘の酸味。Ron especial 45ml、Coca-Cola、ライム。"};
+const [cuba] = await sql`select data from menu_items where id = 'cl11'`;
+if (!cuba || (cuba.data.media === MEDIA.cl11 && cuba.data.d?.ru === CUBA_D.ru)) console.log('cl11: left as it is');
+else {
+  console.log(`cl11: clip and description${DRY ? ' (dry run)' : ''}`);
+  if (!DRY) await sql`update menu_items set data = (data - 'img') || ${sql.json({ media: MEDIA.cl11, d: CUBA_D })}, updated_at = now() where id = 'cl11'`;
+}
 await sql.end();

@@ -312,6 +312,7 @@ export const MEDIA = {
   panqueques: '/media/panqueques.webm#t=5.63',
   'phila-ebi': '/media/roll-phila.webm#t=1.08', // this clip is the Ebi Ponzu roll (the kitchen tile shows it too)
   'dark-roll': '/media/roll-dark.webm#t=0.04', // starts on the plate, then the roll comes apart
+  cl11: '/media/cuba-libre.webm#t=0.04', // its own clip instead of the cut-out photo (2026-11-02)
   'midnight-roll': '/media/roll-midnight.webm#t=0.04', // starts on the plate too
   phila: '/media/roll-philadelphia.webm#t=0.04', // its own clip (2026-10-28): starts on the plate, then the roll comes apart
   maki: '/media/roll-maki.webm#t=2.71',
