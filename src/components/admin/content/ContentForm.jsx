@@ -31,7 +31,7 @@ export default function ContentForm({ initial }) {
   }
 
   return (
-    <LangProvider data={c}>
+    <LangProvider data={c} onFill={set}>
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="font-display text-lg uppercase tracking-[.08em]">Контент</h1>
@@ -39,7 +39,7 @@ export default function ContentForm({ initial }) {
           {TABS.map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`rounded-lg px-3 py-1.5 ${tab === k ? 'bg-white/15 text-white' : 'text-white/60'}`}>{l}</button>)}
         </nav>
       </div>
-      <p className="-mt-2 text-xs text-white/45">Тексты вводятся на каждом языке вручную. Если язык пустой, гость увидит английский или испанский вариант.</p>
+      <p className="-mt-2 text-xs text-white/45">Напишите текст на одном языке и нажмите «Перевести пустые поля», перевод можно поправить перед сохранением. Если язык пустой, гость увидит английский или испанский вариант.</p>
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
         <span>Фон за блюдами на карточках:</span>
         <div className="flex gap-1 rounded-lg border border-white/10 p-1">

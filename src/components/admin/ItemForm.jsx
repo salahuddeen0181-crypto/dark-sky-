@@ -39,7 +39,7 @@ export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
 
   const pairOptions = others.filter(o => o.id !== item?.id && !f.pair.includes(o.id));
   return (
-    <LangProvider data={{ nm: f.nm, d: f.d, v: f.v }}>{/* weight/volume is usually the same in every language: not counted */}
+    <LangProvider data={{ nm: f.nm, d: f.d, v: f.v }} onFill={set}>{/* weight/volume is usually the same in every language: not counted */}
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
         <Link href="/admin" className="rounded-lg border border-white/15 px-3 py-2 text-sm text-white/70">← Меню</Link>

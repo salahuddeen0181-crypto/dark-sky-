@@ -14,7 +14,8 @@ export default function AccessForm({ db, adminInDb: inDb, tabletSet }) {
   // recovery mail: what is saved (status) and the form (the app password is never sent back)
   const [mail, setMail] = useState(null), [mf, setMf] = useState({ to: '', user: '', pass: '' }), [adminInDb, setAdminInDb] = useState(inDb);
   const loadMail = m => { setMail(m); setMf({ to: m.to, user: m.user, pass: '' }); };
-  useEffect(() => { if (db) api('/api/admin/access', 'GET').then(r => { loadMail(r.mail); setAdminInDb(r.adminInDb); }).catch(() => {}); }, [db]);
+  const [tr, setTr] = useState(null), [trKey, setTrKey] = useState('');
+  useEffect(() => { if (db) api('/api/admin/access', 'GET').then(r => { loadMail(r.mail); setAdminInDb(r.adminInDb); setTr(r.translate); }).catch(() => {}); }, [db]);
 
   async function savePassword(e) {
     e.preventDefault();
@@ -34,6 +35,12 @@ export default function AccessForm({ db, adminInDb: inDb, tabletSet }) {
     e.preventDefault(); setBusy('mail');
     try { const r = await api('/api/admin/access', 'POST', { action: 'mail', ...mf }); loadMail(r.mail); say('mail', true, r.mail.to ? 'Сохранено. Проверьте отправкой тестового письма.' : 'Восстановление по почте выключено.'); }
     catch (x) { say('mail', false, x.message); }
+    setBusy('');
+  }
+  async function saveTranslate(e, key = trKey) {
+    e.preventDefault(); setBusy('translate');
+    try { const r = await api('/api/admin/access', 'POST', { action: 'translate', key }); setTr(r.translate); setTrKey(''); say('tr', !r.warn, r.warn || (key ? 'Ключ сохранён и работает' : 'Ключ удалён')); }
+    catch (x) { say('tr', false, x.message); }
     setBusy('');
   }
   async function testMail() {
@@ -60,6 +67,17 @@ export default function AccessForm({ db, adminInDb: inDb, tabletSet }) {
         {pw.next && weak(pw.next) && <p className="text-xs text-[#f2a676]">Простой пароль: лучше 12+ символов, буквы и цифры вперемешку.</p>}
         <Msg k="pw" />
         <button disabled={!db || busy === 'pw'} className="h-11 self-start rounded-xl bg-[#f2f2f4] px-5 font-semibold text-[#050507] disabled:opacity-50">{busy === 'pw' ? 'Сохраняем…' : 'Сменить пароль'}</button>
+      </form>
+
+      <form onSubmit={saveTranslate} className={box}>
+        <h2 className="font-semibold">Автоперевод меню</h2>
+        <p className="text-xs text-white/45">Кнопка «Перевести пустые поля» в формах блюд и контента работает через сервис DeepSeek. На platform.deepseek.com создайте аккаунт, пополните баланс и выпустите API-ключ в разделе API Keys. Ключ хранится зашифрованным и наружу не отдаётся.</p>
+        <input type="password" autoComplete="off" placeholder={tr?.set ? 'Ключ сохранён: введите новый, чтобы заменить' : 'API-ключ DeepSeek'} value={trKey} onChange={e => setTrKey(e.target.value)} className={input} />
+        <Msg k="tr" />
+        <div className="flex flex-wrap gap-2">
+          <button disabled={!db || !trKey.trim() || busy === 'translate'} className="h-11 rounded-xl bg-[#f2f2f4] px-5 font-semibold text-[#050507] disabled:opacity-50">{busy === 'translate' ? 'Проверяем…' : 'Сохранить ключ'}</button>
+          {tr?.set && <button type="button" disabled={busy === 'translate'} onClick={e => saveTranslate(e, '')} className="h-11 rounded-xl border border-white/20 px-4 text-sm disabled:opacity-50">Удалить</button>}
+        </div>
       </form>
 
       <form onSubmit={saveMail} className={box}>

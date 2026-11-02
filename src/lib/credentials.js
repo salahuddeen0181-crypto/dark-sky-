@@ -105,6 +105,16 @@ async function unseal(stored) {
     return Buffer.concat([d.update(Buffer.from(body, 'base64url')), d.final()]).toString('utf8');
   } catch { return null; } // ADMIN_SECRET changed: the password has to be entered again
 }
+// MARK: - Translation key (DeepSeek)
+// Entered in «Доступ» and encrypted like the mail password, so the owner can change it without touching the server;
+// DEEPSEEK_API_KEY on the server works too. Never sent back to the browser.
+export async function translateKey() {
+  const k = (await getAuth()).translate;
+  return (k ? await unseal(k) : null) || process.env.DEEPSEEK_API_KEY || '';
+}
+export const translateStatus = async () => ({ set: !!(await translateKey()) });
+export async function setTranslateKey(key) { await patchAuth({ translate: key ? await seal(key) : null }); }
+
 export const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '')) && String(v).length <= 254;
 
 // For the admin form: addresses and whether the app password is there (never the password itself)

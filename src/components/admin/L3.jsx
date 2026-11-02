@@ -27,8 +27,18 @@ const refOf = (v, lang) => { const k = REF.find(x => x !== lang && v[x]?.trim())
 // MARK: - Language bar
 const Ctx = createContext({ lang: 'es' });
 
-export function LangProvider({ data, children }) {
-  const [lang, setLang] = useState('es');
+// The same object with new texts in the fields(), in fields() order: fill(field, index) → the field's new value
+function mapFields(o, fill, at = { i: 0 }) {
+  if (isML(o)) return CODES.some(k => o[k].trim()) ? fill(o, at.i++) : o;
+  if (Array.isArray(o)) return o.map(v => mapFields(v, fill, at));
+  if (o && typeof o === 'object') return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, mapFields(v, fill, at)]));
+  return o;
+}
+const BATCH = 12; // the service answers each batch in several seconds; a longer one risks being cut off
+
+// onFill(next): takes the form's data with the empty languages translated, the same shape as data
+export function LangProvider({ data, onFill, children }) {
+  const [lang, setLang] = useState('es'), [auto, setAuto] = useState(null), [autoErr, setAutoErr] = useState('');
   const all = useMemo(() => fields(data), [data]);
   const filled = useMemo(() => Object.fromEntries(CODES.map(k => [k, all.filter(v => v[k].trim()).length])), [all]);
   useEffect(() => {
@@ -40,11 +50,29 @@ export function LangProvider({ data, children }) {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, []);
-  return <Ctx.Provider value={{ lang, setLang, filled, total: all.length }}>{children}</Ctx.Provider>;
+  async function translateGaps() {
+    const todo = all.map((value, key) => ({ key, value })).filter(f => CODES.some(k => !f.value[k].trim()));
+    const got = {};
+    setAutoErr(''); setAuto(0);
+    try {
+      for (let i = 0; i < todo.length; i += BATCH) {
+        setAuto(i / todo.length);
+        const r = await fetch('/api/admin/translate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fields: todo.slice(i, i + BATCH) }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || `Ошибка ${r.status}`);
+        Object.assign(got, j.values);
+      }
+    } catch (x) { setAutoErr(x.message); }
+    // what arrived is kept even if a later batch failed; the admin's own words are never replaced
+    onFill(mapFields(data, (v, i) => (got[i] ? Object.fromEntries(CODES.map(k => [k, v[k].trim() ? v[k] : got[i][k] || ''])) : v)));
+    setAuto(null);
+  }
+  const canTranslate = !!onFill && all.some(v => CODES.some(k => !v[k].trim()));
+  return <Ctx.Provider value={{ lang, setLang, filled, total: all.length, canTranslate, translateGaps, auto, autoErr }}>{children}</Ctx.Provider>;
 }
 
 export function LangBar() {
-  const { lang, setLang, filled, total } = useContext(Ctx);
+  const { lang, setLang, filled, total, canTranslate, translateGaps, auto, autoErr } = useContext(Ctx);
   const gaps = CODES.filter(k => filled[k] < total);
   const next = () => { const i = CODES.indexOf(lang); const k = [...CODES.slice(i + 1), ...CODES.slice(0, i + 1)].find(x => gaps.includes(x)); if (k) setLang(k); };
   return (
@@ -63,6 +91,8 @@ export function LangBar() {
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs text-white/45">
         <span>Язык для всех полей формы · Alt+← / Alt+→</span>
+        {canTranslate && <button onClick={translateGaps} disabled={auto !== null} className="rounded-md bg-[#f2f2f4] px-2 py-1 font-semibold text-[#050507] disabled:opacity-60">{auto !== null ? `Переводим… ${Math.round(auto * 100)}%` : 'Перевести пустые поля'}</button>}
+        {autoErr && <span className="w-full text-[#f2a676]">{autoErr}</span>}
         {gaps.length > 0 && <button onClick={next} className="rounded-md border border-white/15 px-2 py-1 text-white/75 hover:text-white">Следующий незаполненный →</button>}
       </div>
     </div>

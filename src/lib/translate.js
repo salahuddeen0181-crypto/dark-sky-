@@ -1,16 +1,18 @@
 import 'server-only';
 
-// NOT USED at the moment: the admin types every language by hand. Kept to switch automatic translation back on
-// (wire fillLanguages() into item-schema.js / content.js and set DEEPSEEK_API_KEY).
+import { translateKey } from './credentials';
+
+// The admin's «Перевести пустые поля» (api/admin/translate) uses translate(); the key is set in «Доступ».
+// fillLanguages() is not wired in: nothing is translated on saving.
 
 // Menu texts into all guest languages via DeepSeek (OpenAI-compatible chat API, JSON mode).
-// The admin writes es / en / ru (any of them); the rest is filled in here. Without DEEPSEEK_API_KEY nothing is
-// translated and the caller shows a warning.
+// The admin writes es / en / ru (any of them); the rest is filled in here. Without a key nothing is translated
+// and the caller shows a warning.
 export const LANGS = ['en', 'es', 'ru', 'zh', 'hi', 'ar', 'fr', 'pt', 'de', 'ja'];
 const SOURCE = ['es', 'en', 'ru'];
 // A plain string (a dish name) has no language attached
 const asSource = v => (typeof v === 'string' ? { text: v } : Object.fromEntries(SOURCE.filter(l => v[l]).map(l => [l, v[l]])));
-export const translateReady = () => !!process.env.DEEPSEEK_API_KEY;
+export const translateReady = async () => !!(await translateKey());
 
 const SYSTEM = `You translate the digital menu of DARKSKY, a hookah lounge in Buenos Aires.
 Input: json {"items": [{"key": "...", "es": "...", "en": "...", "ru": "..."}]} — some languages may be missing; "text" instead means a source in an unknown language (e.g. a dish name).
@@ -21,13 +23,15 @@ Short natural menu style, same length and punctuation as the source. Do not tran
 Keep numbers, prices, "$", "%", times and units (g, ml, cl) unchanged. Use "hookah" in the local word guests understand (es: hookah, ru: кальян, ar: شيشة).`;
 
 // fields: [{ key, value: { es?, en?, ru?, ... } }] → { key: { en, es, …, ja } }
-export async function translate(fields) {
+// strict: a language the model left out stays empty instead of repeating the source
+export async function translate(fields, { strict = false } = {}) {
   if (!fields.length) return {};
-  if (!translateReady()) throw new Error('not_configured');
+  const key = await translateKey();
+  if (!key) throw new Error('not_configured');
   const items = fields.map(f => ({ key: f.key, ...asSource(f.value) }));
-  const r = await fetch('https://api.deepseek.com/chat/completions', {
+  const r = await fetch(`${process.env.DEEPSEEK_BASE || 'https://api.deepseek.com'}/chat/completions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
       messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: JSON.stringify({ items }) }],
@@ -42,7 +46,7 @@ export async function translate(fields) {
   return Object.fromEntries(fields.map(f => {
     const t = out[f.key] || {};
     const own = asSource(f.value), fallback = own.text || own.en || own.es || own.ru || '';
-    return [f.key, Object.fromEntries(LANGS.map(l => [l, own[l] || String(t[l] || '').trim() || fallback]))];
+    return [f.key, Object.fromEntries(LANGS.map(l => [l, own[l] || String(t[l] || '').trim() || (strict ? '' : fallback)]))];
   }));
 }
 
@@ -74,7 +78,7 @@ export async function fillLanguages(next, prev = {}) {
   }
   const keepSource = () => { for (const k of Object.keys(values)) if (values[k] == null) delete values[k]; };
   if (!todo.length) return { values, translated: 0 };
-  if (!translateReady()) { keepSource(); return { values, translated: 0, warning: 'Автоперевод не настроен (нет DEEPSEEK_API_KEY): другие языки покажут английский или испанский текст' }; }
+  if (!(await translateReady())) { keepSource(); return { values, translated: 0, warning: 'Автоперевод не настроен (нет DEEPSEEK_API_KEY): другие языки покажут английский или испанский текст' }; }
   try {
     const done = await translate(todo);
     for (const { key } of todo) values[key] = done[key];

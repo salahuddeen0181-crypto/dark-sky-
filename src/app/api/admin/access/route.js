@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { denyUnlessAdmin, startSession, pinLocked, pinFailed, clientIp } from '@/lib/auth';
-import { checkAdminPassword, setAdminPassword, setTabletPin, isPin, mailStatus, setMail, isEmail, adminInDb } from '@/lib/credentials';
+import { checkAdminPassword, setAdminPassword, setTabletPin, isPin, mailStatus, setMail, isEmail, adminInDb, translateStatus, setTranslateKey } from '@/lib/credentials';
+import { translate } from '@/lib/translate';
 import { sendOwnerMail } from '@/lib/mail';
 import { staffReady, findStaffByPin } from '@/lib/staff';
 
@@ -41,6 +42,14 @@ export async function POST(req) {
     await setMail({ to, user, pass });
     return NextResponse.json({ ok: true, mail: await mailStatus() });
   }
+  // { action: 'translate', key } — the translation key, tried at once ('' removes it)
+  if (b.action === 'translate') {
+    const key = String(b.key || '').trim().slice(0, 200);
+    await setTranslateKey(key);
+    let warn = '';
+    if (key) try { await translate([{ key: 't', value: { es: 'Hola' } }], { strict: true }); } catch (e) { console.error('translate', e); warn = /401|403/.test(e.message) ? 'Сервис не принял ключ: проверьте его.' : /402/.test(e.message) ? 'Ключ сохранён, но на счёте DeepSeek нет денег.' : 'Ключ сохранён, но сервис не ответил. Попробуйте перевод позже.'; }
+    return NextResponse.json({ ok: true, warn, translate: await translateStatus() });
+  }
   if (b.action === 'mail-test') {
     const r = await sendOwnerMail({
       subject: 'DARKSKY: проверка почты',
@@ -54,5 +63,5 @@ export async function POST(req) {
 // Recovery mail settings and whether the admin's own password is in force, for the form (the app password itself is never sent)
 export async function GET() {
   const deny = await denyUnlessAdmin(); if (deny) return deny;
-  return NextResponse.json({ mail: await mailStatus(), adminInDb: await adminInDb() });
+  return NextResponse.json({ mail: await mailStatus(), adminInDb: await adminInDb(), translate: await translateStatus() });
 }
