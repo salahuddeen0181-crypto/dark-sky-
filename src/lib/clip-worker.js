@@ -47,7 +47,7 @@ function dishBox(frame, W, H) {
 // frame: the fullest one, as the poster; cover: what the list row and the small cards show, trimmed to the dish
 async function stills(dir, stem, frame, cover, W, H) {
   const write = (src, vf, name) => new Promise((res, rej) => {
-    const p = ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${W}x${H}`, '-i', '-', ...(vf ? ['-vf', vf] : []), '-frames:v', '1', '-c:v', 'libwebp', '-quality', '82', '-alpha_quality', '90', path.join(dir, name)], ['pipe', 'ignore', 'inherit']);
+    const p = ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${W}x${H}`, '-i', '-', ...(vf ? ['-vf', vf] : []), '-frames:v', '1', '-c:v', 'libwebp', '-pix_fmt', 'yuva420p', '-quality', '82', path.join(dir, name)], ['pipe', 'ignore', 'inherit']);
     p.stdin.on('error', () => {}); p.stdin.end(src); done(p).then(res, rej);
   });
   const box = dishBox(cover, W, H), trim = box ? `crop=${box.w}:${box.h}:${box.x}:${box.y},` : '';
