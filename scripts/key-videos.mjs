@@ -38,6 +38,7 @@ const OPTS = {
   udon: { feather: [.1, .07], shadow: 1.25 }, 'wok-rice': { feather: [.1, .07], shadow: 1.25 },
   // filmed landscape with the camera following a wide bowl and the croutons falling at its side: keep the whole frame
   'salad-cesar': { wide: true },
+  'roll-dark': { shadow: 1.25 }, // a dark glossy plate
 };
 const CLIPS = {
   'Chicken_teriyaki_sushi_roll': 'roll-horno',
@@ -67,6 +68,7 @@ const CLIPS = {
   'Sushi_roll_assembling_on_plate': 'roll-newyork',
   'Unagi_sushi_roll': 'roll-unagi',
   'US_dollar_bills_fluttering': 'cash',
+  'Dark_roll': 'roll-dark', // the admin's source name 'Sushi_roll_deconstruction_and_re…_270249b0', renamed: the prefix is taken
 };
 
 function run(args, input) {

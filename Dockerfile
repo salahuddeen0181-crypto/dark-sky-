@@ -23,7 +23,7 @@ RUN mkdir -p .next/static uploads && chown node:node .next/static uploads
 RUN apk add --no-cache ffmpeg
 COPY --from=build /app/public ./public
 # what scripts/setup-db.mjs needs: the schema and the bundled menu to seed an empty database
-COPY --from=build /app/scripts/setup-db.mjs /app/scripts/menu-update-2026-10-26.mjs /app/scripts/sync-media.mjs /app/scripts/menu-update-2026-10-28.mjs /app/scripts/menu-update-2026-10-28b.mjs ./scripts/
+COPY --from=build /app/scripts/setup-db.mjs /app/scripts/menu-update-2026-10-26.mjs /app/scripts/sync-media.mjs /app/scripts/menu-update-2026-10-28.mjs /app/scripts/menu-update-2026-10-28b.mjs /app/scripts/menu-update-2026-11-02.mjs ./scripts/
 COPY --from=build /app/db ./db
 COPY --from=build /app/src/lib/darksky-data.js /app/src/lib/darksky-i18n.mjs ./src/lib/
 COPY --from=deps /app/node_modules/postgres ./node_modules/postgres
