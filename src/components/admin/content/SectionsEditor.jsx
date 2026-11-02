@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api, thumb } from '../api';
 import { shrink } from '../PhotoPanel';
 import MediaTips from '../MediaTips';
+import VideoUpload from '../VideoUpload';
 import { L3, label, asML } from '../L3';
 
 const FIXED = ['hookah', 'promos', 'rules'], PINNED = ['promos', 'rules'];
@@ -13,28 +14,29 @@ const textBtn = 'h-9 rounded-lg border border-white/15 px-3 text-sm text-white/7
 // The tile's picture: uploaded here, or the built-in clip's still until one is
 function TilePicture({ s, onChange }) {
   const [busy, setBusy] = useState(false), [err, setErr] = useState('');
-  const src = s.img ? thumb(s.img) : s.clip ? s.clip.split('#')[0].replace(/\.webm$/i, '-th.webp') : null;
+  const clip = s.video || s.clip, src = s.img ? thumb(s.img) : clip ? clip.split('#')[0].replace(/\.(webm|mp4)$/i, '-th.webp') : null;
   async function upload(file) {
     if (!file) return;
     setBusy(true); setErr('');
-    try { onChange((await api('/api/admin/images', 'POST', await shrink(file))).id); }
+    try { onChange({ img: (await api('/api/admin/images', 'POST', await shrink(file))).id, video: null }); }
     catch (x) { setErr(x.message || 'Не получилось'); }
     setBusy(false);
   }
   return (
     <div className="flex flex-col gap-2">
-      <span className={label}>Картинка плитки</span>
+      <span className={label}>Картинка или видео плитки</span>
       <div className="flex flex-wrap items-center gap-3">
         <div className="h-20 w-28 flex-none overflow-hidden rounded-xl border border-white/10 bg-black">
           {src && <img src={src} alt="" className="h-full w-full object-cover" /> /* eslint-disable-line @next/next/no-img-element */}
         </div>
         <label className={`${textBtn} flex cursor-pointer items-center`}>
-          {busy ? 'Загрузка…' : s.img || s.clip ? 'Заменить' : 'Загрузить'}
+          {busy ? 'Загрузка…' : s.img ? 'Заменить картинку' : 'Загрузить картинку'}
           <input type="file" accept="image/*" hidden disabled={busy} onChange={e => { upload(e.target.files[0]); e.target.value = ''; }} />
         </label>
-        {s.img && <button onClick={() => onChange(null)} className={textBtn}>{s.clip ? 'Вернуть видео' : 'Убрать'}</button>}
+        {(s.img || s.video) && <button onClick={() => onChange({ img: null, video: null })} className={textBtn}>{s.clip ? 'Вернуть стандартное' : 'Убрать'}</button>}
         {err && <span className="text-xs text-[#f2a676]">{err}</span>}
       </div>
+      <VideoUpload onReady={video => onChange({ video, img: null })} />
       <MediaTips kind="tile" />
     </div>
   );
@@ -51,7 +53,7 @@ export default function SectionsEditor({ c, set }) {
 
   const lastDish = c.sections.findLastIndex(s => !PINNED.includes(s.id));
   const addSection = () => {
-    const s = { id: newId('s'), n: asML(''), tag: asML(''), hidden: false, img: null, clip: null, cats: [] };
+    const s = { id: newId('s'), n: asML(''), tag: asML(''), hidden: false, img: null, video: null, clip: null, cats: [] };
     set({ sections: [...c.sections.slice(0, lastDish + 1), s, ...c.sections.slice(lastDish + 1)] });
   };
   const removeSection = (i) => {
@@ -87,7 +89,7 @@ export default function SectionsEditor({ c, set }) {
             </div>
             <div className="flex flex-col gap-2"><span className={label}>Название</span><L3 value={s.n} onChange={n => setSection(i, { n })} /></div>
             <div className="flex flex-col gap-2"><span className={label}>Подпись</span><L3 value={s.tag} onChange={tag => setSection(i, { tag })} /></div>
-            {s.id !== 'rules' && <TilePicture s={s} onChange={img => setSection(i, { img })} />}
+            {s.id !== 'rules' && <TilePicture s={s} onChange={patch => setSection(i, patch)} />}
 
             {!FIXED.includes(s.id) && (
               <div className="flex flex-col gap-2">

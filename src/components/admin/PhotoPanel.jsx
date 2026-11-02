@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api, thumb } from './api';
 import { cutout } from './cutout';
 import MediaTips from './MediaTips';
+import VideoUpload from './VideoUpload';
 
 // Resize in the browser so the database only stores ~100 KB per photo.
 export async function shrink(file, max = 1200) {
@@ -22,7 +23,7 @@ export default function PhotoPanel({ img, media, cut, onChange, onBusy }) {
   const [cutOn, setCutOn] = useState(true), [orig, setOrig] = useState(null);
   const [stage, setStage] = useState(''), [pct, setPct] = useState(0), [err, setErr] = useState('');
   const busy = !!stage;
-  const photo = thumb(img, media), onStage = !!(cut || (media && /\/media\/(cut\/|.+\.webm)/.test(media)));
+  const photo = thumb(img, media), onStage = !!(cut || (media && /\/media\/(cut\/|.+\.webm)|^\/api\/clip\//.test(media)));
 
   async function run(fn) {
     setErr(''); onBusy(true);
@@ -61,6 +62,7 @@ export default function PhotoPanel({ img, media, cut, onChange, onBusy }) {
       <label className="flex items-center gap-2 text-sm text-white/75">
         <input type="checkbox" checked={cutOn} disabled={busy} onChange={e => setCutOn(e.target.checked)} /> Вырезать фон
       </label>
+      <VideoUpload onBusy={onBusy} onReady={m => onChange({ img: null, media: m, cut: false })} />
       <p className="text-xs leading-snug text-white/40">Блюдо встанет на дымный фон, как остальные. Первый раз на устройстве загружается модель (~115 МБ, потом из кэша), вырезка 10–60 секунд — лучше с ноутбука по Wi-Fi.</p>
       {orig && !busy && (cut
         ? <button onClick={() => keepOriginal(orig)} className="text-left text-sm text-white/60 hover:text-white">↺ Оставить оригинал без вырезки</button>

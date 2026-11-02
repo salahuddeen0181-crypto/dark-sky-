@@ -22,7 +22,8 @@ services:
       DATABASE_URL: postgres://darksky:${DB_PASSWORD}@db:5432/darksky?sslmode=disable
       SITE_URL: https://${SITE_HOST}
     # the files of every build (see Dockerfile), so pages cached before a deploy keep working
-    volumes: [next-static:/app/.next/static]
+    # uploads: clips made from videos uploaded in the admin
+    volumes: [next-static:/app/.next/static, uploads:/app/uploads]
     depends_on:
       db: { condition: service_healthy }
 
@@ -42,5 +43,6 @@ services:
 volumes:
   pgdata:
   next-static:
+  uploads:
   caddy_data:
   caddy_config:

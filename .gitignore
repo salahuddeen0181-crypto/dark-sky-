@@ -48,3 +48,5 @@ next-env.d.ts
 
 # personal Claude Code permissions (prod access), never shipped
 /.claude/settings.local.json
+
+uploads/

@@ -129,3 +129,12 @@ create table if not exists shift_reports (
   created_at  timestamptz not null default now(),
   archived_at timestamptz
 );
+
+-- Videos uploaded in the admin, their backdrop cut out on the server (clip-worker.js). media: the finished clip's path
+create table if not exists clips (
+  id         uuid primary key default gen_random_uuid(),
+  status     text not null default 'queued',  -- queued | working | ready | failed
+  media      text,
+  error      text,
+  created_at timestamptz not null default now()
+);

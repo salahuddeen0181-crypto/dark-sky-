@@ -4,4 +4,5 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs' || !(process.env.TELEGRAM_BOT_TOKEN || process.env.DATABASE_URL)) return;
   const { startReminders } = await import('./lib/reminders');
   startReminders();
+  if (process.env.DATABASE_URL) (await import('./lib/clip-worker')).runClips(); // clips a restart interrupted
 }

@@ -15,4 +15,4 @@ export const fmt = n => (n == null ? 'по запросу' : '$' + Math.round(n)
 
 // Preview picture for an item: an uploaded photo, or the menu's own media — a keyed clip shows its still (.webp).
 // small: the 320 px copy every bundled picture has (<name>-th.webp), for lists
-export const thumb = (img, media, small = false) => (img ? `/api/img/${img}` : media ? media.split('#')[0].replace(/\.(webm|webp)$/i, small ? '-th.webp' : '.webp') : null);
+export const thumb = (img, media, small = false) => (img ? `/api/img/${img}` : media ? media.split('#')[0].replace(/\.(webm|webp|mp4)$/i, small ? '-th.webp' : '.webp') : null);

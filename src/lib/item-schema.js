@@ -6,6 +6,7 @@ const LANGS = D.LANGS.map(l => l.code);
 
 // Admin item form → the item shape the menu renders. Unknown fields are dropped.
 
+export const CLIP_PATH = /^\/api\/clip\/[0-9a-f-]{36}\/(clip|wide)\.mp4(#t=[\d.]+)?$/;
 const str = (v, max = 400) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 // { es, en, ru, … } with empty languages removed — the admin types every language by hand.
 function l3(o, max) {
@@ -41,6 +42,7 @@ export function cleanItem(b, cats, existing) {
   if (b.new) data.new = true;
   if (Array.isArray(b.pair)) { const p = b.pair.map(x => str(x, 60)).filter(Boolean).slice(0, 6); if (p.length) data.pair = p; }
   if (typeof b.img === 'string' && /^[0-9a-f-]{36}$/.test(b.img)) data.img = b.img;
+  else if (CLIP_PATH.test(b.media || '')) data.media = b.media; // a finished upload (clip-worker.js)
   else if (existing?.media && b.keepMedia !== false) data.media = existing.media;
   if (b.cut && data.img) data.cut = true; // photo with the background removed in the admin: shown on the smoky stage
   return { cat, hidden: !!b.hidden, data };

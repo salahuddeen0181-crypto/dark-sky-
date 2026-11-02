@@ -2,6 +2,7 @@ import 'server-only';
 import { db } from './db';
 import * as D from './darksky-data';
 import { cached, menuChanged } from './menu-cache';
+import { CLIP_PATH } from './item-schema';
 
 const LANGS = D.LANGS.map(l => l.code);
 
@@ -48,7 +49,7 @@ export async function getContent() {
   ];
   const SECTIONS = tree.filter(s => !s.hidden).map(s => {
     const b = D.SECTIONS.find(x => x.id === s.id);
-    return { ...b, id: s.id, n: s.n, tag: s.tag, img: s.img ? '/api/img/' + s.img : null, clip: s.img ? null : b?.clip || null, cats: s.cats.filter(c => !c.hidden).map(c => c.id) };
+    return { ...b, id: s.id, n: s.n, tag: s.tag, img: s.img ? '/api/img/' + s.img : null, clip: s.img ? null : s.video || b?.clip || null, cats: s.cats.filter(c => !c.hidden).map(c => c.id) };
   });
   // rules2: the house rules in their 2026-10 shape (tabs «Prohibited» / «General»); older saved rules are ignored
   const r = o.rules2 || {};
@@ -120,7 +121,7 @@ function cleanTree(list, names, current) {
       if (!name) throw new ContentError('У каждой категории должно быть название');
       return { id, n: name, hidden: !!names[id].hidden };
     });
-    out.push({ id: s.id, n, tag: clean(s.tag, 120), hidden: !!s.hidden && s.id !== 'rules', img: IMG_ID.test(s.img || '') ? s.img : null, cats: nodes });
+    out.push({ id: s.id, n, tag: clean(s.tag, 120), hidden: !!s.hidden && s.id !== 'rules', img: IMG_ID.test(s.img || '') ? s.img : null, video: CLIP_PATH.test(s.video || '') ? s.video : null, cats: nodes });
   }
   for (const id of FIXED) if (!secs.has(id)) out.push(current.find(s => s.id === id));
   return [...out.filter(s => !PINNED.includes(s.id)), ...PINNED.map(id => out.find(s => s.id === id))];
@@ -168,7 +169,7 @@ export async function getContentForm() {
   const o = await getOverrides(), cur = await getContent(), f = asForm, tree = treeOf(o);
   const R = cur.RULES;
   return {
-    sections: tree.map(s => ({ id: s.id, n: f(s.n), tag: f(s.tag), hidden: !!s.hidden, img: s.img || null, clip: D.SECTIONS.find(x => x.id === s.id)?.clip || null, cats: s.cats.map(c => c.id) })),
+    sections: tree.map(s => ({ id: s.id, n: f(s.n), tag: f(s.tag), hidden: !!s.hidden, img: s.img || null, video: s.video || null, clip: D.SECTIONS.find(x => x.id === s.id)?.clip || null, cats: s.cats.map(c => c.id) })),
     cats: Object.fromEntries(tree.flatMap(s => s.cats).map(c => [c.id, { n: f(c.n), hidden: !!c.hidden }])),
     dishes: await dishCounts(),
     tastes: Object.entries(cur.TASTE).map(([k, n]) => ({ k, n: f(n) })),

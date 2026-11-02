@@ -23,7 +23,7 @@ export default function ItemForm({ item, cats, tastes, others, defaultCat }) {
     const body = {
       name: f.nm.es.trim() || Object.values(f.nm).find(x => x.trim()) || '', nm: f.nm, cat: f.cat, hidden: f.hidden, hit: f.hit, new: f.new, d: f.d, m: f.m,
       p: f.onRequest ? null : f.p, v: f.v, t: f.t, str: f.cat === 'hookah' ? f.str : null, pair: f.pair,
-      img: f.img, cut: f.cut, keepMedia: !!f.media,
+      img: f.img, media: f.media, cut: f.cut, keepMedia: !!f.media,
     };
     try {
       const r = item ? await api(`/api/admin/items/${item.id}`, 'PUT', body) : await api('/api/admin/items', 'POST', body);

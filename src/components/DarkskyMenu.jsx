@@ -10,6 +10,7 @@ import { css, Arrow, Close, CLOSE_BTN, GLASS } from './menu-ui';
 import { createSmoke } from '@/lib/smoke-scene';
 import OrderReview from './OrderReview';
 import GuestAsk from './GuestAsk';
+import AlphaClip from './AlphaClip';
 import QrScan from './QrScan';
 import CatStrip from './CatStrip';
 import { tableName } from '@/lib/table-name';
@@ -95,7 +96,9 @@ const Smoke = ({ still }) => <div className={still ? 'ds-smoke still' : 'ds-smok
 const WIDE_CLIPS = new Set(['/media/salad-cesar']);
 const CLIP = css('position:relative;width:100%;height:100%;object-fit:contain;display:block;transform:scale(1.2)');
 const isHevc = () => { const ua = navigator.userAgent; return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android|Firefox/.test(ua); };
-const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isHevc() ? '.mov' : '.webm');
+// clips uploaded in the admin are one MP4 for everyone (AlphaClip)
+const isUploaded = src => src.startsWith('/api/clip/');
+const clipFile = (stem, v) => stem + (v === 'sm' ? '-sm' : '') + (isUploaded(stem) ? '.mp4' : isHevc() ? '.mov' : '.webm');
 // Home tiles shown large play the full clip, the rest the small one (matches tiles in vm())
 const FULL_TILES = new Set(['hookah', 'kitchen']);
 const ORDER_KEEP_MIN = 30; // no touch or scroll in the menu for longer than this: the visit is over, the next one starts clean
@@ -140,7 +143,7 @@ function ProductClip({ src, v, fit }) {
   const ref = React.useRef(null);
   // list rows show the cover (the finished dish, scripts/make-covers.mjs); mini cards and small tiles the 320 px
   // still from scripts/make-thumbs.mjs as their poster
-  const [file, t] = src.split('#t='), stem = file.replace(/\.webm$/i, ''), still = stem + (v === 'still' ? '-cover' : v === 'sm' ? '-th' : '') + '.webp';
+  const [file, t] = src.split('#t='), stem = file.replace(/\.(webm|mp4)$/i, ''), still = stem + (v === 'still' ? '-cover' : v === 'sm' ? '-th' : '') + '.webp';
   React.useEffect(() => {
     const el = ref.current;
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -163,8 +166,9 @@ function ProductClip({ src, v, fit }) {
     io.observe(el);
     return () => { gone = true; io.disconnect(); el.pause(); };
   }, [stem, t, v]);
-  const style = fit ? { ...CLIP, ...fit } : WIDE_CLIPS.has(stem) ? { ...CLIP, transform: 'none' } : CLIP;
+  const style = fit ? { ...CLIP, ...fit } : WIDE_CLIPS.has(stem) || stem.endsWith('/wide') ? { ...CLIP, transform: 'none' } : CLIP;
   if (v === 'still') return <img src={still} alt="" loading="lazy" style={COVER} />; // eslint-disable-line @next/next/no-img-element
+  if (isUploaded(stem)) return <AlphaClip videoRef={ref} poster={still} style={style} />;
   return <video ref={ref} poster={still} muted loop playsInline preload="none" style={style} />;
 }
 
@@ -190,7 +194,7 @@ function Media({ m, label = true, v = 'full' }) {
   // in the open card a photo (unlike a clip) would stand still: it floats gently instead (.ds-float)
   if (m.mImg && m.mCut) return <><Smoke still={v === 'still'} /><img src={v !== 'full' && m.mSrc.startsWith('/media/cut/') ? m.mSrc.replace(/\.webp$/, '-th.webp') : m.mSrc} alt="" loading="lazy" className={v === 'full' ? 'ds-float' : undefined} style={CUT} /></>; // eslint-disable-line @next/next/no-img-element
   if (m.mImg) return <img src={m.mSrc} alt="" style={fill} />; // eslint-disable-line @next/next/no-img-element
-  if (m.mVideo && /^\/media\/.+\.webm(#|$)/.test(m.mSrc)) return <><Smoke still={v === 'still'} /><ProductClip src={m.mSrc} v={v} /></>;
+  if (m.mVideo && (/^\/media\/.+\.webm(#|$)/.test(m.mSrc) || isUploaded(m.mSrc))) return <><Smoke still={v === 'still'} /><ProductClip src={m.mSrc} v={v} /></>;
   if (m.mVideo) return <video src={m.mSrc} autoPlay muted loop playsInline style={fill} />;
   if (m.mModel) {
     return React.createElement('model-viewer', {
@@ -333,7 +337,7 @@ export default class DarkskyMenu extends React.Component {
   // What warmMedia() fetches in the background: tile clips with their stills, then every dish's small picture
   warm() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const stem = src => src.split('#')[0].replace(/\.webm$/i, ''), clips = [], images = [];
+    const stem = src => src.split('#')[0].replace(/\.(webm|mp4)$/i, ''), clips = [], images = [];
     for (const S of this.C.SECTIONS) {
       if (S.img) images.push(S.img);
       if (!S.clip) continue;
@@ -343,7 +347,7 @@ export default class DarkskyMenu extends React.Component {
     }
     for (const it of this.props.items) {
       const src = it.media || (it.img ? '/api/img/' + it.img : '');
-      if (/^\/media\/.+\.webm(#|$)/.test(src)) images.push(stem(src) + '-cover.webp', ...(it.hit ? [stem(src) + '-th.webp'] : [])); // rows show the cover; the house favourites' cards the clip's poster
+      if (/^\/media\/.+\.webm(#|$)/.test(src) || isUploaded(src)) images.push(stem(src) + '-cover.webp', ...(it.hit ? [stem(src) + '-th.webp'] : [])); // rows show the cover; the house favourites' cards the clip's poster
       else if (src.startsWith('/media/cut/')) images.push(src.replace(/\.webp$/, '-th.webp'));
       else if (src && !/\.(mp4|webm|mov|glb|gltf)$/i.test(src)) images.push(src);
     }
