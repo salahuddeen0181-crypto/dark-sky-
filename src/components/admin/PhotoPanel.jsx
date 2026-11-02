@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api, thumb } from './api';
 import { cutout } from './cutout';
+import MediaTips from './MediaTips';
 
 // Resize in the browser so the database only stores ~100 KB per photo.
 export async function shrink(file, max = 1200) {
@@ -65,6 +66,7 @@ export default function PhotoPanel({ img, media, cut, onChange, onBusy }) {
         ? <button onClick={() => keepOriginal(orig)} className="text-left text-sm text-white/60 hover:text-white">↺ Оставить оригинал без вырезки</button>
         : <button onClick={() => removeBg(orig)} className="text-left text-sm text-white/60 hover:text-white">✂ Вырезать фон у этого фото</button>)}
       {photo && !busy && <button onClick={() => onChange({ img: null, media: null, cut: false })} className="text-left text-sm text-white/50 hover:text-white">Убрать фото</button>}
+      <MediaTips kind="dish" />
       {err && <div className="text-sm text-[#f2a676]">{err}</div>}
     </div>
   );

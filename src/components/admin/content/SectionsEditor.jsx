@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api, thumb } from '../api';
 import { shrink } from '../PhotoPanel';
+import MediaTips from '../MediaTips';
 import { L3, label, asML } from '../L3';
 
 const FIXED = ['hookah', 'promos', 'rules'], PINNED = ['promos', 'rules'];
@@ -34,6 +35,7 @@ function TilePicture({ s, onChange }) {
         {s.img && <button onClick={() => onChange(null)} className={textBtn}>{s.clip ? 'Вернуть видео' : 'Убрать'}</button>}
         {err && <span className="text-xs text-[#f2a676]">{err}</span>}
       </div>
+      <MediaTips kind="tile" />
     </div>
   );
 }
