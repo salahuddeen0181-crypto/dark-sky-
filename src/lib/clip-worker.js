@@ -41,7 +41,13 @@ function dishBox(frame, W, H) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (frame[(y * W + x) * 4 + 3] > 24) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   if (x1 < x0) return null;
   const m = Math.round(Math.max(x1 - x0, y1 - y0) * .04), l = Math.max(0, x0 - m), t = Math.max(0, y0 - m);
-  return { x: l, y: t, w: Math.min(W, x1 + m + 1) - l, h: Math.min(H, y1 + m + 1) - t };
+  const box = { x: l, y: t, w: Math.min(W, x1 + m + 1) - l, h: Math.min(H, y1 + m + 1) - t }, most = Math.round(box.h * 1.2);
+  if (box.w > most) { // chopsticks and a flat view stretch the box: no wider than 6:5, around where the dish's weight is
+    let sum = 0, mass = 0;
+    for (let y = box.y; y < box.y + box.h; y++) for (let x = box.x; x < box.x + box.w; x++) { const v = frame[(y * W + x) * 4 + 3]; sum += v; mass += v * x; }
+    box.x = Math.max(box.x, Math.min(box.x + box.w - most, Math.round(mass / sum - most / 2))); box.w = most;
+  }
+  return box;
 }
 
 // frame: the fullest one, as the poster; cover: what the list row and the small cards show, trimmed to the dish

@@ -41,6 +41,20 @@ function trim(png) {
   const [w, h, x, y] = m.slice(1).map(Number), p = Math.round(Math.max(w, h) * .04), tmp = png + '.png';
   ff(['-i', png, '-vf', `crop=w='min(iw,${w + 2 * p})':h='min(ih,${h + 2 * p})':x='max(0,min(iw-ow,${x - p}))':y='max(0,min(ih-oh,${y - p}))'`, '-pix_fmt', 'rgba', tmp]);
   fs.renameSync(tmp, png);
+  narrow(png);
+}
+
+// Chopsticks and a flat view stretch the box and the dish ends up small in the square row: no wider than 6:5, kept
+// around where the dish's weight is, not the middle of the box
+function narrow(png) {
+  const info = spawnSync(FF, ['-hide_banner', '-i', png]).stderr.toString(), [, W, H] = /(\d{2,5})x(\d{2,5})/.exec(info).map(Number), w = Math.round(H * 1.2);
+  if (W <= w) return;
+  const a = spawnSync(FF, ['-hide_banner', '-loglevel', 'error', '-i', png, '-vf', 'alphaextract,format=gray', '-f', 'rawvideo', '-'], { maxBuffer: 1 << 26 }).stdout;
+  let sum = 0, mass = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const v = a[y * W + x]; sum += v; mass += v * x; }
+  const x = Math.max(0, Math.min(W - w, Math.round(mass / sum - w / 2))), tmp = png + '.png';
+  ff(['-i', png, '-vf', `crop=${w}:${H}:${x}:0`, '-pix_fmt', 'rgba', tmp]);
+  fs.renameSync(tmp, png);
 }
 
 const only = process.argv.slice(2);
