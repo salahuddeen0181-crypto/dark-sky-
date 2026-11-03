@@ -39,8 +39,6 @@
 /* a soft light behind the product: the edges of a clear glass need something to read against */
 .ds-stage-black { --ds-stage: radial-gradient(66% 64% at 50% 47%, #4a4c55 0%, #2c2d33 40%, #0e0e11 74%, #000 100%); }
 .ds-stage-black .ds-smoke { opacity: .2; }
-/* a faint rim of light along the product's outline: thin clear glass (a martini stem) would vanish into the dark */
-.ds-stage-black .ds-stage-main video, .ds-stage-black .ds-stage-main canvas { filter: drop-shadow(0 0 1px rgba(235, 238, 245, .45)) drop-shadow(0 0 8px rgba(235, 238, 245, .14)); }
 .ds-stage-black .ds-stage::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: radial-gradient(75% 72% at 50% 48%, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, .55) 82%, rgba(0, 0, 0, .9) 100%); }
 .ds-stage-glass { --ds-stage: radial-gradient(110% 80% at 60% 30%, rgba(232, 121, 60, .11), rgba(10, 10, 14, 0) 65%), rgba(160, 165, 180, .13); --ds-stage-blur: blur(10px) saturate(1.25); }
