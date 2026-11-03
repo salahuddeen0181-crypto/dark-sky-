@@ -36,7 +36,8 @@
 :root { --ds-stage: radial-gradient(70% 62% at 50% 45%, rgba(196, 199, 208, .34), rgba(110, 112, 120, .12) 48%, rgba(0, 0, 0, 0) 76%), #020203; --ds-stage-blur: none; }
 /* black: dark grey in the middle fading to black, dark smoke drifting over it, and a vignette over the clip itself so
    where a clip is cut off at the frame it melts into the dark instead of ending on a hard line */
-.ds-stage-black { --ds-stage: radial-gradient(62% 58% at 50% 46%, #26272c 0%, #141418 42%, #050506 72%, #000 100%); }
+/* a soft light behind the product: the edges of a clear glass need something to read against */
+.ds-stage-black { --ds-stage: radial-gradient(66% 64% at 50% 47%, #4a4c55 0%, #2c2d33 40%, #0e0e11 74%, #000 100%); }
 .ds-stage-black .ds-smoke { opacity: .2; }
 .ds-stage-black .ds-stage::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: radial-gradient(75% 72% at 50% 48%, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, .55) 82%, rgba(0, 0, 0, .9) 100%); }
