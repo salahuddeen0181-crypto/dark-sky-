@@ -68,6 +68,7 @@ const CLIPS = {
   'Sushi_roll_assembling_on_plate': 'roll-newyork',
   'Unagi_sushi_roll': 'roll-unagi',
   'US_dollar_bills_fluttering': 'cash',
+  'Daiquiri': 'daiquiri', // 'Martini_glass_rotating_on_green_…_248c4900', renamed
   'Garibaldi': 'garibaldi', // 'Garibaldi_drink_glass_rotating_…', renamed
   'Negroni': 'negroni', // 'Negroni_rotating_on_green_screen_…', renamed
   'Cosmoflower': 'cosmoflower', // 'Martini_glass_rotating_on_green_…', renamed
