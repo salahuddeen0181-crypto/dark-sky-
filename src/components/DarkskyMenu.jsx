@@ -889,7 +889,7 @@ export default class DarkskyMenu extends React.Component {
           <button onClick={() => this.closeAll()} aria-label="Close" style={css('position:absolute;top:12px;right:-6px;' + CLOSE_BTN)}><Close /></button>
         </div>
         <Grip />
-        <div className="ds-stage" style={css(`height:min(max(42vh,240px),72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}>
+        <div className="ds-stage ds-stage-main" style={css(`height:min(max(42vh,240px),72vw);width:100%;flex:none;border-radius:22px;border:1px solid rgba(255,255,255,.08);${MEDIA_BG}`)}>
           <Media m={sh} />
           {sh.pos && <>
             <button onClick={() => this.stepItem(-1)} aria-label="Previous" style={css('left:10px;' + STEP_BTN)}><Arrow size={16} flip="scaleX(-1)" /></button>
