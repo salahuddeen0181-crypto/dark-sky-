@@ -156,6 +156,13 @@ function ProductClip({ src, v, fit }) {
       el.src = blob || file + (t ? '#t=' + t : '');
       if (seen) el.play().catch(() => {});
     };
+    // iPhone pauses a muted clip by itself while something covers it (the order screen, a sheet) and, the clip having
+    // no autoplay attribute, never starts it again: whatever is on screen is set going when that is over
+    const resume = () => { if (seen && !gone && !document.hidden && el.getAttribute('src') && el.paused) el.play().catch(() => {}); };
+    const paused = () => { if (seen && !gone) setTimeout(resume, 400); };
+    el.addEventListener('pause', paused);
+    window.addEventListener('ds-resume', resume);
+    document.addEventListener('visibilitychange', resume);
     const io = new IntersectionObserver(([e]) => {
       seen = e.isIntersecting;
       if (!seen) return el.pause();
@@ -164,7 +171,10 @@ function ProductClip({ src, v, fit }) {
       if (wait) wait.then(start); else start(CLIP_BLOBS.get(file));
     }, { rootMargin: '120px' });
     io.observe(el);
-    return () => { gone = true; io.disconnect(); el.pause(); };
+    return () => {
+      gone = true; io.disconnect(); el.pause();
+      el.removeEventListener('pause', paused); window.removeEventListener('ds-resume', resume); document.removeEventListener('visibilitychange', resume);
+    };
   }, [stem, t, v]);
   const style = fit ? { ...CLIP, ...fit } : WIDE_CLIPS.has(stem) || stem.endsWith('/wide') ? { ...CLIP, transform: 'none' } : CLIP;
   if (v === 'still') return <img src={still} alt="" loading="lazy" style={COVER} />; // eslint-disable-line @next/next/no-img-element
@@ -323,6 +333,8 @@ export default class DarkskyMenu extends React.Component {
     // the page behind an open sheet must not scroll
     const lock = !!(this.state.sheetId || this.state.cartOpen || this.state.langOpen || this.state.reviewOpen || this.state.rulesOpen) ? 'hidden' : '';
     if (this.scene && !!lock !== this._sheetPause) { this._sheetPause = !!lock; this.pauseSmoke(); }
+    if (!lock && this._covered) window.dispatchEvent(new Event('ds-resume')); // see ProductClip: clips stopped under it go on
+    this._covered = !!lock;
     if (document.documentElement.style.overflow !== lock) document.documentElement.style.overflow = document.body.style.overflow = lock;
   }
   // the background smoke stands still while a sheet covers it or the page is being scrolled
