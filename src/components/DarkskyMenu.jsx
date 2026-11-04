@@ -118,6 +118,7 @@ const addedLines = (now, sent) => now.map(l => ({ ...l, qty: l.qty - (sent.find(
 // always serve from the HTTP cache, so without this the same clip could be downloaded twice.
 // A clip already queued here is waited for rather than fetched a second time by its player (CLIP_WAIT).
 const CLIP_BLOBS = new Map(), CLIP_WAIT = new Map();
+const CLIP_PATIENCE = 1000; // ms a player waits for the clip being fetched ahead before streaming it
 function warmMedia(clips, images) {
   const c = navigator.connection || {};
   if (c.saveData) return;
@@ -168,7 +169,11 @@ function ProductClip({ src, v, fit }) {
       if (!seen) return el.pause();
       if (el.getAttribute('src')) return void el.play().catch(() => {});
       const wait = !CLIP_BLOBS.has(file) && CLIP_WAIT.get(file);
-      if (wait) wait.then(start); else start(CLIP_BLOBS.get(file));
+      if (!wait) return start(CLIP_BLOBS.get(file));
+      // the clip fetched ahead is used if it comes soon; otherwise the player streams it itself rather than standing
+      // still until the whole file is in (a slow phone network, or the menu opening straight away after a reload)
+      const own = setTimeout(() => start(), CLIP_PATIENCE);
+      wait.then(blob => { clearTimeout(own); start(blob); });
     }, { rootMargin: '120px' });
     io.observe(el);
     return () => {
@@ -470,8 +475,10 @@ export default class DarkskyMenu extends React.Component {
   changeLine(i, d) { this.setState(s => { const cart = s.cart.slice(); const q = cart[i].qty + d; if (q <= 0) cart.splice(i, 1); else cart[i] = { ...cart[i], qty: q }; return { cart, sendKey: keepKey(s) }; }); }
   // «Yes, a new order»: a fresh cart with that dish, marked for the staff as the same guests ordering more;
   // the sent order stays reachable from the cart (orderId / orderView are kept)
-  startExtra({ id, vi, qty, oi }) {
-    this.setState(s => ({ ask: null, cart: [], sent: false, cash: false, note: '', sendErr: '', sendKey: null, sendLines: null, extraOf: s.orderId }), () => this.addToCart(id, vi, qty, oi));
+  // without a dish: «Новый заказ» on the order screen, an empty cart to fill
+  startExtra(add) {
+    this.setState(s => ({ ask: null, reviewOpen: false, cart: [], sent: false, cash: false, note: '', sendErr: '', sendKey: null, sendLines: null, extraOf: s.orderId }),
+      () => add && this.addToCart(add.id, add.vi, add.qty, add.oi));
   }
   openItem(id) { this.setState({ sheetId: id, vi: 0, oi: null, qty: 1, cartOpen: false, langOpen: false, slide: 0 }); }
   // dishes of the open one's category, in menu order: the sheet steps through them (wrapping round)
@@ -1009,7 +1016,7 @@ export default class DarkskyMenu extends React.Component {
             </div>
             <span style={css('font:400 18px/1.3 Michroma,sans-serif;letter-spacing:.04em;text-transform:uppercase')}>{t('sent')}</span>
             <span style={css('font:400 15px/1.4 Manrope,sans-serif;color:rgba(242,242,244,.72)')}>{s.orderStatus === 'served' ? this.tO('served') : s.orderStatus === 'accepted' ? this.tO('accepted') : t('sentSub')} · {this.props.table && tableName(this.props.table, t('table'))}</span>
-            <button onClick={() => this.newOrder()} style={css('margin-top:10px;height:52px;padding:0 24px;border-radius:16px;border:1px solid rgba(255,255,255,.18);font:600 14px/1 Manrope,sans-serif')}>{t('newOrder')}</button>
+            <button onClick={() => this.setState({ cartOpen: false, ask: { kind: 'more', add: null } })} style={css('margin-top:10px;height:52px;padding:0 24px;border-radius:16px;border:1px solid rgba(255,255,255,.18);font:600 14px/1 Manrope,sans-serif')}>{t('newOrder')}</button>
           </div>
         )}
 
@@ -1257,7 +1264,8 @@ export default class DarkskyMenu extends React.Component {
       cash: s.cash, onCash: () => this.setState(st => ({ cash: !st.cash })), note: s.note || '', onNote: note => this.setState({ note }),
       sending: s.sending, err: s.sendErr ? this.tO(s.sendErr === 'lost' ? 'lostText' : s.sendErr) : '', onSend: () => this.sendOrder(),
       onBack: () => this.setState({ reviewOpen: false, cartOpen: true }), onClose: () => this.setState({ reviewOpen: false }),
-      onNew: past ? () => this.setState({ reviewOpen: false, cartOpen: true }) : () => this.newOrder(),
+      // a sent order is never dropped by one tap: the guest sees it and says whether to start another
+      onNew: past ? () => this.setState({ reviewOpen: false, cartOpen: true }) : () => this.setState({ ask: { kind: 'more', add: null } }),
     };
   }
 
