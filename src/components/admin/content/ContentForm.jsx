@@ -10,7 +10,7 @@ import BadgesEditor from './BadgesEditor';
 import { LangProvider, LangBar } from '../L3';
 
 const STAGES = [['black', 'Тёмный дым'], ['smoke', 'Дым'], ['glass', 'Стекло, как плитки главной']];
-const TABS = [['sections', 'Разделы и категории'], ['promos', 'Акции'], ['rules', 'Правила'], ['tastes', 'Вкусы'], ['badges', 'Шильдики']];
+const TABS = [['sections', 'Разделы и категории'], ['promos', 'Акции'], ['rules', 'Правила'], ['tastes', 'Вкусы'], ['badges', 'Шильдики'], ['look', 'Вид']];
 
 // Menu texts outside the dishes (sections, promotions, rules, taste tags), typed in every language; one save for everything.
 export default function ContentForm({ initial }) {
@@ -34,32 +34,34 @@ export default function ContentForm({ initial }) {
   return (
     <LangProvider data={c} onFill={set}>
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <h1 className="font-display text-lg uppercase tracking-[.08em]">Контент</h1>
-        <nav className="flex gap-1 rounded-xl border border-white/10 p-1 text-sm">
-          {TABS.map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`rounded-lg px-3 py-1.5 ${tab === k ? 'bg-white/15 text-white' : 'text-white/60'}`}>{l}</button>)}
+        <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 text-sm [scrollbar-width:none] sm:mx-0 sm:rounded-xl sm:border sm:border-white/10 sm:p-1">
+          {TABS.map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`h-10 shrink-0 whitespace-nowrap rounded-lg px-3 ${tab === k ? 'bg-white/15 text-white' : 'border border-white/10 text-white/60 sm:border-0'}`}>{l}</button>)}
         </nav>
       </div>
-      <p className="-mt-2 text-xs text-white/45">Напишите текст на одном языке и нажмите «Перевести пустые поля», перевод можно поправить перед сохранением. Если язык пустой, гость увидит английский или испанский вариант.</p>
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
-        <span>Фон за блюдами на карточках:</span>
-        <div className="flex gap-1 rounded-lg border border-white/10 p-1">
-          {STAGES.map(([k, l]) => <button key={k} onClick={() => set({ cardStage: k })} className={`rounded-md px-3 py-1.5 ${(c.cardStage || 'black') === k ? 'bg-[#f2f2f4] text-[#050507]' : 'text-white/70'}`}>{l}</button>)}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
-        <span>Дым при переходе между разделами:</span>
-        <div className="flex gap-1 rounded-lg border border-white/10 p-1">
-          {[[true, 'Вкл'], [false, 'Выкл']].map(([k, l]) => <button key={l} onClick={() => set({ navSmoke: k })} className={`rounded-md px-3 py-1.5 ${(c.navSmoke !== false) === k ? 'bg-[#f2f2f4] text-[#050507]' : 'text-white/70'}`}>{l}</button>)}
-        </div>
-      </div>
-      <LangBar />
+      <p className="-mt-2 hidden text-xs text-white/45 sm:block">Напишите текст на одном языке и нажмите «Перевести пустые поля», перевод можно поправить перед сохранением. Если язык пустой, гость увидит английский или испанский вариант.</p>
+      {tab !== 'look' && <LangBar />}
 
       {tab === 'sections' && <SectionsEditor c={c} set={set} />}
       {tab === 'promos' && <PromosEditor c={c} set={set} />}
       {tab === 'rules' && <RulesEditor c={c} set={set} />}
       {tab === 'tastes' && <TastesEditor c={c} set={set} />}
       {tab === 'badges' && <BadgesEditor c={c} set={set} />}
+      {tab === 'look' && <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
+        <span>Фон за блюдами на карточках:</span>
+        <div className="flex flex-wrap gap-1 self-start rounded-lg border border-white/10 p-1">
+          {STAGES.map(([k, l]) => <button key={k} onClick={() => set({ cardStage: k })} className={`rounded-md px-3 py-1.5 ${(c.cardStage || 'black') === k ? 'bg-[#f2f2f4] text-[#050507]' : 'text-white/70'}`}>{l}</button>)}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0e0e13] px-4 py-3 text-sm">
+        <span>Дым при переходе между разделами:</span>
+        <div className="flex flex-wrap gap-1 self-start rounded-lg border border-white/10 p-1">
+          {[[true, 'Вкл'], [false, 'Выкл']].map(([k, l]) => <button key={l} onClick={() => set({ navSmoke: k })} className={`rounded-md px-3 py-1.5 ${(c.navSmoke !== false) === k ? 'bg-[#f2f2f4] text-[#050507]' : 'text-white/70'}`}>{l}</button>)}
+        </div>
+      </div>
+      </div>}
 
       <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#0a0a0d]/95 px-4 py-3 backdrop-blur">
         <button disabled={busy || !dirty} onClick={save} className="h-12 rounded-xl bg-[#f2f2f4] px-6 font-semibold text-[#050507] disabled:opacity-50">{busy ? 'Сохраняем…' : 'Сохранить'}</button>

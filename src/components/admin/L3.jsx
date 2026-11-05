@@ -101,11 +101,11 @@ export function LangBar() {
 
 // MARK: - Field
 // One text in the language chosen on the bar; below it the Spanish (or another filled) version to translate from.
-export function L3({ value, onChange, area, placeholder }) {
+export function L3({ value, onChange, area, placeholder, autoFocus }) {
   const { lang } = useContext(Ctx);
   const ref = refOf(value, lang), missing = !value[lang]?.trim() && !!ref;
   const props = {
-    value: value[lang] || '', dir: lang === 'ar' ? 'rtl' : 'ltr', placeholder: ref ? '' : placeholder,
+    value: value[lang] || '', autoFocus, dir: lang === 'ar' ? 'rtl' : 'ltr', placeholder: ref ? '' : placeholder,
     onChange: e => onChange({ ...value, [lang]: e.target.value }),
   };
   const cls = `${input} pr-10 ${missing ? 'border-[#e8793c]/60' : ''}`;
