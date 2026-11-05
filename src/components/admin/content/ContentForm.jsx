@@ -10,7 +10,7 @@ import BadgesEditor from './BadgesEditor';
 import { LangProvider, LangBar } from '../L3';
 
 const STAGES = [['black', 'Тёмный дым'], ['smoke', 'Дым'], ['glass', 'Стекло, как плитки главной']];
-const TABS = [['sections', 'Разделы и категории'], ['promos', 'Акции'], ['rules', 'Правила'], ['tastes', 'Вкусы'], ['badges', 'Шильдики'], ['look', 'Вид']];
+const TABS = [['sections', 'Плитки главной'], ['promos', 'Акции'], ['rules', 'Правила'], ['tastes', 'Вкусы'], ['badges', 'Шильдики'], ['look', 'Вид']];
 
 // Menu texts outside the dishes (sections, promotions, rules, taste tags), typed in every language; one save for everything.
 export default function ContentForm({ initial }) {
@@ -43,7 +43,7 @@ export default function ContentForm({ initial }) {
       <p className="-mt-2 hidden text-xs text-white/45 sm:block">Напишите текст на одном языке и нажмите «Перевести пустые поля», перевод можно поправить перед сохранением. Если язык пустой, гость увидит английский или испанский вариант.</p>
       {tab !== 'look' && <LangBar />}
 
-      {tab === 'sections' && <SectionsEditor c={c} set={set} saved={initial.cats} />}
+      {tab === 'sections' && <SectionsEditor c={c} set={set} />}
       {tab === 'promos' && <PromosEditor c={c} set={set} />}
       {tab === 'rules' && <RulesEditor c={c} set={set} />}
       {tab === 'tastes' && <TastesEditor c={c} set={set} />}

@@ -3,6 +3,9 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ru, fmt, thumb } from './api';
+import CatHeader from './menu/CatHeader';
+import NameDialog from './menu/NameDialog';
+import useTree, { nameOf } from './menu/useTree';
 
 function priceLabel(it) {
   if (!it.v) return fmt(it.p);
@@ -21,10 +24,25 @@ function Switch({ on, onChange, label }) {
   );
 }
 
-export default function MenuAdmin({ items: initial, cats, badges = [] }) {
+export default function MenuAdmin({ items: initial, tree, badges = [] }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [q, setQ] = useState(''), [onlyStop, setOnlyStop] = useState(false), [err, setErr] = useState('');
+  const T = useTree(tree, () => router.refresh(), setErr), [dialog, setDialog] = useState(null);
+  const ask = (title, value, save) => setDialog({ title, value, onSave: save });
+  const countOf = cid => items.filter(x => x.cat === cid).length;
+  // ⇄ on a dish: any other subcategory, grouped by category (hookah's own list stays apart)
+  const moveTo = (it, cid) => cid === 'hookah' ? null : (
+    <select value="" onChange={e => e.target.value && patch(it.id, { cat: e.target.value })} aria-label="Перенести блюдо" title="Перенести в другую подкатегорию"
+      className="h-9 w-11 flex-none cursor-pointer appearance-none rounded-lg border border-white/15 bg-transparent text-center text-sm text-white/70 [text-align-last:center]">
+      <option value="">⇄</option>
+      {T.dishSections.filter(S => S.id !== 'hookah').map(S => (
+        <optgroup key={S.id} label={nameOf(S.n)}>
+          {S.cats.filter(x => x !== cid).map(x => <option key={x} value={x}>{nameOf(T.tree.cats[x].n)}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
 
   const norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const visible = useMemo(() => items.filter(it => (!onlyStop || it.hidden) && (!q || norm(it.name + ' ' + ru(it.d)).includes(norm(q)))), [items, q, onlyStop]);
@@ -120,24 +138,28 @@ export default function MenuAdmin({ items: initial, cats, badges = [] }) {
       {err && <div className="rounded-xl border border-[#e8793c]/50 bg-[#e8793c]/10 px-4 py-3 text-sm text-[#f6c3a3]">{err}</div>}
       <p className="-mt-3 text-xs text-white/45">{filtered ? 'Чтобы менять порядок, очистите поиск и снимите «Стоп-лист».' : 'Порядок блюд — перетащите за ⋮⋮ слева.'}</p>
 
-      {cats.map(c => {
-        const list = visible.filter(x => x.cat === c.id);
-        if (!list.length) return filtered ? null : (
-          <section key={c.id} className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-white/15 px-4 py-3">
-            <span className="text-sm font-semibold uppercase tracking-[.12em] text-white/60">{c.name}</span>
-            <Link href={`/admin/items/new?cat=${c.id}`} className="rounded-lg border border-white/15 px-3 py-2 text-sm text-white/75 hover:bg-white/5">+ Добавить позицию</Link>
-          </section>
-        );
+      {T.dishSections.map((S, si) => {
+        const fixed = S.id === 'hookah', inSec = S.cats.reduce((n, id) => n + countOf(id), 0);
+        const subs = S.cats.filter(id => !filtered || visible.some(x => x.cat === id));
+        if (filtered && !subs.length) return null;
         return (
-          <section key={c.id} className="rounded-2xl border border-white/10 bg-[#0e0e13]">
-            <h2 className="flex items-baseline justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold uppercase tracking-[.12em]">
-              {c.name}<span className="text-xs font-medium text-white/40">{list.length}</span>
-            </h2>
-            <ul ref={el => { lists.current[c.id] = el; }} className="relative">
-              {list.map(it => (
+          <div key={S.id} className={`flex flex-col gap-3 ${S.hidden ? 'opacity-70' : ''}`}>
+            <CatHeader name={nameOf(S.n)} count={inSec} hidden={S.hidden} fixed={fixed} first={!si} last={si >= T.lastDish}
+              onRename={() => ask('Название категории', S.n, n => T.renameSection(S.id, n))} onUp={() => T.stepSection(S.id, -1)} onDown={() => T.stepSection(S.id, 1)}
+              onHide={() => T.hideSection(S.id)} onRemove={() => confirm(`Удалить категорию «${nameOf(S.n)}»?`) && T.removeSection(S.id)} />
+            {subs.map((cid, j) => {
+              const cat = T.tree.cats[cid], list = visible.filter(x => x.cat === cid);
+              return (
+                <section key={cid} className={`rounded-2xl border border-white/10 bg-[#0e0e13] ${cat.hidden ? 'opacity-60' : ''}`}>
+                  {!fixed && <CatHeader sub name={nameOf(cat.n)} count={countOf(cid)} hidden={cat.hidden} fixed={fixed} first={!j} last={j === S.cats.length - 1}
+                    targets={T.dishSections.filter(x => x.id !== S.id && x.id !== 'hookah').map(x => ({ id: x.id, name: nameOf(x.n) }))} addHref={`/admin/items/new?cat=${cid}`}
+                    onRename={() => ask('Название подкатегории', cat.n, n => T.renameCat(cid, n))} onUp={() => T.stepCat(S.id, cid, -1)} onDown={() => T.stepCat(S.id, cid, 1)}
+                    onHide={() => T.hideCat(cid)} onMove={to => T.moveCat(cid, S.id, to)} onRemove={() => confirm(`Удалить подкатегорию «${nameOf(cat.n)}»?`) && T.removeCat(S.id, cid)} />}
+                  {list.length > 0 && <ul ref={el => { lists.current[cid] = el; }} className="relative">
+                    {list.map(it => (
                 <li key={it.id} data-id={it.id} className={`flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-0 ${it.hidden ? 'opacity-55' : ''} ${drag?.id === it.id ? 'relative z-10 rounded-xl bg-[#1d1d26] shadow-[0_8px_24px_rgba(0,0,0,.5)] outline outline-1 outline-[#e8793c]/60' : ''}`}>
                   <button type="button" aria-label="Перетащить" title={filtered ? '' : 'Перетащить'} disabled={filtered}
-                    onPointerDown={e => startDrag(e, c.id, it.id)} onPointerMove={dragMove} onPointerUp={endDrag} onPointerCancel={endDrag}
+                    onPointerDown={e => startDrag(e, cid, it.id)} onPointerMove={dragMove} onPointerUp={endDrag} onPointerCancel={endDrag}
                     className={`-ml-2 flex h-10 w-6 flex-none touch-none select-none items-center justify-center rounded text-lg leading-none text-white/35 hover:text-white/80 disabled:opacity-0 ${drag?.id === it.id ? 'cursor-grabbing text-[#f2a676]' : 'cursor-grab'}`}>⋮⋮</button>
                   <div className="h-12 w-12 flex-none overflow-hidden rounded-lg bg-[radial-gradient(circle_at_50%_35%,rgba(232,121,60,.18),#0c0c10_70%)]">
                     {(it.img || it.media) && <img alt="" src={thumb(it.img, it.media, true)} loading="lazy" decoding="async" className="h-full w-full object-cover" />}
@@ -154,13 +176,20 @@ export default function MenuAdmin({ items: initial, cats, badges = [] }) {
                     <span className="hidden sm:inline">{it.hidden ? 'Нет в наличии' : 'В наличии'}</span>
                     <Switch on={!it.hidden} onChange={on => patch(it.id, { hidden: !on })} label="В наличии" />
                   </label>
+                  {moveTo(it, cid)}
                   <Link href={`/admin/items/${it.id}`} className="hidden flex-none rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/75 hover:text-white sm:block">Изменить</Link>
                 </li>
-              ))}
-            </ul>
-          </section>
+                    ))}
+                  </ul>}
+                </section>
+              );
+            })}
+            {!fixed && !filtered && <button onClick={() => ask('Новая подкатегория', null, n => T.addCat(S.id, n))} className="h-11 rounded-xl border border-dashed border-white/20 text-sm text-white/65 hover:bg-white/5">+ Подкатегория в «{nameOf(S.n)}»</button>}
+          </div>
         );
       })}
+      {!filtered && <button onClick={() => ask('Новая категория', null, n => T.addSection(n))} className="h-12 rounded-2xl border border-dashed border-white/25 text-sm text-white/75 hover:bg-white/5">+ Категория</button>}
+      {dialog && <NameDialog {...dialog} onClose={() => setDialog(null)} />}
       {!visible.length && <div className="py-16 text-center text-white/50">Ничего не найдено</div>}
     </div>
   );

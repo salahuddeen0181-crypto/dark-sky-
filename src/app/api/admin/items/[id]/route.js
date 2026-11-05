@@ -23,13 +23,19 @@ export async function PUT(req, { params }) {
   return NextResponse.json({ ok: true });
 }
 
-// Quick toggles from the list: stop-list (hidden), hit, new.
+// Quick changes from the list: stop-list (hidden), hit, new, category.
 export async function PATCH(req, { params }) {
   const deny = await denyUnlessAdmin(); if (deny) return deny;
   const { id } = await params;
   const b = await req.json().catch(() => ({}));
   const sql = db();
   if ('hidden' in b) await sql`update menu_items set hidden = ${!!b.hidden}, updated_at = now() where id = ${id}`;
+  // moved to another category from the list: it goes to the end there
+  if ('cat' in b) {
+    if (!(await editableCats()).some(c => c.id === b.cat)) return NextResponse.json({ error: 'Нет такой категории' }, { status: 400 });
+    await sql`update menu_items set cat = ${b.cat}, updated_at = now(),
+      sort = (select coalesce(max(sort), 0) + 10 from menu_items where cat = ${b.cat}) where id = ${id} and cat <> ${b.cat}`;
+  }
   for (const flag of ['hit', 'new']) {
     if (flag in b) {
       await (b[flag]

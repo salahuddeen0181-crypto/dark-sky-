@@ -152,9 +152,14 @@ function cleanBadges(list) {
 
 export async function saveContent(input) {
   // keep only known fields; texts in the languages the admin filled
-  const current = treeOf(await getOverrides());
-  const tree = cleanTree(Array.isArray(input.sections) ? input.sections : [], input.cats, current);
-  await keepDishes(tree, current);
+  // the menu's structure (which sections and categories, their order, names and hiding) is edited on the «Меню» page
+  // (saveTree); from here only the home tiles' look: a section's subtitle, picture or video
+  const current = treeOf(await getOverrides()), given = Array.isArray(input.sections) ? input.sections : [];
+  const list = current.map(s => {
+    const i = given.find(x => x?.id === s.id);
+    return { id: s.id, n: s.n, tag: i ? i.tag : s.tag, hidden: s.hidden, img: i ? i.img : s.img, video: i ? i.video : s.video, cats: s.cats.map(c => c.id) };
+  });
+  const tree = cleanTree(list, Object.fromEntries(current.flatMap(s => s.cats).map(c => [c.id, c])), current);
   const c = {
     tree,
     tastes: Array.isArray(input.tastes) ? cleanTastes(input.tastes) : undefined,
@@ -176,7 +181,31 @@ export async function saveContent(input) {
   menuChanged();
 }
 
+// The menu's structure from the «Меню» page: { sections: [{ id, n, hidden, cats: [ids] }], cats: { id: { n, hidden } } }.
+// Only the tree changes; a section keeps its subtitle and picture, the rest of the content stays as it is.
+export async function saveTree(input) {
+  const o = await getOverrides(), current = treeOf(o);
+  const list = (Array.isArray(input?.sections) ? input.sections : []).map(s => {
+    const c = current.find(x => x.id === s?.id);
+    return { ...s, tag: c?.tag ?? null, img: c?.img ?? null, video: c?.video ?? null };
+  });
+  const tree = cleanTree(list, input?.cats || {}, current);
+  await keepDishes(tree, current);
+  await db()`insert into settings (key, value) values (${KEY}, ${db().json({ ...o, tree })})
+    on conflict (key) do update set value = excluded.value, updated_at = now()`;
+  menuChanged();
+}
+
 // MARK: - Editor
+// The structure for the «Меню» page, names in every language; hidden sections and categories too
+export async function getTreeForm() {
+  const tree = treeOf(await getOverrides());
+  return {
+    sections: tree.map(s => ({ id: s.id, n: asForm(s.n), hidden: !!s.hidden, cats: s.cats.map(c => c.id) })),
+    cats: Object.fromEntries(tree.flatMap(s => s.cats).map(c => [c.id, { n: asForm(c.n), hidden: !!c.hidden }])),
+  };
+}
+
 // Everything the content editor shows, texts in every language; hidden sections and categories too.
 export async function getContentForm() {
   const o = await getOverrides(), cur = await getContent(), f = asForm, tree = treeOf(o);
