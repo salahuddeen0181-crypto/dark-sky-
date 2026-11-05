@@ -43,7 +43,7 @@ export default function ContentForm({ initial }) {
       <p className="-mt-2 hidden text-xs text-white/45 sm:block">Напишите текст на одном языке и нажмите «Перевести пустые поля», перевод можно поправить перед сохранением. Если язык пустой, гость увидит английский или испанский вариант.</p>
       {tab !== 'look' && <LangBar />}
 
-      {tab === 'sections' && <SectionsEditor c={c} set={set} />}
+      {tab === 'sections' && <SectionsEditor c={c} set={set} saved={initial.cats} />}
       {tab === 'promos' && <PromosEditor c={c} set={set} />}
       {tab === 'rules' && <RulesEditor c={c} set={set} />}
       {tab === 'tastes' && <TastesEditor c={c} set={set} />}

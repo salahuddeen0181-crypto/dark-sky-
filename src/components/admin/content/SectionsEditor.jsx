@@ -11,7 +11,7 @@ const plural = (n, one, few, many) => { const t = n % 10, h = n % 100; return t 
 
 // The menu's structure: sections (home tiles) and the categories inside them, as a list of rows; one section opens
 // at a time, its categories first. Hookah, promotions and rules always stay.
-export default function SectionsEditor({ c, set }) {
+export default function SectionsEditor({ c, set, saved = {} }) {
   const [open, setOpen] = useState(null), [openCat, setOpenCat] = useState(null);
   const dishes = id => c.dishes?.[id] || 0;
   const setSection = (i, patch) => set({ sections: c.sections.map((s, k) => (k === i ? { ...s, ...patch } : s)) });
@@ -49,7 +49,7 @@ export default function SectionsEditor({ c, set }) {
           <div className="flex flex-col gap-2">
             <span className={label}>Категории <span className="normal-case tracking-normal text-white/35">— вкладки внутри раздела</span></span>
             {s.cats.map((id, j) => (
-              <CatRow key={id} cat={c.cats[id]} dishes={dishes(id)} open={openCat === id} onToggle={() => setOpenCat(o => (o === id ? null : id))}
+              <CatRow key={id} id={id} saved={!!saved[id]} cat={c.cats[id]} dishes={dishes(id)} open={openCat === id} onToggle={() => setOpenCat(o => (o === id ? null : id))}
                 onChange={patch => setCat(id, patch)} first={!j} last={j === s.cats.length - 1}
                 onUp={() => setSection(i, { cats: moved(s.cats, j, j - 1) })} onDown={() => setSection(i, { cats: moved(s.cats, j, j + 1) })}
                 targets={targets} onMove={to => moveCat(i, id, to)} onRemove={() => setSection(i, { cats: s.cats.filter(x => x !== id) })} />
@@ -82,7 +82,7 @@ export default function SectionsEditor({ c, set }) {
             <div className="flex items-center gap-2 p-2">
               <button onClick={() => toggle(s.id)} className="flex min-h-12 min-w-0 flex-1 flex-col justify-center px-2 text-left">
                 <span className={`truncate font-semibold ${s.hidden ? 'text-white/40' : ''}`}>{mlName(s.n, 'Новый раздел')}{s.hidden && <span className="ml-2 rounded-md bg-white/10 px-1.5 py-0.5 align-middle text-[10px] font-normal uppercase text-white/55">Скрыт</span>}</span>
-                <span className="text-xs text-white/45">{info}</span>
+                <span className={`text-xs ${!FIXED.includes(s.id) && !held ? 'text-[#f2a676]' : 'text-white/45'}`}>{info}{!FIXED.includes(s.id) && !held ? ' · гости не видят, пока нет позиций' : ''}</span>
               </button>
               {!pinned && <>
                 <button onClick={() => set({ sections: moved(c.sections, i, i - 1) })} disabled={!i} className={stepBtn} aria-label="Раздел выше">↑</button>
