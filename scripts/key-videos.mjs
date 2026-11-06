@@ -68,6 +68,7 @@ const CLIPS = {
   'Sushi_roll_assembling_on_plate': 'roll-newyork',
   'Unagi_sushi_roll': 'roll-unagi',
   'US_dollar_bills_fluttering': 'cash',
+  'Gin_tonic': 'gin-tonic', // 'Gin_and_tonic_rotating_glass_b0f77df3', renamed
   'Margarita': 'margarita', // 'Margarita_glass_rotating_on_turn…_23a9c9e5', renamed
   'Daiquiri': 'daiquiri', // 'Martini_glass_rotating_on_green_…_248c4900', renamed
   'Garibaldi': 'garibaldi', // 'Garibaldi_drink_glass_rotating_…', renamed

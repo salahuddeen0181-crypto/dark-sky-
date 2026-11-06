@@ -321,6 +321,7 @@ export const MEDIA = {
   'phila-ebi': '/media/roll-phila.webm#t=1.08', // this clip is the Ebi Ponzu roll (the kitchen tile shows it too)
   'dark-roll': '/media/roll-dark.webm#t=0.04', // starts on the plate, then the roll comes apart
   cl7: '/media/margarita.webm#t=0.04',
+  cl22: '/media/gin-tonic.webm#t=0.04',
   cl17: '/media/daiquiri.webm#t=0.04',
   cl12: '/media/garibaldi.webm#t=0.04',
   cl0: '/media/negroni.webm#t=0.04',
