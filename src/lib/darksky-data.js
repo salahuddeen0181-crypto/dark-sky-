@@ -322,6 +322,7 @@ export const MEDIA = {
   'dark-roll': '/media/roll-dark.webm#t=0.04', // starts on the plate, then the roll comes apart
   cl7: '/media/margarita.webm#t=0.04',
   cl22: '/media/gin-tonic.webm#t=0.04',
+  cl5: '/media/boulevardier.webm#t=0.04',
   cl17: '/media/daiquiri.webm#t=0.04',
   cl12: '/media/garibaldi.webm#t=0.04',
   cl0: '/media/negroni.webm#t=0.04',
