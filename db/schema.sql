@@ -138,3 +138,6 @@ create table if not exists clips (
   error      text,
   created_at timestamptz not null default now()
 );
+-- the cut's settings (stronger / gentler, glass tint, shadow) and the upload a re-cut was made from
+alter table clips add column if not exists opts jsonb;
+alter table clips add column if not exists parent uuid;

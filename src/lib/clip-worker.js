@@ -64,11 +64,22 @@ async function stills(dir, stem, frame, cover, W, H) {
   await write(cover, `${trim}scale=-2:'min(320,ih)':flags=lanczos`, stem + '-cover.webp');
 }
 
-async function keyClip(id, info) {
+// The admin's choice after seeing a cut: strength -2…2 (more → cuts more of what is near the backdrop colour),
+// glass: take the backdrop's tint out of what is seen through a glass, noShadow: drop the soft shadow under the dish
+export function cleanOpts(o) {
+  const strength = Math.max(-2, Math.min(2, Math.round(+o?.strength || 0)));
+  return { strength, glass: !!o?.glass, noShadow: !!o?.noShadow };
+}
+function keyOpts(o, hk) {
+  const { strength: s, glass, noShadow } = cleanOpts(o);
+  return { sat: 1 - .15 * s, hue: 1 + .15 * s, shadow: noShadow ? .3 : 1.25, feather: FEATHER, grey: glass ? [hk - 97, hk + 33] : null, tol: 1 + .2 * s };
+}
+
+async function keyClip(id, info, opts, src) {
   const total = Math.max(1, Math.min(info.seconds, MAX_SECONDS) * FPS);
   const dir = clipDir(id), stem = info.width > info.height ? 'wide' : 'clip', [W, H] = SIZE[stem], frame = W * H * 3;
   const crop = stem === 'wide' ? "crop='min(iw,ih*16/9)':'min(ih,iw*9/16)'" : "crop='min(iw,ih*9/16)':'min(ih,iw*16/9)'";
-  const dec = ff(['-threads', '2', '-i', sourceFile(id), '-vf', `${crop},scale=${W}:${H}:flags=lanczos,fps=${FPS},format=rgb24`, '-f', 'rawvideo', '-'], ['ignore', 'pipe', 'inherit']);
+  const dec = ff(['-threads', '2', '-i', src, '-vf', `${crop},scale=${W}:${H}:flags=lanczos,fps=${FPS},format=rgb24`, '-f', 'rawvideo', '-'], ['ignore', 'pipe', 'inherit']);
   const enc = ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${W}x${H * 2}`, '-r', String(FPS), '-i', '-', '-threads', '2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
     '-pix_fmt', 'yuv420p', '-g', String(FPS), '-movflags', '+faststart', '-an', path.join(dir, stem + '.mp4')], ['pipe', 'ignore', 'inherit']);
   const decoded = done(dec), encoded = done(enc);
@@ -77,7 +88,7 @@ async function keyClip(id, info) {
   const stop = () => { dec.kill('SIGKILL'); enc.kill('SIGKILL'); dec.stdout.destroy(); };
   const guard = setTimeout(stop, MAX_MINUTES * 60e3); // a clip that hangs must not hold up the queue
   const out = Buffer.alloc(W * H * 4), alpha = new Float32Array(W * H), tmp = new Float32Array(W * H), both = Buffer.alloc(W * H * 2 * 3);
-  let buf = Buffer.alloc(0), back, frames = 0, best = 0, bestCover = -1, still = null, first = null, firstCover = 0;
+  let buf = Buffer.alloc(0), back, ko, frames = 0, best = 0, bestCover = -1, still = null, first = null, firstCover = 0;
   for await (const chunk of dec.stdout) {
     buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
     while (buf.length >= frame) {
@@ -86,7 +97,8 @@ async function keyClip(id, info) {
         back = sampleBackdrop(px, W, H);
         if (!back) { clearTimeout(guard); stop(); await decoded.catch(() => {}); await encoded.catch(() => {}); throw new Unusable('Не удалось определить фон: края кадра должны быть одного цвета. Нужно видео на зелёном или однотонном фоне.'); }
       }
-      if (back.hue) keyFrame(px, out, alpha, tmp, back.hue, { feather: FEATHER, shadow: 1.25 }, W, H); else keyFlat(px, out, alpha, tmp, back.flat, FEATHER, W, H);
+      if (!ko) ko = keyOpts(opts, back.hue?.hk ?? 0);
+      if (back.hue) keyFrame(px, out, alpha, tmp, back.hue, ko, W, H); else keyFlat(px, out, alpha, tmp, back.flat, FEATHER, W, H, ko.tol);
       for (let p = 0; p < W * H; p++) {
         const o = p * 4, i = p * 3, m = (W * H + p) * 3, a = out[o + 3];
         both[i] = out[o]; both[i + 1] = out[o + 1]; both[i + 2] = out[o + 2];
@@ -112,26 +124,36 @@ async function keyClip(id, info) {
 }
 
 // MARK: - The queue
+// A source stays a few days so the admin can have it cut again (stronger, gentler…) without uploading it again
+const KEEP_DAYS = 3;
+async function pruneSources() {
+  const old = await db()`select id from clips where created_at < now() - make_interval(days => ${KEEP_DAYS})`;
+  for (const { id } of old) fs.rmSync(sourceFile(id), { force: true });
+}
+export const hasSource = id => fs.existsSync(sourceFile(id));
+
 let running = false;
 export async function runClips() {
   if (running) return;
   running = true;
   try {
     for (;;) {
-      const [c] = await db()`update clips set status = 'working' where id = (select id from clips where status in ('queued', 'working') order by created_at limit 1) returning id`;
+      const [c] = await db()`update clips set status = 'working' where id = (select id from clips where status in ('queued', 'working') order by created_at limit 1) returning id, opts, parent`;
       if (!c) break;
       try {
-        const info = await probe(sourceFile(c.id));
+        const src = sourceFile(c.parent || c.id); // a re-cut reads the first upload's video
+        fs.mkdirSync(clipDir(c.id), { recursive: true });
+        const info = await probe(src);
         if (!info) throw new Unusable('Файл не читается как видео');
         progress.set(c.id, 0);
-        const media = await keyClip(c.id, info);
+        const media = await keyClip(c.id, info, c.opts, src);
         await db()`update clips set status = 'ready', media = ${media}, error = null where id = ${c.id}`;
       } catch (e) {
         if (!(e instanceof Unusable)) console.error('clip', c.id, e);
         await db()`update clips set status = 'failed', error = ${e instanceof Unusable ? e.message : 'Не получилось обработать видео'} where id = ${c.id}`;
       }
       progress.delete(c.id);
-      fs.rmSync(sourceFile(c.id), { force: true }); // only the finished clip stays on the disk
     }
+    await pruneSources();
   } catch (e) { console.error('clips', e); } finally { running = false; }
 }

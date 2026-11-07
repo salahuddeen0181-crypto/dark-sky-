@@ -4,7 +4,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { denyUnlessAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { clipDir, sourceFile, probe, runClips, MAX_SECONDS } from '@/lib/clip-worker';
+import { clipDir, sourceFile, probe, runClips, MAX_SECONDS, progress, hasSource } from '@/lib/clip-worker';
 
 const MAX = 90 * 1024 * 1024;
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
@@ -33,4 +33,11 @@ export async function POST(req) {
   await db()`update clips set status = 'queued' where id = ${id}`;
   runClips();
   return NextResponse.json({ id });
+}
+
+// The last uploads and re-cuts, newest first: the admin can come back to one after leaving the page
+export async function GET() {
+  const deny = await denyUnlessAdmin(); if (deny) return deny;
+  const rows = await db()`select id, status, media, error, opts, created_at from clips where status <> 'uploading' order by created_at desc limit 5`;
+  return NextResponse.json(rows.map(r => ({ ...r, progress: progress.get(r.id) ?? (r.status === 'ready' ? 1 : 0), recut: hasSource(r.parent || r.id) })), { headers: { 'cache-control': 'no-store' } });
 }

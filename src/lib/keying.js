@@ -26,7 +26,8 @@ export function sampleKey(px, W, H, hc = 130, span = 60) {
   return { hk, sk: mid(.6, 1), vk: mid(.5, 2), lk: mid(.4, 3) };
 }
 
-export function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, shadow = 1, feather = null, lift = 0, grey = null } = {}, W, H) {
+// hue: scales how far from the screen's hue still counts as screen (>1 cuts more, <1 keeps more)
+export function keyFrame(px, out, alpha, tmp, key, { sat = 1, hue = 1, smoke = false, shadow = 1, feather = null, lift = 0, grey = null } = {}, W, H) {
   const { hk, sk, vk, lk } = key, n = W * H;
   for (let p = 0; p < n; p++) {
     const i = p * 3, r = px[i], g = px[i + 1], b = px[i + 2];
@@ -35,7 +36,7 @@ export function keyFrame(px, out, alpha, tmp, key, { sat = 1, smoke = false, sha
     // in the dark (shadows on the screen, a glossy black plate reflecting it) hue is noisy: widen the tolerance
     const dark = smooth(.15, .65, 1 - v / vk), tol = 1 + dark;
     const st = sat + (1 - sat) * dark; // per-clip saturation tweak applies to the lit screen only, not to dark objects
-    let k = (1 - smooth(18 * tol, 34 * tol, dh)) * smooth(.22 * st * sk / tol, .5 * st * sk / tol, s); // screen-like → background
+    let k = (1 - smooth(18 * tol * hue, 34 * tol * hue, dh)) * smooth(.22 * st * sk / tol, .5 * st * sk / tol, s); // screen-like → background
     if (smoke) k = Math.max(k, smooth(.45, .65, v) * (1 - smooth(.12, .3, s)));
     // ...but whatever is darker than the screen stays as a soft black shadow instead of a ragged cut-out
     const sh = shadow === 'black' ? (1 - smooth(.06, .17, v)) * .95 : Math.min(.97, dark * .8 * shadow);
@@ -80,9 +81,10 @@ export function sampleBackdrop(px, W, H) {
 }
 
 // A white, grey or black backdrop has no hue to go by: distance from its colour, softened like keyFrame's matte
-export function keyFlat(px, out, alpha, tmp, c, feather, W, H) {
+// tol scales the colour distance still taken for the backdrop (>1 cuts more)
+export function keyFlat(px, out, alpha, tmp, c, feather, W, H, tol = 1) {
   const n = W * H;
-  for (let p = 0; p < n; p++) { const i = p * 3; tmp[p] = 1 - smooth(24, 64, Math.hypot(px[i] - c[0], px[i + 1] - c[1], px[i + 2] - c[2])); }
+  for (let p = 0; p < n; p++) { const i = p * 3; tmp[p] = 1 - smooth(24 * tol, 64 * tol, Math.hypot(px[i] - c[0], px[i + 1] - c[1], px[i + 2] - c[2])); }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     let s = 0, k = 0;
     for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue; for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= W) continue; s += tmp[yy * W + xx]; k++; } }
