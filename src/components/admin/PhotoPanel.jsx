@@ -4,6 +4,7 @@ import { api, thumb } from './api';
 import { cutout } from './cutout';
 import MediaTips from './MediaTips';
 import VideoUpload from './VideoUpload';
+import ClipPreview, { isClip } from './ClipPreview';
 
 // Resize in the browser so the database only stores ~100 KB per photo.
 export async function shrink(file, max = 1200) {
@@ -51,7 +52,9 @@ export default function PhotoPanel({ img, media, cut, onChange, onBusy }) {
   return (
     <div className="flex flex-col gap-3">
       <div className={`aspect-square overflow-hidden rounded-2xl border border-white/10 ${onStage ? STAGE : 'bg-[#0c0c10]'}`}>
-        {photo
+        {!img && isClip(media)
+          ? <div className="h-full w-full p-3"><ClipPreview key={media} media={media} /></div>
+          : photo
           ? <img alt="" src={photo} className={`h-full w-full ${onStage ? 'object-contain p-3' : 'object-cover'}`} /> /* eslint-disable-line @next/next/no-img-element */
           : <div className="flex h-full items-center justify-center text-sm text-white/35">Нет фото</div>}
       </div>

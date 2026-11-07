@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
 
 const btn = 'h-11 rounded-xl border border-white/15 px-3 text-sm text-white/80 hover:bg-white/5 disabled:opacity-30';
 const step = 'h-11 w-11 flex-none rounded-xl border border-white/15 text-lg disabled:opacity-25';
@@ -8,7 +7,7 @@ const empty = 'гости не видят, пока нет позиций';
 
 // The title of a category (a home tile) or of a subcategory (a tab inside it), with its actions behind «⋯».
 // sub: a subcategory; fixed: hookah, which stays as it is apart from its name
-export default function CatHeader({ sub, name, count, hidden, fixed, first, last, targets = [], addHref, onRename, onUp, onDown, onHide, onRemove, onMove }) {
+export default function CatHeader({ sub, name, count, hidden, fixed, first, last, targets = [], onRename, onUp, onDown, onHide, onRemove, onMove }) {
   const [open, setOpen] = useState(false);
   const act = f => () => { setOpen(false); f(); };
   return (
@@ -41,7 +40,6 @@ export default function CatHeader({ sub, name, count, hidden, fixed, first, last
           {!fixed && count > 0 && <span className="text-xs text-white/40">Удалить можно пустую: сначала перенесите блюда кнопкой ⇄ у каждого.</span>}
         </div>
       )}
-      {sub && !count && addHref && <div className="px-4 pb-3"><Link href={addHref} className="flex h-11 items-center justify-center rounded-xl border border-dashed border-white/25 text-sm text-white/75">+ Добавить позицию</Link></div>}
     </div>
   );
 }

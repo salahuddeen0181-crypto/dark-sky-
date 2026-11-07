@@ -4,6 +4,7 @@ import { api, thumb } from '../api';
 import { shrink } from '../PhotoPanel';
 import MediaTips from '../MediaTips';
 import VideoUpload from '../VideoUpload';
+import ClipPreview, { isClip } from '../ClipPreview';
 
 const textBtn = 'h-11 rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/5 disabled:opacity-40';
 
@@ -28,6 +29,7 @@ export default function TilePicture({ s, onChange }) {
         <span className="text-white/40 transition group-open:rotate-90">›</span>
       </summary>
       <div className="flex flex-col gap-3 border-t border-white/10 p-3">
+        {!s.img && isClip(s.video) && <div className="h-56 overflow-hidden rounded-xl bg-[#020203]"><ClipPreview key={s.video} media={s.video} /></div>}
         <div className="flex flex-wrap items-center gap-2">
           <label className={`${textBtn} flex cursor-pointer items-center`}>
             {busy ? 'Загрузка…' : s.img ? 'Заменить картинку' : 'Загрузить картинку'}

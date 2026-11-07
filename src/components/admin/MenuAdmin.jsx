@@ -133,6 +133,7 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
         <h1 className="mr-auto font-display text-lg tracking-[.08em] uppercase">Меню</h1>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск блюда" className="h-10 w-56 rounded-xl border border-white/15 bg-white/5 px-3 text-sm outline-none focus:border-[#e8793c]" />
         <button onClick={() => setOnlyStop(v => !v)} className={`h-10 rounded-xl border px-3 text-sm ${onlyStop ? 'border-[#e8793c] bg-[#e8793c]/15' : 'border-white/15 text-white/75'}`}>Стоп-лист · {stopCount}</button>
+        <button onClick={() => ask('Новая категория', null, n => T.addSection(n))} className="h-10 rounded-xl border border-white/15 px-3 text-sm text-white/80 hover:bg-white/5">+ Категория</button>
         <Link href="/admin/items/new" className="flex h-10 items-center rounded-xl bg-[#f2f2f4] px-4 text-sm font-semibold text-[#050507]">+ Добавить блюдо</Link>
       </div>
       {err && <div className="rounded-xl border border-[#e8793c]/50 bg-[#e8793c]/10 px-4 py-3 text-sm text-[#f6c3a3]">{err}</div>}
@@ -152,7 +153,7 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
               return (
                 <section key={cid} className={`rounded-2xl border border-white/10 bg-[#0e0e13] ${cat.hidden ? 'opacity-60' : ''}`}>
                   {!fixed && <CatHeader sub name={nameOf(cat.n)} count={countOf(cid)} hidden={cat.hidden} fixed={fixed} first={!j} last={j === S.cats.length - 1}
-                    targets={T.dishSections.filter(x => x.id !== S.id && x.id !== 'hookah').map(x => ({ id: x.id, name: nameOf(x.n) }))} addHref={`/admin/items/new?cat=${cid}`}
+                    targets={T.dishSections.filter(x => x.id !== S.id && x.id !== 'hookah').map(x => ({ id: x.id, name: nameOf(x.n) }))}
                     onRename={() => ask('Название подкатегории', cat.n, n => T.renameCat(cid, n))} onUp={() => T.stepCat(S.id, cid, -1)} onDown={() => T.stepCat(S.id, cid, 1)}
                     onHide={() => T.hideCat(cid)} onMove={to => T.moveCat(cid, S.id, to)} onRemove={() => confirm(`Удалить подкатегорию «${nameOf(cat.n)}»?`) && T.removeCat(S.id, cid)} />}
                   {list.length > 0 && <ul ref={el => { lists.current[cid] = el; }} className="relative">
@@ -181,10 +182,11 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
                 </li>
                     ))}
                   </ul>}
+                  {!fixed && !filtered && <Link href={`/admin/items/new?cat=${cid}`} className="flex h-11 items-center justify-center gap-1 border-t border-white/5 text-sm text-white/70 hover:bg-white/5">+ Позиция в «{nameOf(cat.n)}»</Link>}
                 </section>
               );
             })}
-            {!fixed && !filtered && <button onClick={() => ask('Новая подкатегория', null, n => T.addCat(S.id, n))} className="h-11 rounded-xl border border-dashed border-white/20 text-sm text-white/65 hover:bg-white/5">+ Подкатегория в «{nameOf(S.n)}»</button>}
+            {!fixed && !filtered && <button onClick={() => ask('Новая подкатегория', null, n => T.addCat(S.id, n))} className="h-12 rounded-xl border border-dashed border-[#e8793c]/50 text-sm text-[#f2a676] hover:bg-[#e8793c]/10">+ Подкатегория в «{nameOf(S.n)}»</button>}
           </div>
         );
       })}

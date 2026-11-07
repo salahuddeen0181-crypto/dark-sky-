@@ -11,6 +11,8 @@ import { sampleBackdrop, keyFrame, keyFlat } from './keying';
 // Files: uploads/clips/<id>/{clip|wide}{.mp4,-sm.mp4,.webp,-th.webp,-cover.webp}; wide: filmed landscape, kept whole.
 const FF = process.env.FFMPEG || 'ffmpeg', FPS = 24, SIZE = { clip: [480, 854], wide: [854, 480] }, FEATHER = [.04, .03];
 export const MAX_SECONDS = 20;
+// id → share done (0–1) of the clip being cut, for the admin's progress bar; lives as long as the server process
+export const progress = (globalThis.__darkskyClipProgress ||= new Map());
 const MAX_MINUTES = 15;
 const ROOT = () => path.join(process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads'), 'clips');
 export const clipDir = id => path.join(ROOT(), id);
@@ -63,10 +65,11 @@ async function stills(dir, stem, frame, cover, W, H) {
 }
 
 async function keyClip(id, info) {
+  const total = Math.max(1, Math.min(info.seconds, MAX_SECONDS) * FPS);
   const dir = clipDir(id), stem = info.width > info.height ? 'wide' : 'clip', [W, H] = SIZE[stem], frame = W * H * 3;
   const crop = stem === 'wide' ? "crop='min(iw,ih*16/9)':'min(ih,iw*9/16)'" : "crop='min(iw,ih*9/16)':'min(ih,iw*16/9)'";
-  const dec = ff(['-threads', '1', '-i', sourceFile(id), '-vf', `${crop},scale=${W}:${H}:flags=lanczos,fps=${FPS},format=rgb24`, '-f', 'rawvideo', '-'], ['ignore', 'pipe', 'inherit']);
-  const enc = ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${W}x${H * 2}`, '-r', String(FPS), '-i', '-', '-threads', '1', '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
+  const dec = ff(['-threads', '2', '-i', sourceFile(id), '-vf', `${crop},scale=${W}:${H}:flags=lanczos,fps=${FPS},format=rgb24`, '-f', 'rawvideo', '-'], ['ignore', 'pipe', 'inherit']);
+  const enc = ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${W}x${H * 2}`, '-r', String(FPS), '-i', '-', '-threads', '2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
     '-pix_fmt', 'yuv420p', '-g', String(FPS), '-movflags', '+faststart', '-an', path.join(dir, stem + '.mp4')], ['pipe', 'ignore', 'inherit']);
   const decoded = done(dec), encoded = done(enc);
   enc.stdin.on('error', () => {});
@@ -94,6 +97,7 @@ async function keyClip(id, info) {
       if (!frames) { first = Buffer.from(out); firstCover = cover; }
       if (cover > bestCover * 1.002) { bestCover = cover; best = frames; still = Buffer.from(out); } // earliest frame of (nearly) full coverage
       buf = buf.subarray(frame); frames++;
+      progress.set(id, Math.min(.95, frames / total * .9)); // the small copy and the stills take the last tenth
     }
   }
   enc.stdin.end();
@@ -101,7 +105,7 @@ async function keyClip(id, info) {
   clearTimeout(guard);
   if (!frames) throw new Unusable('В файле не нашлось кадров видео');
   if (bestCover < alpha.length / 7 * .01) throw new Unusable('После вырезки фона в кадре ничего не осталось: объект слишком похож на фон.');
-  await done(ff(['-threads', '1', '-i', path.join(dir, stem + '.mp4'), '-vf', 'scale=trunc(iw/4)*2:trunc(ih/4)*2:flags=lanczos', '-c:v', 'libx264', '-preset', 'medium', '-crf', '25', '-pix_fmt', 'yuv420p', '-g', String(FPS), '-movflags', '+faststart', '-an', path.join(dir, stem + '-sm.mp4')], ['ignore', 'ignore', 'inherit']));
+  await done(ff(['-threads', '2', '-i', path.join(dir, stem + '.mp4'), '-vf', 'scale=trunc(iw/4)*2:trunc(ih/4)*2:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '25', '-pix_fmt', 'yuv420p', '-g', String(FPS), '-movflags', '+faststart', '-an', path.join(dir, stem + '-sm.mp4')], ['ignore', 'ignore', 'inherit']));
   // a clip that opens on the finished dish shows that on its thumbnail; one that assembles it, its fullest frame
   await stills(dir, stem, still, firstCover > bestCover * .4 ? first : still, W, H);
   return `/api/clip/${id}/${stem}.mp4#t=${(best / FPS).toFixed(2)}`;
@@ -119,12 +123,14 @@ export async function runClips() {
       try {
         const info = await probe(sourceFile(c.id));
         if (!info) throw new Unusable('Файл не читается как видео');
+        progress.set(c.id, 0);
         const media = await keyClip(c.id, info);
         await db()`update clips set status = 'ready', media = ${media}, error = null where id = ${c.id}`;
       } catch (e) {
         if (!(e instanceof Unusable)) console.error('clip', c.id, e);
         await db()`update clips set status = 'failed', error = ${e instanceof Unusable ? e.message : 'Не получилось обработать видео'} where id = ${c.id}`;
       }
+      progress.delete(c.id);
       fs.rmSync(sourceFile(c.id), { force: true }); // only the finished clip stays on the disk
     }
   } catch (e) { console.error('clips', e); } finally { running = false; }
