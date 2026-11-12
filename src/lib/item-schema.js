@@ -18,6 +18,12 @@ function l3(o, max) {
   return out;
 }
 const price = v => (v === null || v === '' || v === undefined ? null : Math.max(0, Math.round(Number(v)) || 0));
+// { p: full price, off: % } → { p: what the guest pays, was: full price, off } — orders and staff read p as before
+function priced(full, rawOff) {
+  const p = price(full), off = Math.round(Number(rawOff) || 0);
+  if (p == null || !(off >= 1 && off <= 90)) return { p };
+  return { p: Math.round(p * (1 - off / 100)), was: p, off };
+}
 
 // cats: the dish categories as they stand (editableCats() in content.js)
 export function cleanItem(b, cats, existing) {
@@ -29,8 +35,8 @@ export function cleanItem(b, cats, existing) {
   const nm = l3(b.nm, 80); if (nm && typeof nm === 'object') data.nm = nm; // guest-facing name per language
   const d = l3(b.d, 600); if (d) data.d = d;
   const m = l3(b.m, 40); if (m) data.m = typeof m === 'object' && Object.keys(m).length === 1 ? Object.values(m)[0] : m;
-  const variants = Array.isArray(b.v) ? b.v.map(v => ({ n: l3(v?.n, 60), p: price(v?.p) })).filter(v => v.n) : [];
-  if (variants.length) { data.v = variants.slice(0, 12); data.p = data.v[0].p; } else data.p = price(b.p);
+  const variants = Array.isArray(b.v) ? b.v.map(v => ({ n: l3(v?.n, 60), ...priced(v?.p, v?.off) })).filter(v => v.n) : [];
+  if (variants.length) { data.v = variants.slice(0, 12); data.p = data.v[0].p; } else Object.assign(data, priced(b.p, b.off));
   const tags = Array.isArray(b.t) ? b.t.filter(k => typeof k === 'string' && /^[a-z0-9-]{1,24}$/.test(k)) : []; // keys from Контент → Вкусы
   if (tags.length) data.t = [...new Set(tags)].slice(0, 4);
   if (Array.isArray(b.str) && b.str.length === 2) {

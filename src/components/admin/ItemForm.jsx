@@ -13,8 +13,8 @@ export default function ItemForm({ item, cats, tastes, badges = [], hitName, new
   const [f, setF] = useState(() => ({
     // guest name in every language; the Spanish one is also the name staff see (Telegram, admin)
     nm: { ...asML(item?.nm), es: item?.nm?.es || item?.name || '' }, cat: item?.cat || defaultCat, hidden: !!item?.hidden, hit: !!item?.hit, new: !!item?.new, b: item?.b || [],
-    d: asML(item?.d), m: asML(item?.m), p: item?.p ?? '', onRequest: item ? item.p == null && !item.v : false,
-    v: (item?.v || []).map(v => ({ n: asML(v.n), p: v.p ?? '' })), t: item?.t || [], str: item?.str || null,
+    d: asML(item?.d), m: asML(item?.m), p: item?.was ?? item?.p ?? '', off: item?.off ?? '', onRequest: item ? item.p == null && !item.v : false,
+    v: (item?.v || []).map(v => ({ n: asML(v.n), p: v.was ?? v.p ?? '', off: v.off ?? '' })), t: item?.t || [], str: item?.str || null,
     pair: item?.pair || [], img: item?.img || null, media: item?.media || null, cut: !!item?.cut,
   }));
   const [busy, setBusy] = useState(false), [err, setErr] = useState(''), [upl, setUpl] = useState(false);
@@ -24,7 +24,7 @@ export default function ItemForm({ item, cats, tastes, badges = [], hitName, new
     setBusy(true); setErr('');
     const body = {
       name: f.nm.es.trim() || Object.values(f.nm).find(x => x.trim()) || '', nm: f.nm, cat: f.cat, hidden: f.hidden, hit: f.hit, new: f.new, b: f.b.filter(k => badges.some(x => x.k === k)), d: f.d, m: f.m,
-      p: f.onRequest ? null : f.p, v: f.v, t: f.t, str: f.cat === 'hookah' ? f.str : null, pair: f.pair,
+      p: f.onRequest ? null : f.p, off: f.off, v: f.v, t: f.t, str: f.cat === 'hookah' ? f.str : null, pair: f.pair,
       img: f.img, media: f.media, cut: f.cut, keepMedia: !!f.media,
     };
     try {
@@ -68,6 +68,7 @@ export default function ItemForm({ item, cats, tastes, badges = [], hitName, new
             {f.v.length === 0 ? (
               <div className="flex flex-wrap items-center gap-4">
                 <input type="number" min="0" disabled={f.onRequest} value={f.p} onChange={e => set({ p: e.target.value })} className={`${input} w-40 disabled:opacity-40`} placeholder="25941" />
+                {!f.onRequest && <Off p={f.p} off={f.off} onChange={off => set({ off })} />}
                 <label className="flex items-center gap-2 text-sm text-white/75"><input type="checkbox" checked={f.onRequest} onChange={e => set({ onRequest: e.target.checked })} /> Цена по запросу</label>
               </div>
             ) : <div className="text-sm text-white/50">Цена задаётся у каждого варианта ниже</div>}
@@ -78,13 +79,14 @@ export default function ItemForm({ item, cats, tastes, badges = [], hitName, new
             {f.v.map((v, i) => (
               <div key={i} className="flex flex-col gap-2 rounded-xl border border-white/10 p-3">
                 <L3 value={v.n} onChange={n => set({ v: f.v.map((x, k) => (k === i ? { ...x, n } : x)) })} placeholder="Вариант" />
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <input type="number" min="0" value={v.p} onChange={e => set({ v: f.v.map((x, k) => (k === i ? { ...x, p: e.target.value } : x)) })} className={`${input} w-40`} placeholder="Цена" />
+                  <Off p={v.p} off={v.off} onChange={off => set({ v: f.v.map((x, k) => (k === i ? { ...x, off } : x)) })} />
                   <button onClick={() => set({ v: f.v.filter((_, k) => k !== i) })} className="ml-auto text-sm text-white/50 hover:text-[#f2a676]">Удалить вариант</button>
                 </div>
               </div>
             ))}
-            <button onClick={() => set({ v: [...f.v, { n: asML(''), p: f.p || '' }] })} className="h-10 self-start rounded-xl border border-dashed border-white/25 px-4 text-sm text-white/75">+ Вариант</button>
+            <button onClick={() => set({ v: [...f.v, { n: asML(''), p: f.p || '', off: '' }] })} className="h-10 self-start rounded-xl border border-dashed border-white/25 px-4 text-sm text-white/75">+ Вариант</button>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -141,5 +143,18 @@ export default function ItemForm({ item, cats, tastes, badges = [], hitName, new
       </div>
     </div>
     </LangProvider>
+  );
+}
+
+// Discount on one price (a dish or one of its variants): the guest sees the old price struck through
+function Off({ p, off, onChange }) {
+  const n = Math.round(Number(off) || 0), full = Number(p) || 0;
+  const pays = n >= 1 && n <= 90 && full ? Math.round(full * (1 - n / 100)) : null;
+  return (
+    <span className="flex items-center gap-2 text-sm text-white/60">
+      <input type="number" min="0" max="90" value={off} onChange={e => onChange(e.target.value)} className="h-10 w-20 rounded-xl border border-white/15 bg-white/5 px-3 text-white outline-none focus:border-[#e8793c]" placeholder="0" aria-label="Скидка, %" />
+      % скидка
+      {pays != null && <span className="text-[#f2a676]">гость платит {pays.toLocaleString('ru-RU')}</span>}
+    </span>
   );
 }

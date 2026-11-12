@@ -440,7 +440,11 @@ export default class DarkskyMenu extends React.Component {
   // taste tags as named in the admin (a tag removed there just disappears from the dishes)
   tastes(it) { const T = this.C.TASTE || D.TASTE; return (it.t || []).filter(k => T[k]).map(k => this.tx(T[k])); }
   // the dish's badges, in the admin's order
-  marks(it) {
+  marks(it) { // the biggest discount (on the dish or one of its variants) first, then the admin's badges
+    const off = Math.max(it.off || 0, ...(it.v || []).map(v => v.off || 0));
+    return (off ? [{ k: 'off', text: `−${off}%`, bg: '#e8793c', color: '#050507' }] : []).concat(this.marksOf(it));
+  }
+  marksOf(it) {
     return (this.C.BADGES || D.BADGES).filter(b => (b.k === 'hit' ? it.hit : b.k === 'new' ? it.new : (it.b || []).includes(b.k))).map(b => ({ k: b.k, text: this.tx(b.n), bg: b.bg, color: b.color }));
   }
   tx(o) { if (o == null) return ''; if (typeof o === 'string') return o; const l = this.state.lang; return o[l] ?? o.en ?? o.es ?? Object.values(o)[0] ?? ''; }
@@ -510,7 +514,7 @@ export default class DarkskyMenu extends React.Component {
     const c = this.count(it.id), d = this.tx(it.d), meta = this.tx(it.m);
     let price = this.fmt(it.p);
     if (it.v) { const ps = it.v.map(v => v.p), mn = Math.min(...ps), mx = Math.max(...ps); price = this.fmt(mn) + (mx > mn ? '+' : ''); }
-    return { ...this.mediaVm(it), id: it.id, name: this.nm(it), desc: d, meta, price, marks: this.marks(it), hit: !!it.hit, isNew: !!it.new,
+    return { ...this.mediaVm(it), id: it.id, name: this.nm(it), desc: d, meta, price, was: !it.v && it.was ? this.fmt(it.was) : '', marks: this.marks(it), hit: !!it.hit, isNew: !!it.new,
       inCart: c > 0, count: c, addBg: c ? '#e8793c' : '#111116', addColor: c ? '#050507' : '#f2f2f4',
       onOpen: () => this.openItem(it.id), onAdd: e => this.quickAdd(it.id, e) };
   }
@@ -548,7 +552,7 @@ export default class DarkskyMenu extends React.Component {
     let sh = null, addLabel = '';
     if (it) {
       const pairs = (it.pair || D.PAIR[it.cat] || []).filter(id => id !== it.id).map(id => this.item(id)).filter(Boolean).map(p => this.miniVm(p));
-      const variants = (it.v || []).map((v, i) => { const on = i === s.vi; return { name: this.tx(v.n), price: this.fmt(v.p), onPick: () => this.setState({ vi: i }), border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' }; });
+      const variants = (it.v || []).map((v, i) => { const on = i === s.vi; return { name: this.tx(v.n), price: this.fmt(v.p), was: v.was ? this.fmt(v.was) : '', off: v.off ? `−${v.off}%` : '', onPick: () => this.setState({ vi: i }), border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' }; });
       const pick = on => ({ border: on ? 'rgba(232,121,60,.8)' : 'rgba(255,255,255,.1)', bg: on ? 'rgba(232,121,60,.1)' : 'rgba(255,255,255,.03)', ring: on ? '#e8793c' : 'rgba(255,255,255,.3)', dot: on ? '#e8793c' : 'transparent' });
       const opts = it.opt ? [null, ...it.opt.o.map((_, i) => i)].map(oi => ({ name: this.tx(oi == null ? it.opt.none : it.opt.o[oi]), price: '', onPick: () => this.setState({ oi }), ...pick(oi === s.oi) })) : [];
       const sib = this.siblings(it), at = sib.findIndex(x => x.id === it.id);
@@ -733,6 +737,7 @@ export default class DarkskyMenu extends React.Component {
                 {h.tags.map(tg => <span key={tg} style={css('font:500 11px/1 Manrope,sans-serif;padding:6px 9px;border-radius:8px;border:1px solid rgba(255,255,255,.12);color:rgba(242,242,244,.75)')}>{tg}</span>)}
               </div>
               <div style={css('display:flex;align-items:center;gap:12px')}>
+                {h.was && <s style={css('font:500 12px/1 Manrope,sans-serif;color:rgba(242,242,244,.45);white-space:nowrap')}>{h.was}</s>}
                 <span style={css('font:600 17px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{h.price}</span>
                 <button onClick={h.onAdd} aria-label="Add" style={css(`width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${h.addBg};color:${h.addColor};font:700 14px/1 Manrope,sans-serif`)}>
                   {h.inCart ? h.count : <Plus />}
@@ -769,6 +774,7 @@ export default class DarkskyMenu extends React.Component {
               {it.meta && <span style={css('font:500 11.5px/1.3 Manrope,sans-serif;letter-spacing:.04em;color:rgba(242,242,244,.5)')}>{it.meta}</span>}
             </div>
             <div style={css('display:flex;align-items:center;gap:12px')}>
+              {it.was && <s style={css('font:500 12px/1 Manrope,sans-serif;color:rgba(242,242,244,.45);white-space:nowrap')}>{it.was}</s>}
               <span style={css('font:600 14.5px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap')}>{it.price}</span>
               <button onClick={it.onAdd} aria-label="Add" style={css(`width:44px;height:44px;flex:none;border-radius:50%;border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;background:${it.addBg};color:${it.addColor};font:700 14px/1 Manrope,sans-serif`)}>
                 {it.inCart ? it.count : <Plus size={15} />}
@@ -956,7 +962,11 @@ export default class DarkskyMenu extends React.Component {
                     <span style={css(`width:18px;height:18px;border-radius:50%;border:1.5px solid ${vr.ring};display:flex;align-items:center;justify-content:center`)}><span style={css(`width:8px;height:8px;border-radius:50%;background:${vr.dot}`)} /></span>
                     <span style={css('font:500 14.5px/1.2 Manrope,sans-serif')}>{vr.name}</span>
                   </span>
-                  <span style={css('font:600 14px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{vr.price}</span>
+                  <span style={css('display:flex;align-items:center;gap:8px')}>
+                    {vr.off && <span style={css('font:700 10.5px/1 Manrope,sans-serif;padding:4px 6px;border-radius:6px;background:#e8793c;color:#050507;white-space:nowrap')}>{vr.off}</span>}
+                    {vr.was && <s style={css('font:500 12px/1 Manrope,sans-serif;color:rgba(242,242,244,.45);white-space:nowrap')}>{vr.was}</s>}
+                    <span style={css('font:600 14px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums')}>{vr.price}</span>
+                  </span>
                 </button>
               ))}
             </div>

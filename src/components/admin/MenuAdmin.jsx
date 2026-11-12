@@ -7,6 +7,9 @@ import CatHeader from './menu/CatHeader';
 import NameDialog from './menu/NameDialog';
 import useTree, { nameOf } from './menu/useTree';
 
+// the biggest discount on the dish or any of its variants (ItemForm → «% скидка»)
+const maxOff = it => Math.max(it.off || 0, ...(it.v || []).map(v => v.off || 0));
+
 function priceLabel(it) {
   if (!it.v) return fmt(it.p);
   const ps = it.v.map(v => v.p).filter(p => p != null);
@@ -171,7 +174,7 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
                       {badges.filter(b => (b.k === 'hit' ? it.hit : b.k === 'new' ? it.new : it.b?.includes(b.k))).map(b => <span key={b.k} style={{ background: b.bg, color: b.color }} className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">{b.name}</span>)}
                       {it.hidden && <span className="rounded border border-[#e8793c]/60 px-1.5 py-0.5 text-[10px] font-bold uppercase text-[#f2a676]">стоп</span>}
                     </div>
-                    <div className="truncate text-xs text-white/50">{priceLabel(it)}{ru(it.d) ? ' · ' + ru(it.d) : ''}</div>
+                    <div className="truncate text-xs text-white/50">{priceLabel(it)}{maxOff(it) > 0 && <span className="text-[#f2a676]"> · −{maxOff(it)}%</span>}{ru(it.d) ? ' · ' + ru(it.d) : ''}</div>
                   </div>
                   <label className="flex flex-none items-center gap-2 text-xs text-white/60">
                     <span className="hidden sm:inline">{it.hidden ? 'Нет в наличии' : 'В наличии'}</span>
