@@ -3,6 +3,7 @@ import { denyUnlessAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { menuChanged } from '@/lib/menu-cache';
 import { cleanItem } from '@/lib/item-schema';
+import { withOff } from '@/lib/discount';
 import { editableCats } from '@/lib/content';
 
 // Full save from the item editor.
@@ -23,7 +24,7 @@ export async function PUT(req, { params }) {
   return NextResponse.json({ ok: true });
 }
 
-// Quick changes from the list: stop-list (hidden), hit, new, category.
+// Quick changes from the list: stop-list (hidden), hit, new, category, discounts.
 export async function PATCH(req, { params }) {
   const deny = await denyUnlessAdmin(); if (deny) return deny;
   const { id } = await params;
@@ -35,6 +36,11 @@ export async function PATCH(req, { params }) {
     if (!(await editableCats()).some(c => c.id === b.cat)) return NextResponse.json({ error: 'Нет такой категории' }, { status: 400 });
     await sql`update menu_items set cat = ${b.cat}, updated_at = now(),
       sort = (select coalesce(max(sort), 0) + 10 from menu_items where cat = ${b.cat}) where id = ${id} and cat <> ${b.cat}`;
+  }
+  // { off: [percent per variant] | percent } — discounts set from the list (menu/DiscountDialog)
+  if ('off' in b) {
+    const [r] = await sql`select data from menu_items where id = ${id}`;
+    if (r) await sql`update menu_items set data = ${sql.json(withOff(r.data, b.off))}, updated_at = now() where id = ${id}`;
   }
   for (const flag of ['hit', 'new']) {
     if (flag in b) {

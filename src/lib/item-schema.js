@@ -1,6 +1,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import * as D from './darksky-data';
+import { priced } from './discount';
 
 const LANGS = D.LANGS.map(l => l.code);
 
@@ -17,14 +18,6 @@ function l3(o, max) {
   if (!vals.length) return undefined;
   return out;
 }
-const price = v => (v === null || v === '' || v === undefined ? null : Math.max(0, Math.round(Number(v)) || 0));
-// { p: full price, off: % } → { p: what the guest pays, was: full price, off } — orders and staff read p as before
-function priced(full, rawOff) {
-  const p = price(full), off = Math.round(Number(rawOff) || 0);
-  if (p == null || !(off >= 1 && off <= 90)) return { p };
-  return { p: Math.round(p * (1 - off / 100)), was: p, off };
-}
-
 // cats: the dish categories as they stand (editableCats() in content.js)
 export function cleanItem(b, cats, existing) {
   const name = str(b.name, 80);

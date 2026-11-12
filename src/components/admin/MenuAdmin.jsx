@@ -5,10 +5,9 @@ import { useRouter } from 'next/navigation';
 import { api, ru, fmt, thumb } from './api';
 import CatHeader from './menu/CatHeader';
 import NameDialog from './menu/NameDialog';
+import DiscountDialog from './menu/DiscountDialog';
+import { maxOff, withOff } from '@/lib/discount';
 import useTree, { nameOf } from './menu/useTree';
-
-// the biggest discount on the dish or any of its variants (ItemForm → «% скидка»)
-const maxOff = it => Math.max(it.off || 0, ...(it.v || []).map(v => v.off || 0));
 
 function priceLabel(it) {
   if (!it.v) return fmt(it.p);
@@ -33,6 +32,7 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
   const [q, setQ] = useState(''), [onlyStop, setOnlyStop] = useState(false), [err, setErr] = useState('');
   const T = useTree(tree, () => router.refresh(), setErr), [dialog, setDialog] = useState(null);
   const ask = (title, value, save) => setDialog({ title, value, onSave: save });
+  const [sale, setSale] = useState(null); // the dish whose discounts are open (menu/DiscountDialog)
   const countOf = cid => items.filter(x => x.cat === cid).length;
   // ⇄ on a dish: any other subcategory, grouped by category (hookah's own list stays apart)
   const moveTo = (it, cid) => cid === 'hookah' ? null : (
@@ -55,6 +55,12 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
     setItems(xs => xs.map(x => (x.id === id ? { ...x, ...change } : x)));
     try { await api(`/api/admin/items/${id}`, 'PATCH', change); router.refresh(); }
     catch (e) { setErr(e.message); setItems(initial); }
+  }
+  async function saveOff(it, off) {
+    setErr('');
+    try { await api(`/api/admin/items/${it.id}`, 'PATCH', { off }); } catch (e) { setErr(e.message); return false; }
+    setItems(xs => xs.map(x => (x.id === it.id ? withOff(x, off) : x)));
+    router.refresh();
   }
   // MARK: - Drag to reorder (mouse or finger) by the ⋮⋮ handle; saved when the dish is let go.
   // The dragged row follows the pointer; the others glide out of its way (FLIP: the layout jumps, a transform
@@ -174,12 +180,14 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
                       {badges.filter(b => (b.k === 'hit' ? it.hit : b.k === 'new' ? it.new : it.b?.includes(b.k))).map(b => <span key={b.k} style={{ background: b.bg, color: b.color }} className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">{b.name}</span>)}
                       {it.hidden && <span className="rounded border border-[#e8793c]/60 px-1.5 py-0.5 text-[10px] font-bold uppercase text-[#f2a676]">стоп</span>}
                     </div>
-                    <div className="truncate text-xs text-white/50">{priceLabel(it)}{maxOff(it) > 0 && <span className="text-[#f2a676]"> · −{maxOff(it)}%</span>}{ru(it.d) ? ' · ' + ru(it.d) : ''}</div>
+                    <div className="truncate text-xs text-white/50">{priceLabel(it)}{ru(it.d) ? ' · ' + ru(it.d) : ''}</div>
                   </div>
                   <label className="flex flex-none items-center gap-2 text-xs text-white/60">
                     <span className="hidden sm:inline">{it.hidden ? 'Нет в наличии' : 'В наличии'}</span>
                     <Switch on={!it.hidden} onChange={on => patch(it.id, { hidden: !on })} label="В наличии" />
                   </label>
+                  <button type="button" onClick={() => setSale(it)} aria-label="Скидка" title="Скидка"
+                    className={`h-9 flex-none rounded-lg border px-2.5 text-xs font-bold ${maxOff(it) ? 'border-[#e8793c] bg-[#e8793c] text-[#050507]' : 'border-white/15 text-white/70 hover:text-white'}`}>{maxOff(it) ? `−${maxOff(it)}%` : '%'}</button>
                   {moveTo(it, cid)}
                   <Link href={`/admin/items/${it.id}`} className="hidden flex-none rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/75 hover:text-white sm:block">Изменить</Link>
                 </li>
@@ -195,6 +203,7 @@ export default function MenuAdmin({ items: initial, tree, badges = [] }) {
       })}
       {!filtered && <button onClick={() => ask('Новая категория', null, n => T.addSection(n))} className="h-12 rounded-2xl border border-dashed border-white/25 text-sm text-white/75 hover:bg-white/5">+ Категория</button>}
       {dialog && <NameDialog {...dialog} onClose={() => setDialog(null)} />}
+      {sale && <DiscountDialog item={sale} onSave={off => saveOff(sale, off)} onClose={() => setSale(null)} />}
       {!visible.length && <div className="py-16 text-center text-white/50">Ничего не найдено</div>}
     </div>
   );
